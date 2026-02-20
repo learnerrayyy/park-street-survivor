@@ -79,7 +79,7 @@ function drawWarningIcon(x, y, size) {
     let breathe = 0.85 + sin(frameCount * 0.08) * 0.15;
     let renderH = size * breathe;
     let renderW = (size * aspectRatio) * breathe;
-    
+
     push();
     imageMode(CENTER);
     image(assets.warningImg, x, y, renderW, renderH);
@@ -568,8 +568,7 @@ function keyPressed() {
                     if (storyScrollOffset >= maxScroll) {
                         // Auto-advance to next day
                         let nextDay = storyRecapDay + 1;
-                        let isNextUnlocked = (nextDay <= currentUnlockedDay) || (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-                        if (nextDay <= 5 && isNextUnlocked) {
+                        if (nextDay <= 5) {
                             storyRecapDay = nextDay;
                             storyScrollOffset = 0;
                         }
@@ -796,12 +795,9 @@ function mousePressed() {
                 if (mouseX > sidebarAnchorX - 120 && mouseX < sidebarAnchorX + 120 &&
                     mouseY > cardY - 40           && mouseY < cardY + 40) {
                     let day        = i + 1;
-                    let isUnlocked = (day <= currentUnlockedDay) || DEBUG_UNLOCK_ALL;
-                    if (isUnlocked) {
                         storyRecapDay     = day;
                         storyScrollOffset = 0;
                         if (typeof playSFX === 'function') playSFX(sfxSelect);
-                    }
                     return;
                 }
             }
@@ -819,8 +815,7 @@ function mousePressed() {
             }
             if (dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35) {
                 let nextDay        = storyRecapDay + 1;
-                let isNextUnlocked = (nextDay <= currentUnlockedDay) || DEBUG_UNLOCK_ALL;
-                if (nextDay <= 5 && isNextUnlocked) {
+                if (nextDay <= 5) {
                     storyRecapDay     = nextDay;
                     storyScrollOffset = 0;
                     if (typeof playSFX === 'function') playSFX(sfxSelect);
@@ -902,32 +897,10 @@ function mouseWheel(event) {
         let maxScroll = max(0, recap.lines.length - 10);
         if (event.delta > 0) {
             // Scroll down
-            if (storyScrollOffset >= maxScroll) {
-                // Auto-advance to next day
-                let nextDay = storyRecapDay + 1;
-                let isNextUnlocked = (nextDay <= currentUnlockedDay) || (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-                if (nextDay <= 5 && isNextUnlocked) {
-                    storyRecapDay = nextDay;
-                    storyScrollOffset = 0;
-                    playSFX(sfxSelect);
-                }
-            } else {
-                storyScrollOffset = min(maxScroll, storyScrollOffset + 2);
-            }
+            storyScrollOffset = min(maxScroll, storyScrollOffset + 2);
         } else {
             // Scroll up
-            if (storyScrollOffset <= 0) {
-                // Auto-retreat to previous day
-                let prevDay = storyRecapDay - 1;
-                if (prevDay >= 1) {
-                    let prevRecap = STORY_RECAPS[prevDay];
-                    storyRecapDay = prevDay;
-                    storyScrollOffset = max(0, prevRecap.lines.length - 10);
-                    playSFX(sfxSelect);
-                }
-            } else {
-                storyScrollOffset = max(0, storyScrollOffset - 2);
-            }
+            storyScrollOffset = max(0, storyScrollOffset - 2);
         }
         return false; // prevent page scroll
     }
@@ -1356,7 +1329,7 @@ function renderPauseOverlay() {
  */
 function renderStoryRecap() {
     let dayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
-    let isUnlocked = (storyRecapDay <= currentUnlockedDay) ||
+    let isUnlocked = (storyRecapDay < currentUnlockedDay) ||
                      (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
     let recap = STORY_RECAPS[storyRecapDay];
 
@@ -1416,19 +1389,10 @@ function renderStoryRecap() {
     if (assets.storyShape) {
         push();
         imageMode(CENTER);
-        if (!isUnlocked) {
-            drawingContext.filter = 'grayscale(100%) brightness(0.6)';
-        } else {
-            drawingContext.shadowBlur  = 30;
-            drawingContext.shadowColor = 'rgba(255, 105, 180, 0.5)';
-        }
-        tint(255, storyDebugData.shape.alpha);
         image(assets.storyShape,
               storyDebugData.shape.x, storyDebugData.shape.y,
               storyDebugData.shape.w, storyDebugData.shape.h);
-        drawingContext.shadowBlur = 0;
         drawingContext.filter = 'none';
-        noTint();
         pop();
     }
 
@@ -1484,15 +1448,26 @@ function renderStoryRecap() {
             rect(textX - barW / 2, textY + textH / 2 + 18,
                  map(storyScrollOffset, 0, maxScroll, 20, barW), barH, 3);
         }
-    } else if (!isUnlocked) {
+    } else {
         push();
-        textFont(fonts.title); textSize(28); textAlign(CENTER, CENTER);
-        let pulse = sin(frameCount * 0.08) * 40 + 120;
-        stroke(0, 0, 0, 150); strokeWeight(4);
-        fill(pulse, pulse * 0.6, pulse * 0.6);
-        text("REACH DAY " + storyRecapDay + " TO UNLOCK", textX, textY);
-        noStroke(); fill(pulse, pulse * 0.6, pulse * 0.6);
-        text("REACH DAY " + storyRecapDay + " TO UNLOCK", textX, textY);
+
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title);
+
+        textSize(45);
+        stroke(0, 0, 0, 180);
+        strokeWeight(6);
+        fill(255, 215, 0);
+        text("LOCKED", textX, textY);
+
+        noStroke();
+        fill(255, 215, 0);
+        text("LOCKED", textX, textY);
+
+        textFont(fonts.body);
+        textSize(20);
+        fill(200);
+        text("COMPLETE TODAY TO REVEAL", textX, textY + 40);
         pop();
     }
 
@@ -1550,10 +1525,9 @@ function renderStoryRecap() {
 
         // Down arrow (next day)
         let nextDay   = storyRecapDay + 1;
-        let canGoDown = nextDay <= 5 &&
-                        ((nextDay <= currentUnlockedDay) ||
-                         (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL));
+        let canGoDown = nextDay <= 5;
         let downHover = canGoDown && dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35;
+
         push();
         translate(arrowX, centerY + arrowGap);
         rotate(-HALF_PI);
