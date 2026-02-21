@@ -22,6 +22,12 @@ class MainMenu {
         this.difficultyIndex = gameDifficulty;  // 0=EASY, 1=NORMAL, 2=HARD
         this.diffToastText   = "";
         this.diffToastTimer  = 0;
+
+        // Mute state tracking for settings menu
+        this.isBGMMuted = false;
+        this.isSFXMuted = false;
+        this.preMuteBGMVolume = masterVolumeBGM;
+        this.preMuteSFXVolume = masterVolumeSFX;
     }
 
     /**
@@ -62,8 +68,7 @@ class MainMenu {
         if (this.menuState === STATE_LEVEL_SELECT) {
             // Level select uses its own background drawn by TimeWheel
         } else if (this.menuState === STATE_SETTINGS || this.menuState === STATE_HELP) {
-            if (assets && assets.otherBg) image(assets.otherBg, 0, 0, width, height);
-            else background(20);
+            // Background drawn inside each sub-screen via drawOtherBgWithOverlay()
         } else {
             if (assets.menuBg) image(assets.menuBg, 0, 0, width, height);
             else background(20);
@@ -125,19 +130,7 @@ class MainMenu {
      * Renders the settings screen with BGM and SFX volume sliders.
      */
     drawSettingsScreen() {
-        if (assets.otherBg) {
-            imageMode(CENTER);
-            let scale = max(width / assets.otherBg.width, height / assets.otherBg.height);
-            image(assets.otherBg, width / 2, height / 2, assets.otherBg.width * scale, assets.otherBg.height * scale);
-        } else {
-            background(20);
-        }
-        // Dark overlay so text is readable
-        noStroke();
-        fill(0, 0, 0, 100);
-        rectMode(CORNER);
-        rect(0, 0, width, height);
-        imageMode(CORNER);
+        drawOtherBgWithOverlay();
 
         push();
         textAlign(CENTER, CENTER);
@@ -154,6 +147,34 @@ class MainMenu {
         // ── Volume sliders (shifted up) ─────────────────────────────────────
         this.bgmSlider.display();
         this.sfxSlider.display();
+
+        // Mute toggle icons with hover zoom effect
+        let iconSz = 45;
+        let iconXOffset = 240;
+        let iconHitR = 28;
+
+        // BGM mute toggle icon
+        let bgmIconX = this.bgmSlider.x + iconXOffset;
+        let bgmIconY = this.bgmSlider.y;
+        let bgmHover = dist(mouseX, mouseY, bgmIconX, bgmIconY) < iconHitR;
+        push();
+        translate(bgmIconX, bgmIconY);
+        if (bgmHover) scale(1.3);
+        let bgmIcon = this.isBGMMuted ? assets.musicOff : assets.musicOn;
+        if (bgmIcon) { imageMode(CENTER); image(bgmIcon, 0, 0, iconSz, iconSz); }
+        pop();
+
+        // SFX mute toggle icon
+        let sfxIconX = this.sfxSlider.x + iconXOffset;
+        let sfxIconY = this.sfxSlider.y;
+        let sfxHover = dist(mouseX, mouseY, sfxIconX, sfxIconY) < iconHitR;
+        push();
+        translate(sfxIconX, sfxIconY);
+        if (sfxHover) scale(1.3);
+        let sfxIcon = this.isSFXMuted ? assets.musicOff : assets.musicOn;
+        if (sfxIcon) { imageMode(CENTER); image(sfxIcon, 0, 0, iconSz, iconSz); }
+        pop();
+
         masterVolumeBGM = this.bgmSlider.value;
         masterVolumeSFX = this.sfxSlider.value;
         if (bgm) bgm.setVolume(masterVolumeBGM);
@@ -264,23 +285,7 @@ class MainMenu {
      */
     drawHelpScreen() {
         push();
-
-        // Background
-        if (assets.otherBg) {
-            imageMode(CENTER);
-            let scale = max(width / assets.otherBg.width, height / assets.otherBg.height);
-            image(assets.otherBg, width / 2, height / 2, assets.otherBg.width * scale, assets.otherBg.height * scale);
-        } else {
-            background(20);
-        }
-        imageMode(CORNER);
-
-        // Dark overlay so text is readable
-        noStroke();
-        fill(0, 0, 0, 100);
-        rectMode(CORNER);
-        rect(0, 0, width, height);
-        imageMode(CORNER);
+        drawOtherBgWithOverlay();
 
         // Header
         textAlign(CENTER, CENTER);
@@ -482,7 +487,7 @@ class MainMenu {
     /**
      * Routes keyboard input to the correct sub-system based on the active menu state.
      */
-    handleKeyPress(key, keyCode) {
+    handleKeyPress(_key, keyCode) {
         if (globalFade.isFading) return;
 
         if (this.menuState === STATE_HELP) {
@@ -524,7 +529,18 @@ class MainMenu {
 
             if (keyCode === ENTER || keyCode === 13) {
                 let selectedDay = this.timeWheel.selectedDay;
+                // Day 1 first press: unlock visually, don't enter yet
+                if (selectedDay === 1 &&
+                    typeof tutorialHints !== 'undefined' &&
+                    !tutorialHints.day1VisuallyUnlocked) {
+                    tutorialHints.day1VisuallyUnlocked = true;
+                    playSFX(sfxClick);
+                    return;
+                }
                 if (DEBUG_UNLOCK_ALL || selectedDay <= currentUnlockedDay) {
+                    if (typeof tutorialHints !== 'undefined') {
+                        tutorialHints.levelSelectShownForDay = selectedDay;
+                    }
                     playSFX(sfxClick);
                     triggerTransition(() => { setupRun(selectedDay); });
                 }
@@ -559,15 +575,60 @@ class MainMenu {
                 this.bgmSlider.handlePress(mx, my);
                 this.sfxSlider.handlePress(mx, my);
                 this.handleDifficultyClick(mx, my);
+
+                let iconXOffset = 240;
+                let hitR = 25;
+
+                // Check BGM mute toggle click
+                if (dist(mx, my, this.bgmSlider.x + iconXOffset, this.bgmSlider.y) < hitR) {
+                    this.toggleBGMMute();
+                }
+                // Check SFX mute toggle click
+                if (dist(mx, my, this.sfxSlider.x + iconXOffset, this.sfxSlider.y) < hitR) {
+                    this.toggleSFXMute();
+                }
             }
-            // Level select: click on cloud to start the selected day
+            // Level select: click on cloud to start the selected day, or arrows to change day
             if (this.menuState === STATE_LEVEL_SELECT) {
+                // Right-side up/down arrows
+                let arrowX  = width - 90;
+                let centerY = height / 2;
+                let arrowGap = 90;
+                if (!this.timeWheel.isEntering) {
+                    if (this.timeWheel.selectedDay > 1 &&
+                        dist(mx, my, arrowX, centerY - arrowGap) < 35) {
+                        this.timeWheel.selectedDay--;
+                        this.timeWheel.targetIndex--;
+                        playSFX(sfxSelect);
+                        return;
+                    }
+                    if (this.timeWheel.selectedDay < 5 &&
+                        dist(mx, my, arrowX, centerY + arrowGap) < 35) {
+                        this.timeWheel.selectedDay++;
+                        this.timeWheel.targetIndex++;
+                        playSFX(sfxSelect);
+                        return;
+                    }
+                }
+                // Cloud click to start (or to visually unlock Day 1 on first click)
                 let cloudX = width * 0.65, cloudY = height * 0.5;
                 let cloudW = 700, cloudH = 450;
                 if (mx > cloudX - cloudW / 2 && mx < cloudX + cloudW / 2 &&
                     my > cloudY - cloudH / 2 && my < cloudY + cloudH / 2) {
                     let selectedDay = this.timeWheel.selectedDay;
+                    // Day 1 first click: unlock visually, don't enter the game yet
+                    if (selectedDay === 1 &&
+                        typeof tutorialHints !== 'undefined' &&
+                        !tutorialHints.day1VisuallyUnlocked) {
+                        tutorialHints.day1VisuallyUnlocked = true;
+                        playSFX(sfxClick);
+                        return;
+                    }
+                    // Normal entry (Day 1 already unlocked, or Days 2-5)
                     if (DEBUG_UNLOCK_ALL || selectedDay <= currentUnlockedDay) {
+                        if (typeof tutorialHints !== 'undefined') {
+                            tutorialHints.levelSelectShownForDay = selectedDay;
+                        }
                         playSFX(sfxClick);
                         triggerTransition(() => { setupRun(selectedDay); });
                     }
@@ -653,5 +714,33 @@ class MainMenu {
                 this.helpPage          = 0;
             });
         }
+    }
+
+    /**
+     * Toggles the BGM mute state and updates the slider value accordingly.
+     */
+    toggleBGMMute() {
+        this.isBGMMuted = !this.isBGMMuted;
+        if (this.isBGMMuted) {
+            this.preMuteBGMVolume = this.bgmSlider.value;
+            this.bgmSlider.value = 0;
+        } else {
+            this.bgmSlider.value = this.preMuteBGMVolume || 0.25;
+        }
+        playSFX(sfxClick);
+    }
+
+    /**
+     * Toggles the SFX mute state and updates the slider value accordingly.
+     */
+    toggleSFXMute() {
+        this.isSFXMuted = !this.isSFXMuted;
+        if (this.isSFXMuted) {
+            this.preMuteSFXVolume = this.sfxSlider.value;
+            this.sfxSlider.value = 0;
+        } else {
+            this.sfxSlider.value = this.preMuteSFXVolume || 0.7;
+        }
+        playSFX(sfxClick);
     }
 }

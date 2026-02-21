@@ -14,6 +14,7 @@ let currentDayID = 1;
 let assets = {
     menuBg: null,
     otherBg: null,
+    warningImg: null,
     keys: {},
     selectClouds: [],
     selectBg: {
@@ -39,6 +40,51 @@ let masterVolumeSFX = 0.7;
 // 0 = EASY (locked), 1 = NORMAL (default), 2 = HARD (locked)
 let gameDifficulty = 1;
 const DIFFICULTY_LABELS = ["EASY", "NORMAL", "HARD"];
+
+// ─── GLOBAL BACKGROUND WITH OVERLAY ──────────────────────────────────────────
+/**
+ * Draws the standard otherBg background with a unified dark overlay.
+ * Used in settings, help, pause, and story screens for consistent look.
+ */
+function drawOtherBgWithOverlay() {
+    push();
+    if (assets && assets.otherBg) {
+        imageMode(CORNER);
+        image(assets.otherBg, 0, 0, width, height);
+    } else {
+        background(20);
+    }
+    noStroke();
+    fill(0, 0, 0, 120);
+    rectMode(CORNER);
+    rect(0, 0, width, height);
+    imageMode(CORNER);
+    pop();
+}
+
+// ─── TUTORIAL WARNING ICON ────────────────────────────────────────────────────
+/**
+ * Draws a pulsing warning icon at (x, y) with a breathing scale animation.
+ * @param {number} x      Center X
+ * @param {number} y      Center Y
+ * @param {number} size   Base diameter in pixels
+ */
+function drawWarningIcon(x, y, size) {
+    if (!assets.warningImg) return;
+
+    let originalW = assets.warningImg.width;
+    let originalH = assets.warningImg.height;
+    let aspectRatio = originalW / originalH;
+
+    let breathe = 0.85 + sin(frameCount * 0.08) * 0.15;
+    let renderH = size * breathe;
+    let renderW = (size * aspectRatio) * breathe;
+
+    push();
+    imageMode(CENTER);
+    image(assets.warningImg, x, y, renderW, renderH);
+    pop();
+}
 
 // ─── GLOBAL FADE TRANSITION CONTROLLER ───────────────────────────────────────
 // Drives a 0.3s fade-in / fade-out overlay across all scene transitions.
@@ -75,6 +121,22 @@ let showStoryRecap = false;
 let storyRecapDay = 1;
 let storyScrollOffset = 0;  // scroll offset within current day's text
 
+// ─── TUTORIAL HINT SYSTEM ─────────────────────────────────────────────────────
+/**
+ * Tracks which tutorial hints are active.
+ *   day1VisuallyUnlocked   — false until the player clicks Day 1's cloud for the first time;
+ *                            on that click the background turns color and the warning disappears,
+ *                            but the game does NOT start yet (a second click is required).
+ *   levelSelectShownForDay — last day whose cloud was clicked to ENTER the game;
+ *                            hint icon shows on days above this value.
+ *   roomPhase              — 'DESK' | 'CLOSE_BP' | 'DOOR' | 'DONE'
+ */
+let tutorialHints = {
+    day1VisuallyUnlocked: false,
+    levelSelectShownForDay: 0,
+    roomPhase: 'DESK'
+};
+
 // ─── SPLASH LOGO ANIMATION STATE ─────────────────────────────────────────────
 let titleDrop = { y: -200, vy: 0, landed: false, shake: 0 };
 
@@ -102,7 +164,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 36;
+const totalAssetsToLoad = 37;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -215,6 +277,11 @@ function preload() {
             }
         });
     });
+
+    // Sound effects & Background music mute buttons
+    assets.musicOn    = loadImage('assets/buttons/music_on.png', itemLoaded);
+    assets.musicOff   = loadImage('assets/buttons/music_off.png', itemLoaded);
+    assets.warningImg = loadImage('assets/buttons/warning.png', itemLoaded);
 }
 
 
@@ -284,6 +351,18 @@ function draw() {
 
             case STATE_INVENTORY:
                 if (backpackUI) backpackUI.display();
+                // Tutorial: show close-backpack hint when required items are packed
+                if (tutorialHints.roomPhase === 'CLOSE_BP' && backpackUI && backpackUI.hasRequiredItems()) {
+                    drawWarningIcon(width / 2, height - 75, 48);
+                    push();
+                    textFont(fonts.body);
+                    textSize(20);
+                    textAlign(CENTER, CENTER);
+                    fill(255, 215, 0, 200 + sin(frameCount * 0.1) * 55);
+                    noStroke();
+                    text("PACK COMPLETE! PRESS ESC TO CLOSE BACKPACK", width / 2, height - 45);
+                    pop();
+                }
                 break;
 
             case STATE_DAY_RUN:
@@ -437,6 +516,40 @@ function keyPressed() {
     // Pause menu navigation
     if (state === STATE_PAUSED) {
         if (showStoryRecap) {
+            // ── Dev adjust mode: intercept arrow keys for layer positioning ──
+            if (showStoryDebugControls) {
+                // Layer selection: 1=shape, 2=cloud, 3=content, 4=title
+                if (key === '1') { storyDebugActiveLayer = 1; return; }
+                if (key === '2') { storyDebugActiveLayer = 2; return; }
+                if (key === '3') { storyDebugActiveLayer = 3; return; }
+                if (key === '4') { storyDebugActiveLayer = 4; return; }
+                if (key === 'p' || key === 'P') { printStoryDebugData(); return; }
+
+                let layerKey = storyDebugActiveLayer === 1 ? 'shape'
+                             : storyDebugActiveLayer === 2 ? 'cloud'
+                             : storyDebugActiveLayer === 3 ? 'textArea'
+                             : 'titleArea';
+                let target = storyDebugData[layerKey];
+                let resize = keyIsDown(SHIFT);
+
+                if (keyCode === UP_ARROW) {
+                    resize ? target.h -= 5 : target.y -= 5;
+                    printStoryDebugData(); return;
+                }
+                if (keyCode === DOWN_ARROW) {
+                    resize ? target.h += 5 : target.y += 5;
+                    printStoryDebugData(); return;
+                }
+                if (keyCode === LEFT_ARROW) {
+                    resize ? target.w -= 5 : target.x -= 5;
+                    printStoryDebugData(); return;
+                }
+                if (keyCode === RIGHT_ARROW) {
+                    resize ? target.w += 5 : target.x += 5;
+                    printStoryDebugData(); return;
+                }
+            }
+
             // Story recap: UP/DOWN or W/S scroll content within the day
             if (keyCode === UP_ARROW || keyCode === 87) {
                 if (storyScrollOffset <= 0 && storyRecapDay > 1) {
@@ -455,8 +568,7 @@ function keyPressed() {
                     if (storyScrollOffset >= maxScroll) {
                         // Auto-advance to next day
                         let nextDay = storyRecapDay + 1;
-                        let isNextUnlocked = (nextDay <= currentUnlockedDay) || (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-                        if (nextDay <= 5 && isNextUnlocked) {
+                        if (nextDay <= 5) {
                             storyRecapDay = nextDay;
                             storyScrollOffset = 0;
                         }
@@ -545,8 +657,11 @@ function keyPressed() {
         if (endScreenManager) endScreenManager.handleKeyPress(keyCode);
     }
 
-    // Close inventory with ESC
+    // Close inventory with ESC — advance tutorial hint from CLOSE_BP
     if (gameState.currentState === STATE_INVENTORY && keyCode === ESCAPE) {
+        if (tutorialHints.roomPhase === 'CLOSE_BP') {
+            tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
+        }
         gameState.currentState = STATE_ROOM;
         return false;
     }
@@ -594,6 +709,14 @@ function handlePauseSelection() {
                 setupRun(currentDayID);
             });
         }
+    } else if (selected === "EXIT") {
+        triggerTransition(() => {
+            gameState.setState(STATE_MENU);
+            mainMenu.menuState = STATE_MENU;
+            pauseFromState     = null;
+            showRestartChoice  = false;
+            showStoryRecap     = false;
+        });
     }
 }
 
@@ -662,7 +785,44 @@ function mousePressed() {
                 if (typeof playSFX === 'function') playSFX(sfxClick);
                 handleRestartChoice();
             }
-        } else if (!showStoryRecap) {
+        } else if (showStoryRecap) {
+            // Story recap: day sidebar clicks (anchor matches render at width * 0.16)
+            let sidebarAnchorX = width * 0.16;
+            let sidebarBaseY   = height * 0.45;
+            for (let i = 0; i < 5; i++) {
+                let diff  = i - (storyRecapDay - 1);
+                let cardY = sidebarBaseY + diff * 130;
+                if (mouseX > sidebarAnchorX - 120 && mouseX < sidebarAnchorX + 120 &&
+                    mouseY > cardY - 40           && mouseY < cardY + 40) {
+                    let day        = i + 1;
+                        storyRecapDay     = day;
+                        storyScrollOffset = 0;
+                        if (typeof playSFX === 'function') playSFX(sfxSelect);
+                    return;
+                }
+            }
+            // Story recap: up/down arrow clicks — same coords as render (arrowX=width-90, gap=90)
+            let arrowX  = width - 90;
+            let centerY = height / 2;
+            let arrowGap = 90;
+            if (dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35) {
+                if (storyRecapDay > 1) {
+                    storyRecapDay--;
+                    storyScrollOffset = 0;
+                    if (typeof playSFX === 'function') playSFX(sfxSelect);
+                }
+                return;
+            }
+            if (dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35) {
+                let nextDay        = storyRecapDay + 1;
+                if (nextDay <= 5) {
+                    storyRecapDay     = nextDay;
+                    storyScrollOffset = 0;
+                    if (typeof playSFX === 'function') playSFX(sfxSelect);
+                }
+                return;
+            }
+        } else {
             if (pauseIndex >= 0) {
                 if (typeof playSFX === 'function') playSFX(sfxClick);
                 handlePauseSelection();
@@ -674,96 +834,6 @@ function mousePressed() {
     if (state === STATE_MENU || state === STATE_LEVEL_SELECT ||
         state === STATE_SETTINGS || state === STATE_HELP) {
         if (mainMenu) mainMenu.handleClick(mouseX, mouseY);
-    } else if (state === STATE_PAUSED) {
-        if (showStoryRecap) {
-            // Story recap clicks
-            // Back arrow → close story recap
-            if (dist(mouseX, mouseY, 70, 65) < 40) {
-                playSFX(sfxClick);
-                showStoryRecap = false;
-                return;
-            }
-            // Day sidebar click (left side, skewed cards)
-            let sidebarAnchorX = width * 0.12;
-            let sidebarBaseY = height * 0.45;
-            for (let i = 0; i < 5; i++) {
-                let diff = i - (storyRecapDay - 1);
-                let cardY = sidebarBaseY + diff * 130;
-                if (mouseX > sidebarAnchorX - 120 && mouseX < sidebarAnchorX + 120 &&
-                    mouseY > cardY - 40 && mouseY < cardY + 40) {
-                    let day = i + 1;
-                    let isUnlocked = (day <= currentUnlockedDay) || (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-                    if (isUnlocked) {
-                        storyRecapDay = day;
-                        storyScrollOffset = 0;
-                        playSFX(sfxSelect);
-                    }
-                    return;
-                }
-            }
-            // Up/Down arrow click (right side) — change days
-            let arrowX = width - 100;
-            if (dist(mouseX, mouseY, arrowX, height / 2 - 80) < 35) {
-                if (storyRecapDay > 1) {
-                    storyRecapDay--;
-                    storyScrollOffset = 0;
-                    playSFX(sfxSelect);
-                }
-                return;
-            }
-            if (dist(mouseX, mouseY, arrowX, height / 2 + 80) < 35) {
-                let nextDay = storyRecapDay + 1;
-                let isNextUnlocked = (nextDay <= currentUnlockedDay) || (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-                if (nextDay <= 5 && isNextUnlocked) {
-                    storyRecapDay = nextDay;
-                    storyScrollOffset = 0;
-                    playSFX(sfxSelect);
-                }
-                return;
-            }
-        } else if (showRestartChoice) {
-            // Restart sub-menu click (larger hit area)
-            let optW = 280, optH = 80;
-            for (let i = 0; i < RESTART_OPTIONS.length; i++) {
-                let ox = width / 2;
-                let oy = height / 2 + 20 + i * 80;
-                if (mouseX > ox - optW / 2 && mouseX < ox + optW / 2 &&
-                    mouseY > oy - optH / 2 && mouseY < oy + optH / 2) {
-                    restartChoiceIndex = i;
-                    playSFX(sfxClick);
-                    handleRestartChoice();
-                    return;
-                }
-            }
-            // Back arrow click in restart submenu
-            if (dist(mouseX, mouseY, 70, 65) < 40) {
-                playSFX(sfxClick);
-                showRestartChoice = false;
-                return;
-            }
-        } else {
-            // Back arrow click → resume (replaces RESUME button)
-            if (dist(mouseX, mouseY, 70, 65) < 40) {
-                playSFX(sfxClick);
-                togglePause();
-                pauseFromState = null;
-                return;
-            }
-            // Pause menu option click (larger hit area)
-            let options = getPauseOptions();
-            let optW = 280, optH = 80;
-            for (let i = 0; i < options.length; i++) {
-                let ox = width / 2;
-                let oy = height / 2 + 20 + i * 80;
-                if (mouseX > ox - optW / 2 && mouseX < ox + optW / 2 &&
-                    mouseY > oy - optH / 2 && mouseY < oy + optH / 2) {
-                    pauseIndex = i;
-                    playSFX(sfxClick);
-                    handlePauseSelection();
-                    return;
-                }
-            }
-        }
     } else if (state === STATE_ROOM) {
         // Room back arrow click
         if (roomScene && roomScene.backButton.checkMouse(mouseX, mouseY)) {
@@ -827,32 +897,10 @@ function mouseWheel(event) {
         let maxScroll = max(0, recap.lines.length - 10);
         if (event.delta > 0) {
             // Scroll down
-            if (storyScrollOffset >= maxScroll) {
-                // Auto-advance to next day
-                let nextDay = storyRecapDay + 1;
-                let isNextUnlocked = (nextDay <= currentUnlockedDay) || (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-                if (nextDay <= 5 && isNextUnlocked) {
-                    storyRecapDay = nextDay;
-                    storyScrollOffset = 0;
-                    playSFX(sfxSelect);
-                }
-            } else {
-                storyScrollOffset = min(maxScroll, storyScrollOffset + 2);
-            }
+            storyScrollOffset = min(maxScroll, storyScrollOffset + 2);
         } else {
             // Scroll up
-            if (storyScrollOffset <= 0) {
-                // Auto-retreat to previous day
-                let prevDay = storyRecapDay - 1;
-                if (prevDay >= 1) {
-                    let prevRecap = STORY_RECAPS[prevDay];
-                    storyRecapDay = prevDay;
-                    storyScrollOffset = max(0, prevRecap.lines.length - 10);
-                    playSFX(sfxSelect);
-                }
-            } else {
-                storyScrollOffset = max(0, storyScrollOffset - 2);
-            }
+            storyScrollOffset = max(0, storyScrollOffset - 2);
         }
         return false; // prevent page scroll
     }
@@ -891,6 +939,7 @@ function setupRun(dayID) {
     roomScene.reset();
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
+    tutorialHints.roomPhase = 'DESK';
     gameState.setState(STATE_ROOM);
 }
 
@@ -1162,16 +1211,7 @@ function drawPauseButton() {
  */
 function renderPauseOverlay() {
     push();
-    if (assets.otherBg) {
-        imageMode(CORNER);
-        image(assets.otherBg, 0, 0, width, height);
-        noStroke();
-        fill(0, 0, 0, 160);
-        rect(0, 0, width, height);
-    } else {
-        fill(0, 0, 0, 200);
-        rect(0, 0, width, height);
-    }
+    drawOtherBgWithOverlay();
 
     // Back arrow (top-left) — replaces RESUME, click to go back
     if (assets.backImg) {
@@ -1277,207 +1317,281 @@ function renderPauseOverlay() {
 
 /**
  * Renders the story recap sub-page inside the pause overlay.
- * Layout: left sidebar (Day 1-5 tabs), center (story text), right (up/down arrows).
+ *
+ * Layer order (bottom → top):
+ *   L1  other_bg + overlay      — drawn by renderPauseOverlay() before this call
+ *   L2a Left sidebar (day cards)
+ *   L2b frame_shape.png         — full-canvas decorative background panel
+ *   L3  Story CONTENT text      — clipped to textArea, sandwiched before cloud
+ *   L4  frame_cloud.png         — full-canvas decorative overlay (covers content edges)
+ *   L5  Title text              — always on top of everything
+ *   L5  Up/Down arrows          — always on top, fully clickable
  */
 function renderStoryRecap() {
     let dayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
+    let isUnlocked = (storyRecapDay < currentUnlockedDay) ||
+                     (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
+    let recap = STORY_RECAPS[storyRecapDay];
 
-    // ── Left sidebar: skewed day cards (TimeWheel style) ──
-    let sidebarX = width * 0.12;
+    // ── L2a: Left sidebar — skewed day cards (moved right slightly) ──
+    let sidebarX     = width * 0.16;   // was 0.12 — shifted right
     let sidebarBaseY = height * 0.45;
-    let cardSpacing = 130;
+    let cardSpacing  = 130;
 
     push();
     translate(sidebarX, sidebarBaseY);
     for (let i = 0; i < 5; i++) {
-        let day = i + 1;
+        let day  = i + 1;
         let diff = i - (storyRecapDay - 1);
         let distFromCenter = abs(diff);
-        let y = diff * cardSpacing;
-        let x = distFromCenter * 30;
+        let cardY = diff * cardSpacing;
+        let cardX = distFromCenter * 30;
 
-        let isUnlocked = (day <= currentUnlockedDay) || (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
+        let dayUnlocked = (day <= currentUnlockedDay) ||
+                          (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
         let isSelected = (day === storyRecapDay);
         let alpha = map(distFromCenter, 0, 2, 255, 50);
-        let s = map(distFromCenter, 0, 1, 1.15, 0.8);
+        let s     = map(distFromCenter, 0, 1, 1.15, 0.8);
 
         push();
-        translate(x, y);
+        translate(cardX, cardY);
         rotate(radians(-12));
         scale(constrain(s, 0.5, 1.4));
 
         noStroke();
-        if (!isUnlocked) {
-            fill(30, 30, 45, alpha * 0.7);
-        } else {
-            fill(isSelected ? [255, 20, 147, alpha] : [70, 20, 90, alpha * 0.6]);
-        }
+        fill(dayUnlocked
+            ? (isSelected ? [255, 20, 147, alpha] : [70, 20, 90, alpha * 0.6])
+            : [30, 30, 45, alpha * 0.7]);
 
         beginShape();
         vertex(-110, -32); vertex(130, -44);
-        vertex(110, 32); vertex(-130, 44);
+        vertex(110,   32); vertex(-130,  44);
         endShape(CLOSE);
 
         textAlign(LEFT, CENTER);
-        textFont(fonts.title);
-        textSize(40);
+        textFont(fonts.title); textSize(40);
         fill(isSelected ? color(255, 215, 0, alpha) : color(255, alpha));
         text(day.toString().padStart(2, '0'), -90, 4);
 
-        textFont(fonts.body);
-        textSize(18);
-        fill(isSelected ? color(255, 215, 0, alpha) : color(255, 215, 0, alpha * 0.8));
-        if (isUnlocked) {
+        textFont(fonts.body); textSize(18);
+        if (dayUnlocked) {
+            fill(isSelected ? color(255, 215, 0, alpha) : color(255, 215, 0, alpha * 0.8));
             text(dayNames[i], -10, 8);
         } else {
-            fill(180, 60, 60, alpha);
-            textSize(14);
+            fill(180, 60, 60, alpha); textSize(14);
             text("LOCKED", -10, 8);
         }
-
         pop();
     }
     pop();
 
-    // ── Center: Cloud with story content (bigger) ──
-    let cloudX = width * 0.55;
-    let cloudY = height * 0.48;
-    let cloudW = 900, cloudH = 600;
-    let cloudImg = assets.selectClouds ? assets.selectClouds[0] : null;
-    let isUnlocked = (storyRecapDay <= currentUnlockedDay) || (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-    let recap = STORY_RECAPS[storyRecapDay];
-
-    if (cloudImg) {
+    // ── L2b: frame_shape.png ──
+    if (assets.storyShape) {
         push();
-        translate(cloudX, cloudY);
         imageMode(CENTER);
-
-        if (!isUnlocked) {
-            drawingContext.filter = 'grayscale(100%) brightness(0.6)';
-        } else {
-            drawingContext.shadowBlur = 30;
-            drawingContext.shadowColor = 'rgba(255, 105, 180, 0.5)';
-        }
-
-        image(cloudImg, 0, 0, cloudW, cloudH);
-        drawingContext.shadowBlur = 0;
+        image(assets.storyShape,
+              storyDebugData.shape.x, storyDebugData.shape.y,
+              storyDebugData.shape.w, storyDebugData.shape.h);
         drawingContext.filter = 'none';
         pop();
     }
 
-    // Story text inside cloud area (clipped to ellipse)
+    // ── L3: Story CONTENT lines — clipped to textArea, sandwiched before cloud ──
+    let textX = storyDebugData.textArea.x;
+    let textY = storyDebugData.textArea.y;
+    let textW = storyDebugData.textArea.w;
+    let textH = storyDebugData.textArea.h;
+
     if (recap && isUnlocked) {
         push();
         drawingContext.save();
         drawingContext.beginPath();
-        drawingContext.ellipse(cloudX, cloudY, cloudW * 0.42, cloudH * 0.38, 0, 0, TWO_PI);
+        drawingContext.rect(textX - textW / 2, textY - textH / 2, textW, textH);
         drawingContext.clip();
 
-        // Day title at top of cloud
-        textFont(fonts.title);
-        textSize(28);
-        textAlign(CENTER, CENTER);
-        stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 105, 180);
-        text(recap.title, cloudX, cloudY - 200);
-        noStroke(); fill(255, 105, 180);
-        text(recap.title, cloudX, cloudY - 200);
-
-        // Story lines with scroll offset — more lines visible
-        textFont(fonts.body);
-        textSize(22);
-        textAlign(CENTER, CENTER);
-        let lineH = 32;
-        let startY = cloudY - 155;
-        let maxScroll = max(0, recap.lines.length - 10);
-        // Smooth scroll clamp
+        // Content lines only (title is drawn separately above the cloud)
+        textFont(fonts.body); textSize(25); textAlign(CENTER, CENTER);
+        let lineH      = 32;
+        let contentTop = textY - textH / 2 + 24;   // start near top of clip box
+        let maxScroll  = max(0, recap.lines.length - 10);
         storyScrollOffset = constrain(storyScrollOffset, 0, maxScroll);
 
         for (let j = 0; j < recap.lines.length; j++) {
-            let visibleIdx = j - storyScrollOffset;
-            let ly = startY + visibleIdx * lineH;
-            if (ly > cloudY - 220 && ly < cloudY + 210) {
-                let lineText = recap.lines[j];
-                if (lineText === "") continue;
-                // Fade lines near edges
-                let edgeFade = 255;
-                if (ly < cloudY - 170) edgeFade = map(ly, cloudY - 220, cloudY - 170, 0, 255);
-                if (ly > cloudY + 160) edgeFade = map(ly, cloudY + 160, cloudY + 210, 255, 0);
-                edgeFade = constrain(edgeFade, 0, 255);
+            let ly = contentTop + (j - storyScrollOffset) * lineH;
+            if (ly < textY - textH / 2 || ly > textY + textH / 2) continue;
+            let lineText = recap.lines[j];
+            if (lineText === "") continue;
 
-                stroke(0, 0, 0, edgeFade * 0.6); strokeWeight(3); fill(255, 240, 220, edgeFade);
-                text(lineText, cloudX, ly);
-                noStroke(); fill(255, 240, 220, edgeFade);
-                text(lineText, cloudX, ly);
-            }
+            let edgeFade = 255;
+            let topEdge  = textY - textH / 2 + 30;
+            let botEdge  = textY + textH / 2 - 28;
+            if (ly < topEdge) edgeFade = map(ly, textY - textH / 2, topEdge, 0, 255);
+            if (ly > botEdge) edgeFade = map(ly, botEdge, textY + textH / 2, 255, 0);
+            edgeFade = constrain(edgeFade, 0, 255);
+
+            stroke(0, 0, 0, edgeFade * 0.6); strokeWeight(3); fill(255, 240, 220, edgeFade);
+            text(lineText, textX, ly);
+            noStroke(); fill(255, 240, 220, edgeFade);
+            text(lineText, textX, ly);
         }
 
         drawingContext.restore();
         pop();
 
-        // Scroll bar indicator below cloud
+        // Scroll bar below text area
         if (maxScroll > 0) {
             let barW = 200, barH = 6;
-            let barX = cloudX - barW / 2;
-            let barY = cloudY + cloudH * 0.38 + 15;
             noStroke();
             fill(255, 255, 255, 40);
-            rect(barX, barY, barW, barH, 3);
-            let fillW = map(storyScrollOffset, 0, maxScroll, 20, barW);
+            rect(textX - barW / 2, textY + textH / 2 + 18, barW, barH, 3);
             fill(255, 215, 0, 150);
-            rect(barX, barY, fillW, barH, 3);
+            rect(textX - barW / 2, textY + textH / 2 + 18,
+                 map(storyScrollOffset, 0, maxScroll, 20, barW), barH, 3);
         }
-    } else if (!isUnlocked) {
-        textFont(fonts.title);
-        textSize(28);
+    } else {
+        push();
+
         textAlign(CENTER, CENTER);
-        let pulse = sin(frameCount * 0.08) * 40 + 120;
-        stroke(0, 0, 0, 150); strokeWeight(4); fill(pulse, pulse * 0.6, pulse * 0.6);
-        text("REACH DAY " + storyRecapDay + " TO UNLOCK", cloudX, cloudY);
-        noStroke(); fill(pulse, pulse * 0.6, pulse * 0.6);
-        text("REACH DAY " + storyRecapDay + " TO UNLOCK", cloudX, cloudY);
+        textFont(fonts.title);
+
+        textSize(45);
+        stroke(0, 0, 0, 180);
+        strokeWeight(6);
+        fill(255, 215, 0);
+        text("LOCKED", textX, textY);
+
+        noStroke();
+        fill(255, 215, 0);
+        text("LOCKED", textX, textY);
+
+        textFont(fonts.body);
+        textSize(20);
+        fill(200);
+        text("COMPLETE TODAY TO REVEAL", textX, textY + 40);
+        pop();
     }
 
-    // ── Right side: Up/Down arrows — change days (not scroll) ──
-    let arrowX = width - 100;
-    let arrowSz = 56;
+    // ── L4: frame_cloud.png — sits on top of content, under title ──
+    if (assets.storyCloud) {
+        push();
+        imageMode(CENTER);
+        tint(255, storyDebugData.cloud.alpha);
+        image(assets.storyCloud,
+              storyDebugData.cloud.x, storyDebugData.cloud.y,
+              storyDebugData.cloud.w, storyDebugData.cloud.h);
+        noTint();
+        pop();
+    }
+
+    // ── L5: Title — drawn ABOVE the cloud ──
+    if (recap && isUnlocked) {
+        push();
+        textFont(fonts.title); textSize(35); textAlign(CENTER, CENTER);
+        stroke(0, 0, 0, 200); strokeWeight(6); fill(255, 105, 180);
+        text(recap.title, storyDebugData.titleArea.x, storyDebugData.titleArea.y);
+        noStroke(); fill(255, 105, 180);
+        text(recap.title, storyDebugData.titleArea.x, storyDebugData.titleArea.y);
+        pop();
+    }
+
+    // ── L5: Up/Down arrows + day indicator — identical to level-select arrows ──
+    let arrowX   = width - 90;
+    let centerY  = height / 2;
+    let arrowSz  = 60;
+    let arrowGap = 90;
 
     if (assets.backImg) {
         // Up arrow (previous day)
-        let canGoUp = storyRecapDay > 1;
-        let upHover = canGoUp && dist(mouseX, mouseY, arrowX, height / 2 - 80) < 35;
+        let canGoUp  = storyRecapDay > 1;
+        let upHover  = canGoUp && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35;
         push();
-        translate(arrowX, height / 2 - 80);
+        translate(arrowX, centerY - arrowGap);
         rotate(HALF_PI);
         if (!canGoUp) tint(255, 60);
-        if (upHover) scale(1.25);
+        if (upHover)  scale(1.25);
         imageMode(CENTER);
         image(assets.backImg, 0, 0, arrowSz, arrowSz);
+        noTint();
+        pop();
+
+        // Day indicator between arrows
+        push();
+        textFont(fonts.title); textSize(20); textAlign(CENTER, CENTER);
+        stroke(0, 0, 0, 150); strokeWeight(3); fill(255, 215, 0);
+        text("DAY " + storyRecapDay, arrowX, centerY);
+        noStroke(); fill(255, 215, 0);
+        text("DAY " + storyRecapDay, arrowX, centerY);
         pop();
 
         // Down arrow (next day)
-        let nextDay = storyRecapDay + 1;
-        let canGoDown = nextDay <= 5 && ((nextDay <= currentUnlockedDay) || (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL));
-        let downHover = canGoDown && dist(mouseX, mouseY, arrowX, height / 2 + 80) < 35;
+        let nextDay   = storyRecapDay + 1;
+        let canGoDown = nextDay <= 5;
+        let downHover = canGoDown && dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35;
+
         push();
-        translate(arrowX, height / 2 + 80);
+        translate(arrowX, centerY + arrowGap);
         rotate(-HALF_PI);
         if (!canGoDown) tint(255, 60);
-        if (downHover) scale(1.25);
+        if (downHover)  scale(1.25);
         imageMode(CENTER);
         image(assets.backImg, 0, 0, arrowSz, arrowSz);
+        noTint();
         pop();
     }
 
-    // Day indicator between arrows
-    textFont(fonts.title); textSize(20);
-    textAlign(CENTER, CENTER);
-    stroke(0, 0, 0, 150); strokeWeight(3); fill(255, 215, 0);
-    text("DAY " + storyRecapDay, arrowX, height / 2);
-    noStroke(); fill(255, 215, 0);
-    text("DAY " + storyRecapDay, arrowX, height / 2);
+    // ── DEV MODE: bounding boxes + controls hint ──
+    if (showStoryDebugControls) {
+        drawStoryDebugOverlay();
+    }
+}
 
-    // Scroll hint
-    textFont(fonts.body); textSize(14);
-    fill(200, 160, 255, 150);
-    text("SCROLL TO READ", arrowX, height / 2 + 140);
+/**
+ * Draws bounding-box overlays for each story layer during dev adjust mode.
+ * Layers: [1] Shape  [2] Cloud  [3] TextArea  [4] TitleArea
+ */
+function drawStoryDebugOverlay() {
+    push();
+    let layers = [
+        { key: 'shape',     label: 'SHAPE',      color: [255, 80,  80 ] },
+        { key: 'cloud',     label: 'CLOUD',      color: [80,  200, 255] },
+        { key: 'textArea',  label: 'CONTENT',    color: [80,  255, 80 ] },
+        { key: 'titleArea', label: 'TITLE',      color: [255, 200, 0  ] }
+    ];
+
+    for (let l = 0; l < layers.length; l++) {
+        let layerIdx = l + 1;
+        let d   = storyDebugData[layers[l].key];
+        let col = layers[l].color;
+        let active = (layerIdx === storyDebugActiveLayer);
+
+        stroke(col[0], col[1], col[2], active ? 255 : 100);
+        strokeWeight(active ? 3 : 1);
+        noFill();
+        rectMode(CENTER);
+        rect(d.x, d.y, d.w, d.h);
+
+        noStroke();
+        fill(col[0], col[1], col[2], active ? 230 : 130);
+        textFont(fonts.body); textSize(15); textAlign(LEFT, BOTTOM);
+        text(`[${layerIdx}] ${layers[l].label}: (${d.x}, ${d.y})  ${d.w}×${d.h}`,
+             d.x - d.w / 2 + 4, d.y - d.h / 2 - 4);
+    }
+
+    // Controls hint bar
+    fill(0, 0, 0, 170);
+    noStroke(); rectMode(CORNER);
+    rect(0, height - 50, width, 50);
+    fill(255, 255, 0, 220);
+    textFont(fonts.body); textSize(17); textAlign(CENTER, CENTER);
+    text("DEV  [1] Shape  [2] Cloud  [3] Content  [4] Title  |  Arrows: Move  |  Shift+Arrows: Resize  |  P: print",
+         width / 2, height - 25);
+    pop();
+}
+
+/**
+ * Prints current storyDebugData to the browser console.
+ */
+function printStoryDebugData() {
+    console.log("[DEV] Current storyDebugData:");
+    console.log(JSON.stringify(storyDebugData, null, 2));
 }

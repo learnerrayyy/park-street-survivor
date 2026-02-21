@@ -128,6 +128,10 @@ class RoomScene {
     handleKeyPress(keyCode) {
         if (this.isPlayerNearDesk && keyCode === 69) {
             console.log("[RoomScene] Opening backpack");
+            // Advance tutorial hint: desk visited → now prompt to close backpack once items are packed
+            if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'DESK') {
+                tutorialHints.roomPhase = 'CLOSE_BP';
+            }
             gameState.currentState = STATE_INVENTORY;
             if (typeof playSFX !== 'undefined' && typeof sfxClick !== 'undefined') {
                 playSFX(sfxClick);
@@ -144,6 +148,7 @@ class RoomScene {
                 return;
             }
             console.log("[RoomScene] Leaving room");
+            if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DONE';
             if (typeof player !== 'undefined') {
                 player.x = width / 2;
                 player.y = height - 200;
@@ -190,15 +195,18 @@ class RoomScene {
         this.checkInteraction();
         this.drawInteractionIndicators();
 
-        // 4. Door-blocked warning prompt
+        // 4. Tutorial hint icons (warning.png breathing icons)
+        this.drawTutorialHints();
+
+        // 5. Door-blocked warning prompt
         this.drawDoorBlockedPrompt();
 
-        // 5. Back arrow button (top-left)
+        // 6. Back arrow button (top-left)
         this.backButton.isFocused = this.backButton.checkMouse(mouseX, mouseY);
         this.backButton.update();
         this.backButton.display();
 
-        // 6. Developer overlay
+        // 7. Developer overlay
         this.drawRoomDevTools();
 
         pop();
@@ -253,6 +261,31 @@ class RoomScene {
             noTint();
         }
 
+        pop();
+    }
+
+    /**
+     * Draws breathing warning icons to guide the player through the tutorial sequence.
+     * Phase 'DESK'  — icon near the desk, prompting to open the backpack.
+     * Phase 'DOOR'  — icon near the door (Day 1 only), prompting to leave the room.
+     */
+    drawTutorialHints() {
+        if (typeof tutorialHints === 'undefined' || !assets.warningImg) return;
+        let phase = tutorialHints.roomPhase;
+        if (phase !== 'DESK' && phase !== 'DOOR') return;
+
+        let breathe = 0.85 + sin(frameCount * 0.08) * 0.15;
+        let sz = 52 * breathe;
+
+        push();
+        imageMode(CENTER);
+        if (phase === 'DESK') {
+            // Position above and to the right of the desk interaction box
+            image(assets.warningImg, this.deskX + 55, this.deskY - 45, sz, sz);
+        } else if (phase === 'DOOR') {
+            // Position above and to the right of the door
+            image(assets.warningImg, this.doorX + 35, this.doorY - 55, sz, sz);
+        }
         pop();
     }
 

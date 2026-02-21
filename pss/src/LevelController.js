@@ -42,9 +42,7 @@ class LevelController {
       }
 
       // Route to appropriate level type
-      if (levelConfig.type === "TUTORIAL") {
-         this.initializeTutorialLevel(dayID, levelConfig);
-      } else if (levelConfig.type === "NORMAL") {
+      if (levelConfig.type === "TUTORIAL" || levelConfig.type === "NORMAL") {
          this.initializeProceduralLevel(dayID, levelConfig);
       }
 
@@ -88,14 +86,6 @@ class LevelController {
     * Instantiate and initialize the TutorialLevel for Day 1.
     */
    initializeTutorialLevel(dayID, config) {
-      console.log(`[LevelController] → Loading Tutorial Level (Day ${dayID})`);
-
-      this.tutorialLevel = new TutorialLevel(dayID, config);
-      this.currentLevel = this.tutorialLevel;
-      this.levelType = "TUTORIAL";
-
-      // Initialize level with session data
-      this.tutorialLevel.setup();
    }
 
    /**

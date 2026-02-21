@@ -138,6 +138,7 @@ class TimeWheel {
 
         // Cloud hover scale (smooth lerp)
         this._cloudScale = 1.0;
+
     }
 
     /**
@@ -147,7 +148,7 @@ class TimeWheel {
     triggerEntrance() {
         this.isEntering = true;
         this.entryTimer = 0;
-        this.bgAlpha    = 0;
+        this.bgAlpha = 0;
 
         let delays = [0, 4, 10, 6, 2];
         for (let i = 0; i < this.totalDays; i++) {
@@ -211,6 +212,59 @@ class TimeWheel {
         }
         pop();
 
+        // Right-side up/down arrows
+        this.drawSelectionArrows();
+
+        pop();
+    }
+
+    /**
+     * RENDERER: RIGHT-SIDE NAVIGATION ARROWS
+     * Up/Down arrows for day selection with hover zoom effect.
+     */
+    drawSelectionArrows() {
+        if (!assets.backImg || this.isEntering) return;
+
+        let arrowX   = width - 90;
+        let centerY  = height / 2;
+        let arrowSz  = 60;
+        let arrowGap = 90;
+
+        // Up arrow (previous day)
+        let canGoUp  = this.selectedDay > 1;
+        let upHover  = canGoUp && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35;
+        push();
+        translate(arrowX, centerY - arrowGap);
+        rotate(HALF_PI);
+        if (!canGoUp) tint(255, 60);
+        if (upHover)  scale(1.25);
+        imageMode(CENTER);
+        image(assets.backImg, 0, 0, arrowSz, arrowSz);
+        noTint();
+        pop();
+
+        // Day indicator between arrows
+        push();
+        textFont(fonts.title);
+        textSize(20);
+        textAlign(CENTER, CENTER);
+        stroke(0, 0, 0, 150); strokeWeight(3); fill(255, 215, 0);
+        text("DAY " + this.selectedDay, arrowX, centerY);
+        noStroke(); fill(255, 215, 0);
+        text("DAY " + this.selectedDay, arrowX, centerY);
+        pop();
+
+        // Down arrow (next day)
+        let canGoDown  = this.selectedDay < this.totalDays;
+        let downHover  = canGoDown && dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35;
+        push();
+        translate(arrowX, centerY + arrowGap);
+        rotate(-HALF_PI);
+        if (!canGoDown) tint(255, 60);
+        if (downHover)  scale(1.25);
+        imageMode(CENTER);
+        image(assets.backImg, 0, 0, arrowSz, arrowSz);
+        noTint();
         pop();
     }
 
@@ -265,20 +319,23 @@ class TimeWheel {
     }
 
     /**
-     * RENDERER: DUAL-STATE BACKGROUND
-     * Blends lock/unlock backgrounds based on selection.
+     * RENDERER: BACKGROUND BLEND
+     * Lerps bgAlpha (0=lock image, 255=unlock image) based on whether the selected day
+     * is locked. Day 1 is treated as locked until the player clicks once, so flipping
+     * day1VisuallyUnlocked automatically starts the fade-in to the colorful background.
      */
     drawDynamicBackground() {
         let isLocked = (this.selectedDay > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
-        let targetAlpha = isLocked ? 0 : 255;
-        this.bgAlpha = lerp(this.bgAlpha, targetAlpha, 0.08);
-
-        imageMode(CORNER);
-        
-        if (assets.selectBg.lock) {
-            image(assets.selectBg.lock, 0, 0, width, height);
+        // Day 1 stays visually locked until the player clicks once
+        if (this.selectedDay === 1 && !tutorialHints.day1VisuallyUnlocked) {
+            isLocked = true;
         }
 
+        let targetAlpha = isLocked ? 0 : 255;
+        this.bgAlpha = lerp(this.bgAlpha, targetAlpha, 0.02);
+
+        imageMode(CORNER);
+        if (assets.selectBg.lock)   image(assets.selectBg.lock,   0, 0, width, height);
         if (assets.selectBg.unlock) {
             push();
             tint(255, this.bgAlpha);
@@ -286,6 +343,8 @@ class TimeWheel {
             pop();
         }
 
+        // Darken overlay
+        noStroke();
         fill(0, 0, 0, 100);
         rect(0, 0, width, height);
     }
@@ -325,19 +384,26 @@ class TimeWheel {
         let cloudW = 700, cloudH = 450;
         let isCloudHover = (mouseX > x - cloudW / 2 && mouseX < x + cloudW / 2 &&
                             mouseY > y - cloudH / 2 && mouseY < y + cloudH / 2);
-        let targetScale = (isCloudHover && !isLocked && !this.isEntering) ? 1.08 : 1.0;
+
+        // Day 1 is "visually locked" (grayscale, same as Days 2-5) until the player clicks once
+        let visuallyLocked = isLocked ||
+            (dayID === 1 &&
+             typeof tutorialHints !== 'undefined' &&
+             !tutorialHints.day1VisuallyUnlocked);
+
+        let targetScale = (isCloudHover && !visuallyLocked && !this.isEntering) ? 1.08 : 1.0;
         this._cloudScale = lerp(this._cloudScale, targetScale, 0.1);
         scale(this._cloudScale);
 
         imageMode(CENTER);
 
-        // Grayscale filter for locked days
-        if (isLocked) {
+        // Grayscale filter for locked / not-yet-clicked days
+        if (visuallyLocked) {
             drawingContext.filter = 'grayscale(100%) brightness(0.6)';
         }
 
-        // Pink dreamcore glow for unlocked
-        if (!isLocked) {
+        // Pink dreamcore glow only for visually-unlocked days
+        if (!visuallyLocked) {
             drawingContext.shadowBlur = 40;
             drawingContext.shadowColor = 'rgba(255, 105, 180, 0.6)';
         }
@@ -347,9 +413,26 @@ class TimeWheel {
         drawingContext.shadowBlur = 0;
         drawingContext.filter = 'none';
 
+        // ── Tutorial hint: breathing warning icon on cloud top-right ──
+        // Day 1: show while still visually locked (first-click prompt)
+        // Days 2-5: show on the newest-unlocked day before first entry
+        let showDay1Hint = typeof tutorialHints !== 'undefined' &&
+                           dayID === 1 &&
+                           !tutorialHints.day1VisuallyUnlocked;
+        let showNewDayHint = typeof tutorialHints !== 'undefined' &&
+                             typeof currentUnlockedDay !== 'undefined' &&
+                             !isLocked && dayID > 1 &&
+                             dayID === currentUnlockedDay &&
+                             tutorialHints.levelSelectShownForDay < currentUnlockedDay;
+        if ((showDay1Hint || showNewDayHint) && typeof assets !== 'undefined' && assets.warningImg) {
+            let warnX = cloudW / 2 - 80;
+            let warnY = -cloudH / 2 + 55;
+            drawWarningIcon(warnX, warnY, 100);
+        }
+
         // Mission title positioned at cloud's left-center-lower area
         this.drawMissionTitle(dayID);
-        
+
         pop();
     }
 
@@ -380,6 +463,11 @@ class TimeWheel {
 
         let isSelected = (i === this.selectedDay - 1);
         let isLocked = (i + 1 > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
+
+        if (i === 0 && typeof tutorialHints !== 'undefined' && !tutorialHints.day1VisuallyUnlocked) {
+            isLocked = true; 
+        }
+
         let alpha = map(distFromCenter, 0, 2, 255, 50);
         let s = map(distFromCenter, 0, 1, 1.2, 0.8);
         scale(constrain(s, 0.5, 1.5));
