@@ -65,3 +65,9 @@ The gameplay area is divided into four lanes: Lanes 1 & 4 (Sidewalks, 200px) and
 | **bag_tangle**    | 300x300        | tangle                 | ArtAsset\Backpack |
 | **bag_headphone** | 300x300        | Noise cancel earphone. | ArtAsset\Backpack |
 | **bag_boots**     | 300x300        | rain boots             | ArtAsset\Backpack |
+
+# 5. UI Related
+| **Asset Name**    | **Dimensions** | **Description**        | Path              |
+| ----------------- | -------------- | ---------------------- | ----------------- |
+| **icon_success**   | 300x300        | Iris celebrating. Used in success page.    | ArtAsset\UI |
+| **Frame**    | 1920x1080        | Story background frame            | ArtAsset\UI |
