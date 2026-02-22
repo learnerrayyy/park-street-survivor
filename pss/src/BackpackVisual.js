@@ -104,11 +104,6 @@ class BackpackVisual {
             startMY:  0,
             startVal: null     // snapshot of the value being edited
         };
-
-        // Back arrow button — returns to room
-        this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => {
-            gameState.currentState = STATE_ROOM;
-        });
     }
 
     /**
@@ -175,10 +170,6 @@ class BackpackVisual {
             this.messageTimer--;
         }
         this.drawInstructions();
-        // Back arrow button (top-left)
-        this.backButton.isFocused = this.backButton.checkMouse(mouseX, mouseY);
-        this.backButton.update();
-        this.backButton.display();
         // Dev overlays are drawn last so they are always on top
         if (developerMode) this.drawDevOverlays();
         pop();
@@ -813,7 +804,7 @@ class BackpackVisual {
         for (let i = 0; i < this.scatteredItems.length; i++) {
             if (this.dragSource === 'desk' && this.dragIndex === i) continue;
             let s = this.scatteredItems[i];
-            if (dist(mx, my, s.x, s.y) < 70) { this.hoveredItem = i; break; }
+            if (dist(mx, my, s.x, s.y) < 50) { this.hoveredItem = i; break; }
         }
 
         // Check backpack slots
@@ -831,11 +822,6 @@ class BackpackVisual {
      * In dev mode, checks for dev handles first before normal game interaction.
      */
     handleMousePressed(mx, my) {
-        // Back arrow click
-        if (this.backButton.checkMouse(mx, my)) {
-            this.backButton.handleClick();
-            return;
-        }
         // ── Dev mode: check for dev handles first ─────────────────────────────
         if (developerMode && !this.showReplaceDialog) {
             let hit = this.getDevHit(mx, my);
@@ -895,7 +881,7 @@ class BackpackVisual {
         // Drag from desk — record original position for potential snap-back
         for (let i = this.scatteredItems.length - 1; i >= 0; i--) {
             let s = this.scatteredItems[i];
-            if (dist(mx, my, s.x, s.y) < 70) {
+            if (dist(mx, my, s.x, s.y) < 50) {
                 this.draggedItem = s.item;
                 this.dragSource  = 'desk';
                 this.dragIndex   = i;

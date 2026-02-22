@@ -4,7 +4,7 @@
 // ─── GLOBAL SYSTEM INSTANCES ─────────────────────────────────────────────────
 let gameState, mainMenu, roomScene, inventory, env, player, obstacleManager, levelController;
 let backpackUI;
-let endScreenManager;
+let testingPanel;
 
 // ─── GAME PROGRESS STATE ─────────────────────────────────────────────────────
 let currentUnlockedDay = 1;
@@ -14,7 +14,6 @@ let currentDayID = 1;
 let assets = {
     menuBg: null,
     otherBg: null,
-    warningImg: null,
     keys: {},
     selectClouds: [],
     selectBg: {
@@ -25,8 +24,8 @@ let assets = {
     playerAnim: {
         north: [],
         south: [],
-        west:  [],
-        east:  []
+        west: [],
+        east: []
     }
 };
 let fonts = {};
@@ -35,56 +34,6 @@ let bgm, sfxSelect, sfxClick;
 // ─── AUDIO VOLUME CONTROLS ───────────────────────────────────────────────────
 let masterVolumeBGM = 0.25;
 let masterVolumeSFX = 0.7;
-
-// ─── DIFFICULTY SETTING ──────────────────────────────────────────────────────
-// 0 = EASY (locked), 1 = NORMAL (default), 2 = HARD (locked)
-let gameDifficulty = 1;
-const DIFFICULTY_LABELS = ["EASY", "NORMAL", "HARD"];
-
-// ─── GLOBAL BACKGROUND WITH OVERLAY ──────────────────────────────────────────
-/**
- * Draws the standard otherBg background with a unified dark overlay.
- * Used in settings, help, pause, and story screens for consistent look.
- */
-function drawOtherBgWithOverlay() {
-    push();
-    if (assets && assets.otherBg) {
-        imageMode(CORNER);
-        image(assets.otherBg, 0, 0, width, height);
-    } else {
-        background(20);
-    }
-    noStroke();
-    fill(0, 0, 0, 120);
-    rectMode(CORNER);
-    rect(0, 0, width, height);
-    imageMode(CORNER);
-    pop();
-}
-
-// ─── TUTORIAL WARNING ICON ────────────────────────────────────────────────────
-/**
- * Draws a pulsing warning icon at (x, y) with a breathing scale animation.
- * @param {number} x      Center X
- * @param {number} y      Center Y
- * @param {number} size   Base diameter in pixels
- */
-function drawWarningIcon(x, y, size) {
-    if (!assets.warningImg) return;
-
-    let originalW = assets.warningImg.width;
-    let originalH = assets.warningImg.height;
-    let aspectRatio = originalW / originalH;
-
-    let breathe = 0.85 + sin(frameCount * 0.08) * 0.15;
-    let renderH = size * breathe;
-    let renderW = (size * aspectRatio) * breathe;
-
-    push();
-    imageMode(CENTER);
-    image(assets.warningImg, x, y, renderW, renderH);
-    pop();
-}
 
 // ─── GLOBAL FADE TRANSITION CONTROLLER ───────────────────────────────────────
 // Drives a 0.3s fade-in / fade-out overlay across all scene transitions.
@@ -97,45 +46,9 @@ let globalFade = {
 };
 
 // ─── PAUSE MENU STATE ─────────────────────────────────────────────────────────
-let pauseIndex = -1;  // -1 = no selection (nothing highlighted by default)
+let pauseIndex = 0;
+const PAUSE_OPTIONS = ["RESUME", "HELP", "QUIT TO MENU"];
 let pauseFromState = null;
-
-// Pause options vary by context (room vs day-run)
-function getPauseOptions() {
-    if (gameState && gameState.previousState === STATE_DAY_RUN) {
-        return ["RESTART","SETTINGS", "STORY", "HELP", "EXIT"];
-    }
-    return ["SETTINGS", "STORY", "HELP", "EXIT"];
-}
-
-// Restart sub-menu state
-let showRestartChoice = false;
-let restartChoiceIndex = 0;
-const RESTART_OPTIONS = ["BACK TO ROOM", "RESTART RUN"];
-
-// Pause button breathing scale (smooth lerp)
-let pauseBtnScale = 1.0;
-
-// Story recap state
-let showStoryRecap = false;
-let storyRecapDay = 1;
-let storyScrollOffset = 0;  // scroll offset within current day's text
-
-// ─── TUTORIAL HINT SYSTEM ─────────────────────────────────────────────────────
-/**
- * Tracks which tutorial hints are active.
- *   day1VisuallyUnlocked   — false until the player clicks Day 1's cloud for the first time;
- *                            on that click the background turns color and the warning disappears,
- *                            but the game does NOT start yet (a second click is required).
- *   levelSelectShownForDay — last day whose cloud was clicked to ENTER the game;
- *                            hint icon shows on days above this value.
- *   roomPhase              — 'DESK' | 'CLOSE_BP' | 'DOOR' | 'DONE'
- */
-let tutorialHints = {
-    day1VisuallyUnlocked: false,
-    levelSelectShownForDay: 0,
-    roomPhase: 'DESK'
-};
 
 // ─── SPLASH LOGO ANIMATION STATE ─────────────────────────────────────────────
 let titleDrop = { y: -200, vy: 0, landed: false, shake: 0 };
@@ -143,20 +56,20 @@ let titleDrop = { y: -200, vy: 0, landed: false, shake: 0 };
 // ─── ITEM ENCYCLOPEDIA ───────────────────────────────────────────────────────
 const ITEM_WIKI = [
     // BUFFS (Help Page 2)
-    { name: 'COFFEE',      desc: 'INSTANT ENERGY +20', unlockDay: 1, imgKey: 'coffee',                      type: 'BUFF'   },
-    { name: 'MOTORCYCLE',  desc: 'INSTANT ENERGY +20', unlockDay: 1, imgKey: 'motorcycle',                  type: 'BUFF'   },
-    { name: 'HOT COFFEE',  desc: 'INSTANT ENERGY +20', unlockDay: 2, imgKey: 'coffee',                      type: 'BUFF'   },
-    { name: 'HOT COFFEE',  desc: 'INSTANT ENERGY +20', unlockDay: 3, imgKey: 'coffee',                      type: 'BUFF'   },
-    { name: 'HOT COFFEE',  desc: 'INSTANT ENERGY +20', unlockDay: 4, imgKey: 'coffee',                      type: 'BUFF'   },
-    { name: 'HOT COFFEE',  desc: 'INSTANT ENERGY +20', unlockDay: 5, imgKey: 'coffee',                      type: 'BUFF'   },
+    { name: 'COFFEE', desc: 'INSTANT ENERGY +20', unlockDay: 1, imgKey: 'coffee', type: 'BUFF' },
+    { name: 'MOTORCYCLE', desc: 'INSTANT ENERGY +20', unlockDay: 1, imgKey: 'motorcycle', type: 'BUFF' },
+    { name: 'HOT COFFEE', desc: 'INSTANT ENERGY +20', unlockDay: 2, imgKey: 'coffee', type: 'BUFF' },
+    { name: 'HOT COFFEE', desc: 'INSTANT ENERGY +20', unlockDay: 3, imgKey: 'coffee', type: 'BUFF' },
+    { name: 'HOT COFFEE', desc: 'INSTANT ENERGY +20', unlockDay: 4, imgKey: 'coffee', type: 'BUFF' },
+    { name: 'HOT COFFEE', desc: 'INSTANT ENERGY +20', unlockDay: 5, imgKey: 'coffee', type: 'BUFF' },
 
     // HAZARDS (Help Page 3)
-    { name: 'HEAVY TRAFFIC',  desc: 'Immediately fail upon collision.',           unlockDay: 1, imgKey: ['ambulance', 'bus'],       type: 'HAZARD' },
-    { name: 'LIGHT TRAFFIC',  desc: 'Causes player to lose health.',              unlockDay: 1, imgKey: ['car_brown', 'car_red'],   type: 'HAZARD' },
-    { name: 'HOMELESS',       desc: 'Forces immediate lane change.',              unlockDay: 1, imgKey: 'homeless',                type: 'HAZARD' },
-    { name: 'PROMOTER',       desc: 'A flyer that blocks the Iris\'s view.',      unlockDay: 1, imgKey: 'promoter',                type: 'HAZARD' },
-    { name: 'SCOOTER RIDER',  desc: 'Causes temporary stun.',                     unlockDay: 1, imgKey: 'scooter_rider',           type: 'HAZARD' },
-    { name: 'PADDLE',         desc: '...',                                        unlockDay: 4, imgKey: 'scooter_rider',           type: 'HAZARD' }
+    { name: 'HEAVY TRAFFIC', desc: 'DANGER: INSTANT FAIL', unlockDay: 1, imgKey: ['ambulance', 'bus'], type: 'HAZARD' },
+    { name: 'LIGHT TRAFFIC', desc: 'SPACE OBSTACLE: BLOCKS PATH.', unlockDay: 1, imgKey: ['car_brown', 'car_red'], type: 'HAZARD' },
+    { name: 'HOMELESS', desc: 'TRIPS PLAYER: SLOW DOWN', unlockDay: 1, imgKey: 'homeless', type: 'HAZARD' },
+    { name: 'PROMOTER', desc: 'TRIPS PLAYER: SLOW DOWN', unlockDay: 1, imgKey: 'promoter', type: 'HAZARD' },
+    { name: 'SCOOTER RIDER', desc: 'TRIPS PLAYER: SLOW DOWN', unlockDay: 1, imgKey: 'scooter_rider', type: 'HAZARD' },
+    { name: 'PADDLE', desc: 'TRIPS PLAYER: SLOW DOWN', unlockDay: 4, imgKey: 'scooter_rider', type: 'HAZARD' }
 ];
 
 // ─── ASSET LOADING TRACKER ───────────────────────────────────────────────────
@@ -164,7 +77,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 37;
+const totalAssetsToLoad = 29;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -185,23 +98,16 @@ function itemLoaded() {
  */
 function preload() {
     // Visual assets
-    assets.menuBg      = loadImage('assets/cbg.png', itemLoaded);
-    assets.otherBg     = loadImage('assets/other_bg.png', itemLoaded);
-    assets.libraryBg   = loadImage('assets/background/library.jpg', itemLoaded);
-    assets.bbg         = loadImage('assets/bbg.png', itemLoaded);
-    assets.roomBg      = loadImage('assets/room.png', itemLoaded);
-    assets.inventoryBg    = loadImage('assets/inventory/table.png', itemLoaded);
-    assets.backpackImg    = loadImage('assets/inventory/backpack.png', itemLoaded);
+    assets.menuBg = loadImage('assets/cbg.png', itemLoaded);
+    assets.otherBg = loadImage('assets/other_bg.png', itemLoaded);
+    assets.roomBg = loadImage('assets/room.png', itemLoaded);
+    assets.inventoryBg = loadImage('assets/inventory/table.png', itemLoaded);
+    assets.backpackImg = loadImage('assets/inventory/backpack.png', itemLoaded);
     assets.studentCardImg = loadImage('assets/inventory/student_card.png', itemLoaded);
-    assets.computerImg    = loadImage('assets/inventory/computer.png', itemLoaded);
+    assets.computerImg = loadImage('assets/inventory/computer.png', itemLoaded);
 
     assets.selectBg.unlock = loadImage('assets/select_background/day_unlock.jpg', itemLoaded);
-    assets.selectBg.lock   = loadImage('assets/select_background/day_lock.jpg', itemLoaded);
-
-    // Story recap assets
-    assets.storyShape = loadImage('assets/story/frame_shape.png', itemLoaded);
-    assets.storyCloud = loadImage('assets/story/frame_cloud.png', itemLoaded);
-
+    assets.selectBg.lock = loadImage('assets/select_background/day_lock.jpg', itemLoaded);
 
     for (let i = 1; i <= 5; i++) {
         assets.selectClouds.push(loadImage(`assets/select_cloud/Cloud-${i}.png`, itemLoaded));
@@ -209,29 +115,29 @@ function preload() {
 
     // Typography
     fonts.title = loadFont('assets/fonts/PressStart2P-Regular.ttf', itemLoaded);
-    fonts.time  = loadFont('assets/fonts/VT323-Regular.ttf', itemLoaded);
-    fonts.body  = loadFont('assets/fonts/DotGothic16-Regular.ttf', itemLoaded);
-    fonts.logo  = loadFont('assets/fonts/title_1.otf', itemLoaded);
+    fonts.time = loadFont('assets/fonts/VT323-Regular.ttf', itemLoaded);
+    fonts.body = loadFont('assets/fonts/DotGothic16-Regular.ttf', itemLoaded);
+    fonts.logo = loadFont('assets/fonts/title_1.otf', itemLoaded);
 
     // Audio
     soundFormats('mp3', 'wav');
-    bgm       = loadSound('assets/audio/music/MainTheme.mp3', itemLoaded);
+    bgm = loadSound('assets/audio/music/MainTheme.mp3', itemLoaded);
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
-    sfxClick  = loadSound('assets/audio/effects/Click.wav', itemLoaded);
+    sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
 
     // Control key sprites
-    assets.keys.w     = loadImage('assets/control_keys/W.png', itemLoaded);
-    assets.keys.a     = loadImage('assets/control_keys/A.png', itemLoaded);
-    assets.keys.s     = loadImage('assets/control_keys/S.png', itemLoaded);
-    assets.keys.d     = loadImage('assets/control_keys/D.png', itemLoaded);
-    assets.keys.up    = loadImage('assets/control_keys/ARROWUP.png', itemLoaded);
-    assets.keys.down  = loadImage('assets/control_keys/ARROWDOWN.png', itemLoaded);
-    assets.keys.left  = loadImage('assets/control_keys/ARROWLEFT.png', itemLoaded);
+    assets.keys.w = loadImage('assets/control_keys/W.png', itemLoaded);
+    assets.keys.a = loadImage('assets/control_keys/A.png', itemLoaded);
+    assets.keys.s = loadImage('assets/control_keys/S.png', itemLoaded);
+    assets.keys.d = loadImage('assets/control_keys/D.png', itemLoaded);
+    assets.keys.up = loadImage('assets/control_keys/ARROWUP.png', itemLoaded);
+    assets.keys.down = loadImage('assets/control_keys/ARROWDOWN.png', itemLoaded);
+    assets.keys.left = loadImage('assets/control_keys/ARROWLEFT.png', itemLoaded);
     assets.keys.right = loadImage('assets/control_keys/ARROWRIGHT.png', itemLoaded);
     assets.keys.enter = loadImage('assets/control_keys/ENTER.png', itemLoaded);
     assets.keys.space = loadImage('assets/control_keys/SPACE.png', itemLoaded);
-    assets.keys.e     = loadImage('assets/control_keys/E.png', itemLoaded);
-    assets.keys.p     = loadImage('assets/control_keys/P.png', itemLoaded);
+    assets.keys.e = loadImage('assets/control_keys/E.png', itemLoaded);
+    assets.keys.p = loadImage('assets/control_keys/P.png', itemLoaded);
 
     // Logo frames
     assets.logoImgs = [
@@ -244,44 +150,60 @@ function preload() {
 
     assets.uobLogo = loadImage('assets/logo/uob_logo.png', itemLoaded);
 
-    // UI button sprites
-    assets.btnImg   = loadImage('assets/buttons/button.png', itemLoaded);
-    assets.backImg  = loadImage('assets/buttons/back.png', itemLoaded);
-    assets.pauseImg = loadImage('assets/buttons/pause.png', itemLoaded);
-
     // Entity preview sprites (no progress tracking — non-critical)
     if (!assets.previews) assets.previews = {};
-    assets.previews['player']        = loadImage('assets/characters/wiki/Iris.png');
-    assets.previews['npc_1']         = loadImage('assets/characters/wiki/Wiola.png');
-    assets.previews['ambulance']     = loadImage('assets/obstacles/ambulance.png');
-    assets.previews['bus']           = loadImage('assets/obstacles/bus.png');
-    assets.previews['car_brown']     = loadImage('assets/obstacles/car_brown.png');
-    assets.previews['car_red']       = loadImage('assets/obstacles/car_red.png');
-    assets.previews['homeless']      = loadImage('assets/obstacles/homeless.png');
-    assets.previews['promoter']      = loadImage('assets/obstacles/promoter.png');
-    assets.previews['scooter_rider'] = loadImage('assets/obstacles/scooter_rider.png');
-    assets.previews['coffee']        = loadImage('assets/power_up/coffee.png');
-    assets.previews['motorcycle']    = loadImage('assets/power_up/motorcycle.png');
+    assets.previews['player'] = loadImage('assets/characters/wiki/Iris.png');
+    assets.previews['npc_1'] = loadImage('assets/characters/wiki/Wiola.png');
+    assets.previews['ambulance'] = loadImage('assets/obstacles/obstacle_ambulance.png');
+    assets.previews['bus'] = loadImage('assets/obstacles/obstacle_bus.png');
+    assets.previews['car_brown'] = loadImage('assets/obstacles/obstacle_car_brown.png');
+    assets.previews['car_red'] = loadImage('assets/obstacles/obstacle_car_red.png');
+    assets.previews['homeless'] = loadImage('assets/obstacles/obstacle_homeless.png');
+    assets.previews['promoter'] = loadImage('assets/obstacles/obstacle_promoter.png');
+    assets.previews['scooter_rider'] = loadImage('assets/obstacles/obstacle_scooter.png');
+    assets.previews['coffee'] = loadImage('assets/power_up/powerup_coffee.png');
+    assets.previews['motorcycle'] = loadImage('assets/power_up/powerup_motorcycle.png');
+    assets.previews['empty_scooter'] = loadImage('assets/power_up/powerup_scooter.png');
+    assets.previews['powerup_scooter'] = assets.previews['empty_scooter'];
 
-    // Player directional animation spritesheets
+    // Player directional frame animation (uses authored frame PNGs directly)
     assets.playerAnim = {};
     const dirs = ['north', 'south', 'west', 'east'];
+    const frameFilesByDir = {
+        north: ['frame_1.png', 'frame_2.png', 'frame_3.png', 'frame_4.png', 'frame_5.png'],
+        south: ['frame_1.png', 'frame_2.png', 'frame_3.png', 'frame_4.png', 'frame_5.png'],
+        west: ['frame_001.png', 'frame_002.png', 'frame_003.png', 'frame_004.png', 'frame_005.png'],
+        east: ['frame_001.png', 'frame_002.png', 'frame_003.png', 'frame_004.png', 'frame_005.png']
+    };
+
     dirs.forEach(d => {
         assets.playerAnim[d] = { walk: [], idle: null };
-        assets.playerAnim[d].idle = loadImage(`assets/characters/spritesheet/${d}.png`);
-        loadImage(`assets/characters/spritesheet/spritesheet_${d}.png`, (img) => {
-            let fw = img.width / 5;
-            let fh = img.height;
-            for (let i = 0; i < 5; i++) {
-                assets.playerAnim[d].walk.push(img.get(i * fw, 0, fw, fh));
-            }
-        });
-    });
 
-    // Sound effects & Background music mute buttons
-    assets.musicOn    = loadImage('assets/buttons/music_on.png', itemLoaded);
-    assets.musicOff   = loadImage('assets/buttons/music_off.png', itemLoaded);
-    assets.warningImg = loadImage('assets/buttons/warning.png', itemLoaded);
+        if (d === 'north') {
+            // Back-running animation uses the dedicated run spritesheet.
+            loadImage('assets/characters/sprite_frames/sprite_sheets/spritesheet_run.png', (img) => {
+                const fw = img.height;
+                const fh = img.height;
+                const totalFrames = max(1, floor(img.width / fw));
+                for (let i = 0; i < totalFrames; i++) {
+                    assets.playerAnim[d].walk.push(img.get(i * fw, 0, fw, fh));
+                }
+            });
+        } else {
+            frameFilesByDir[d].forEach((fileName) => {
+                const path = `assets/characters/sprite_frames/${d}/${fileName}`;
+                const frameImg = loadImage(path);
+                assets.playerAnim[d].walk.push(frameImg);
+            });
+        }
+
+        // Keep dedicated idle if present; fallback to first run frame.
+        assets.playerAnim[d].idle = loadImage(
+            `assets/characters/spritesheet/${d}.png`,
+            () => { },
+            () => { assets.playerAnim[d].idle = assets.playerAnim[d].walk[0]; }
+        );
+    });
 }
 
 
@@ -297,16 +219,16 @@ function setup() {
     cvs.parent('canvas-container');
     noSmooth();
 
-    gameState       = new GameState();
-    mainMenu        = new MainMenu();
-    roomScene       = new RoomScene();
-    inventory       = new InventorySystem();
-    env             = new Environment();
-    player          = new Player();
+    gameState = new GameState();
+    mainMenu = new MainMenu();
+    roomScene = new RoomScene();
+    inventory = new InventorySystem();
+    env = new Environment();
+    player = new Player();
     obstacleManager = new ObstacleManager();
-    backpackUI      = new BackpackVisual(inventory, roomScene);
-    levelController  = new LevelController();
-    endScreenManager = new EndScreenManager();
+    testingPanel = new TestingPanel();
+    backpackUI = new BackpackVisual(inventory, roomScene);
+    levelController = new LevelController();
 
     textFont(fonts.body);
     gameState.currentState = STATE_LOADING;
@@ -351,18 +273,6 @@ function draw() {
 
             case STATE_INVENTORY:
                 if (backpackUI) backpackUI.display();
-                // Tutorial: show close-backpack hint when required items are packed
-                if (tutorialHints.roomPhase === 'CLOSE_BP' && backpackUI && backpackUI.hasRequiredItems()) {
-                    drawWarningIcon(width / 2, height - 75, 48);
-                    push();
-                    textFont(fonts.body);
-                    textSize(20);
-                    textAlign(CENTER, CENTER);
-                    fill(255, 215, 0, 200 + sin(frameCount * 0.1) * 55);
-                    noStroke();
-                    text("PACK COMPLETE! PRESS ESC TO CLOSE BACKPACK", width / 2, height - 45);
-                    pop();
-                }
                 break;
 
             case STATE_DAY_RUN:
@@ -378,25 +288,23 @@ function draw() {
                     if (env) env.display();
                     if (obstacleManager) obstacleManager.display();
                     if (player) player.display();
+                    if (obstacleManager && typeof obstacleManager.renderPromoterEffects === 'function') {
+                        obstacleManager.renderPromoterEffects();
+                    }
                 }
                 renderPauseOverlay();
                 break;
 
             case STATE_FAIL:
-                // Draw frozen gameplay behind the overlay
-                if (env) env.display();
-                if (obstacleManager) obstacleManager.display();
-                if (player) player.display();
-                if (endScreenManager) endScreenManager.display();
-                break;
-
             case STATE_WIN:
-                if (endScreenManager) endScreenManager.display();
+                drawEndScreen();
                 break;
         }
     } catch (e) {
         console.error("[Core Systems] Runtime Exception:", e);
     }
+
+    if (testingPanel && testingPanel.isVisible()) testingPanel.draw();
 
     renderGlobalFade();
 }
@@ -406,9 +314,13 @@ function draw() {
  */
 function runGameLoop() {
     if (levelController) { levelController.update(); }
-    if (env)             { env.update(GLOBAL_CONFIG.scrollSpeed); env.display(); }
-    if (obstacleManager) { obstacleManager.update(GLOBAL_CONFIG.scrollSpeed, player); obstacleManager.display(); }
-    if (player)          { player.update(); player.display(); }
+    if (env) { env.update(GLOBAL_CONFIG.scrollSpeed); env.display(); }
+    const levelPhase = levelController ? levelController.getLevelPhase() : "RUNNING";
+    if (obstacleManager) { obstacleManager.update(GLOBAL_CONFIG.scrollSpeed, player, levelPhase); obstacleManager.display(); }
+    if (player) { player.update(); player.display(); }
+    if (obstacleManager && typeof obstacleManager.renderPromoterEffects === 'function') {
+        obstacleManager.renderPromoterEffects();
+    }
     if (levelController) { levelController.display(); }
 
     // Win condition: settlement point reached
@@ -445,8 +357,8 @@ function playSFX(sound) {
 function triggerTransition(onBlackout) {
     if (globalFade.isFading) return;
     globalFade.isFading = true;
-    globalFade.dir      = 1;
-    globalFade.alpha    = 0;
+    globalFade.dir = 1;
+    globalFade.alpha = 0;
     globalFade.callback = onBlackout;
 }
 
@@ -465,7 +377,7 @@ function renderGlobalFade() {
         globalFade.dir = -1;
     }
     if (globalFade.dir === -1 && globalFade.alpha <= 0) {
-        globalFade.alpha    = 0;
+        globalFade.alpha = 0;
         globalFade.isFading = false;
         globalFade.callback = null;
     }
@@ -491,156 +403,51 @@ function keyPressed() {
 
     // Toggle developer mode
     if (key === '0') devToggle();
-
-    // Dev shortcuts: 8 = instant WIN, 9 = instant FAIL
-    if (developerMode) {
-        if (key === '8') { devGoToWin();  return; }
-        if (key === '9') { devGoToFail("EXHAUSTED"); return; }
+    if ((keyCode === 113 || key === 'F2' || key === '`') && testingPanel) {
+        testingPanel.toggle();
+        return false;
+    }
+    if (testingPanel && testingPanel.isVisible()) {
+        if (testingPanel.handleKeyPressed(key, keyCode)) return false;
     }
 
-    // Pause / unpause — available in most gameplay states (but NOT while already paused)
-    if ((key === 'p' || key === 'P' || keyCode === ESCAPE) && state !== STATE_PAUSED) {
+    // Pause / unpause — available in most gameplay states
+    if (key === 'p' || key === 'P' || keyCode === ESCAPE) {
         if (state !== STATE_MENU && state !== STATE_LEVEL_SELECT &&
             state !== STATE_SETTINGS && state !== STATE_HELP &&
-            state !== STATE_SPLASH && state !== STATE_INVENTORY &&
-            state !== STATE_FAIL && state !== STATE_WIN) {
+            state !== STATE_SPLASH && state !== STATE_INVENTORY) {
             playSFX(sfxClick);
             togglePause();
-            pauseIndex = -1;
-            showRestartChoice = false;
-            showStoryRecap = false;
+            // If we just resumed (left STATE_PAUSED), clear the pause-origin tracker
+            if (gameState.currentState !== STATE_PAUSED) {
+                pauseFromState = null;
+            }
+            pauseIndex = 0;
             return;
         }
     }
 
     // Pause menu navigation
     if (state === STATE_PAUSED) {
-        if (showStoryRecap) {
-            // ── Dev adjust mode: intercept arrow keys for layer positioning ──
-            if (showStoryDebugControls) {
-                // Layer selection: 1=shape, 2=cloud, 3=content, 4=title
-                if (key === '1') { storyDebugActiveLayer = 1; return; }
-                if (key === '2') { storyDebugActiveLayer = 2; return; }
-                if (key === '3') { storyDebugActiveLayer = 3; return; }
-                if (key === '4') { storyDebugActiveLayer = 4; return; }
-                if (key === 'p' || key === 'P') { printStoryDebugData(); return; }
-
-                let layerKey = storyDebugActiveLayer === 1 ? 'shape'
-                             : storyDebugActiveLayer === 2 ? 'cloud'
-                             : storyDebugActiveLayer === 3 ? 'textArea'
-                             : 'titleArea';
-                let target = storyDebugData[layerKey];
-                let resize = keyIsDown(SHIFT);
-
-                if (keyCode === UP_ARROW) {
-                    resize ? target.h -= 5 : target.y -= 5;
-                    printStoryDebugData(); return;
-                }
-                if (keyCode === DOWN_ARROW) {
-                    resize ? target.h += 5 : target.y += 5;
-                    printStoryDebugData(); return;
-                }
-                if (keyCode === LEFT_ARROW) {
-                    resize ? target.w -= 5 : target.x -= 5;
-                    printStoryDebugData(); return;
-                }
-                if (keyCode === RIGHT_ARROW) {
-                    resize ? target.w += 5 : target.x += 5;
-                    printStoryDebugData(); return;
-                }
-            }
-
-            // Story recap: UP/DOWN or W/S scroll content within the day
+        if (keyCode === UP_ARROW || keyCode === 87 || keyCode === DOWN_ARROW || keyCode === 83) {
+            playSFX(sfxSelect);
             if (keyCode === UP_ARROW || keyCode === 87) {
-                if (storyScrollOffset <= 0 && storyRecapDay > 1) {
-                    // Auto-retreat to previous day
-                    storyRecapDay--;
-                    let prevRecap = STORY_RECAPS[storyRecapDay];
-                    storyScrollOffset = max(0, prevRecap.lines.length - 10);
-                } else {
-                    storyScrollOffset = max(0, storyScrollOffset - 1);
-                }
-                if (typeof playSFX === 'function') playSFX(sfxSelect);
-            } else if (keyCode === DOWN_ARROW || keyCode === 83) {
-                let recap = STORY_RECAPS[storyRecapDay];
-                if (recap) {
-                    let maxScroll = max(0, recap.lines.length - 10);
-                    if (storyScrollOffset >= maxScroll) {
-                        // Auto-advance to next day
-                        let nextDay = storyRecapDay + 1;
-                        if (nextDay <= 5) {
-                            storyRecapDay = nextDay;
-                            storyScrollOffset = 0;
-                        }
-                    } else {
-                        storyScrollOffset = min(maxScroll, storyScrollOffset + 1);
-                    }
-                }
-                if (typeof playSFX === 'function') playSFX(sfxSelect);
-            } else if (keyCode === LEFT_ARROW || keyCode === 65) {
-                // Change to previous day
-                if (storyRecapDay > 1) {
-                    storyRecapDay--;
-                    storyScrollOffset = 0;
-                    if (typeof playSFX === 'function') playSFX(sfxSelect);
-                }
-            } else if (keyCode === RIGHT_ARROW || keyCode === 68) {
-                // Change to next day
-                let nextDay = storyRecapDay + 1;
-                let isNextUnlocked = (nextDay <= currentUnlockedDay) || (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-                if (nextDay <= 5 && isNextUnlocked) {
-                    storyRecapDay = nextDay;
-                    storyScrollOffset = 0;
-                    if (typeof playSFX === 'function') playSFX(sfxSelect);
-                }
-            } else if (keyCode === ESCAPE) {
-                showStoryRecap = false;
-                pauseIndex = -1;
+                pauseIndex = (pauseIndex - 1 + PAUSE_OPTIONS.length) % PAUSE_OPTIONS.length;
+            } else {
+                pauseIndex = (pauseIndex + 1) % PAUSE_OPTIONS.length;
             }
-            return;
-        } else if (showRestartChoice) {
-            // Restart sub-menu navigation
-            if (keyCode === UP_ARROW || keyCode === 87 || keyCode === DOWN_ARROW || keyCode === 83) {
-                if (typeof playSFX === 'function') playSFX(sfxSelect);
-                if (restartChoiceIndex < 0) {
-                    restartChoiceIndex = 0;
-                } else {
-                    restartChoiceIndex = (restartChoiceIndex + 1) % RESTART_OPTIONS.length;
-                }
-            } else if ((keyCode === ENTER || keyCode === 13) && restartChoiceIndex >= 0) {
-                if (typeof playSFX === 'function') playSFX(sfxClick);
-                handleRestartChoice();
-            } else if (keyCode === ESCAPE) {
-                showRestartChoice = false;
-                pauseIndex = -1;
-            }
-        } else {
-            let options = getPauseOptions();
-            if (keyCode === UP_ARROW || keyCode === 87 || keyCode === DOWN_ARROW || keyCode === 83) {
-                if (typeof playSFX === 'function') playSFX(sfxSelect);
-                
-                if (pauseIndex < 0) {
-                    if (keyCode === UP_ARROW || keyCode === 87) {
-                        pauseIndex = options.length - 1;
-                    } else {
-                        pauseIndex = 0;
-                    }
-                } else if (keyCode === UP_ARROW || keyCode === 87) {
-                    pauseIndex = (pauseIndex - 1 + options.length) % options.length;
-                } else {
-                    pauseIndex = (pauseIndex + 1) % options.length;
-                }
-            } else if ((keyCode === ENTER || keyCode === 13) && pauseIndex >= 0) {
-                if (typeof playSFX === 'function') playSFX(sfxClick);
-                handlePauseSelection();
-            } else if (keyCode === ESCAPE) {
-                // Back arrow behavior: resume from pause
-                togglePause();
-                pauseFromState = null;
-                showStoryRecap = false;
-            }
+        } else if (keyCode === ENTER || keyCode === 13) {
+            playSFX(sfxClick);
+            handlePauseSelection();
         }
         return;
+    }
+
+    // Promoter leaflet interaction: SPACE is consumed by obstacle system while active.
+    if (state === STATE_DAY_RUN && obstacleManager &&
+        typeof obstacleManager.handlePromoterSpacePress === 'function' &&
+        (keyCode === 32 || key === ' ')) {
+        if (obstacleManager.handlePromoterSpacePress(player)) return false;
     }
 
     // Menu navigation
@@ -652,16 +459,16 @@ function keyPressed() {
     else if (state === STATE_ROOM) {
         if (roomScene) roomScene.handleKeyPress(keyCode);
     }
-    // End screen navigation (fail / win)
+    // Retry from end screen
     else if (state === STATE_FAIL || state === STATE_WIN) {
-        if (endScreenManager) endScreenManager.handleKeyPress(keyCode);
+        if (keyCode === ENTER || keyCode === 13) {
+            playSFX(sfxClick);
+            setupRun(currentDayID);
+        }
     }
 
-    // Close inventory with ESC — advance tutorial hint from CLOSE_BP
+    // Close inventory with ESC
     if (gameState.currentState === STATE_INVENTORY && keyCode === ESCAPE) {
-        if (tutorialHints.roomPhase === 'CLOSE_BP') {
-            tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
-        }
         gameState.currentState = STATE_ROOM;
         return false;
     }
@@ -671,72 +478,19 @@ function keyPressed() {
  * Executes the selected option in the pause menu.
  */
 function handlePauseSelection() {
-    let options = getPauseOptions();
-    let selected = options[pauseIndex];
-
-    if (selected === "RESUME") {
+    if (PAUSE_OPTIONS[pauseIndex] === "RESUME") {
         togglePause();
-    } else if (selected === "STORY") {
-        showStoryRecap = true;
-        storyRecapDay = 1;
-        storyScrollOffset = 0;
-    } else if (selected === "SETTINGS") {
+        pauseFromState = null;
+    } else if (PAUSE_OPTIONS[pauseIndex] === "HELP") {
         pauseFromState = gameState.previousState;
-        if (typeof playSFX === 'function') playSFX(sfxClick);
-        gameState.currentState = STATE_SETTINGS;
-        mainMenu.menuState     = STATE_SETTINGS;
-    } else if (selected === "HELP") {
-        pauseFromState         = gameState.previousState;
-        if (typeof playSFX === 'function') playSFX(sfxClick);
+        playSFX(sfxClick);
         gameState.currentState = STATE_HELP;
-        mainMenu.menuState     = STATE_HELP;
-        mainMenu.helpPage      = 0;
-    } else if (selected === "QUIT TO MENU") {
+        mainMenu.menuState = STATE_HELP;
+        mainMenu.helpPage = 0;
+    } else if (PAUSE_OPTIONS[pauseIndex] === "QUIT TO MENU") {
         triggerTransition(() => {
             gameState.setState(STATE_MENU);
             mainMenu.menuState = STATE_MENU;
-            pauseFromState     = null;
-            if (typeof showRestartChoice !== 'undefined') showRestartChoice = false;
-            if (typeof showStoryRecap !== 'undefined') showStoryRecap = false;
-        });
-    } else if (selected === "RESTART") {
-        if (typeof showRestartChoice !== 'undefined') {
-            showRestartChoice   = true;
-            restartChoiceIndex  = -1;
-        } else {
-            triggerTransition(() => {
-                gameState.resetFlags();
-                setupRun(currentDayID);
-            });
-        }
-    } else if (selected === "EXIT") {
-        triggerTransition(() => {
-            gameState.setState(STATE_MENU);
-            mainMenu.menuState = STATE_MENU;
-            pauseFromState     = null;
-            showRestartChoice  = false;
-            showStoryRecap     = false;
-        });
-    }
-}
-
-function handleRestartChoice() {
-    if (RESTART_OPTIONS[restartChoiceIndex] === "BACK TO ROOM") {
-        triggerTransition(() => {
-            showRestartChoice = false;
-            gameState.setState(STATE_ROOM);
-            if (roomScene) roomScene.reset();
-            pauseFromState = null;
-        });
-    } else if (RESTART_OPTIONS[restartChoiceIndex] === "RESTART RUN") {
-        triggerTransition(() => {
-            showRestartChoice = false;
-            player.applyLevelStats(currentDayID);
-            player.x = 500;
-            player.y = height / 2;
-            obstacleManager = new ObstacleManager();
-            levelController.initializeLevel(currentDayID);
-            gameState.setState(STATE_DAY_RUN);
             pauseFromState = null;
         });
     }
@@ -746,7 +500,10 @@ function handleRestartChoice() {
  * Dispatches mouse press events; also unlocks the Web Audio context on first click.
  */
 function mousePressed() {
-    if (globalFade.isFading) return;
+    if (globalFade.isFading || !gameState) return;
+    if (testingPanel && testingPanel.isVisible()) {
+        if (testingPanel.handleMousePressed(mouseX, mouseY)) return false;
+    }
     let state = gameState.currentState;
 
     // Splash screen: unlock audio and transition to main menu
@@ -761,106 +518,16 @@ function mousePressed() {
         return;
     }
 
-    if (state === STATE_PAUSED) {
-        if (assets.backImg) {
-            let bx = 70, by = 65;
-            if (dist(mouseX, mouseY, bx, by) < 40) {
-                if (typeof playSFX === 'function') playSFX(sfxClick);
-                
-                if (typeof showStoryRecap !== 'undefined' && showStoryRecap) {
-                    showStoryRecap = false;
-                    pauseIndex = -1;
-                } else if (typeof showRestartChoice !== 'undefined' && showRestartChoice) {
-                    showRestartChoice = false;
-                    pauseIndex = -1;
-                } else {
-                    togglePause();
-                }
-                return;
-            }
-        }
-        
-        if (typeof showRestartChoice !== 'undefined' && showRestartChoice) {
-            if (typeof restartChoiceIndex !== 'undefined' && restartChoiceIndex >= 0) {
-                if (typeof playSFX === 'function') playSFX(sfxClick);
-                handleRestartChoice();
-            }
-        } else if (showStoryRecap) {
-            // Story recap: day sidebar clicks (anchor matches render at width * 0.16)
-            let sidebarAnchorX = width * 0.16;
-            let sidebarBaseY   = height * 0.45;
-            for (let i = 0; i < 5; i++) {
-                let diff  = i - (storyRecapDay - 1);
-                let cardY = sidebarBaseY + diff * 130;
-                if (mouseX > sidebarAnchorX - 120 && mouseX < sidebarAnchorX + 120 &&
-                    mouseY > cardY - 40           && mouseY < cardY + 40) {
-                    let day        = i + 1;
-                        storyRecapDay     = day;
-                        storyScrollOffset = 0;
-                        if (typeof playSFX === 'function') playSFX(sfxSelect);
-                    return;
-                }
-            }
-            // Story recap: up/down arrow clicks — same coords as render (arrowX=width-90, gap=90)
-            let arrowX  = width - 90;
-            let centerY = height / 2;
-            let arrowGap = 90;
-            if (dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35) {
-                if (storyRecapDay > 1) {
-                    storyRecapDay--;
-                    storyScrollOffset = 0;
-                    if (typeof playSFX === 'function') playSFX(sfxSelect);
-                }
-                return;
-            }
-            if (dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35) {
-                let nextDay        = storyRecapDay + 1;
-                if (nextDay <= 5) {
-                    storyRecapDay     = nextDay;
-                    storyScrollOffset = 0;
-                    if (typeof playSFX === 'function') playSFX(sfxSelect);
-                }
-                return;
-            }
-        } else {
-            if (pauseIndex >= 0) {
-                if (typeof playSFX === 'function') playSFX(sfxClick);
-                handlePauseSelection();
-            }
-        }
-        return;
-    }
-
     if (state === STATE_MENU || state === STATE_LEVEL_SELECT ||
         state === STATE_SETTINGS || state === STATE_HELP) {
         if (mainMenu) mainMenu.handleClick(mouseX, mouseY);
-    } else if (state === STATE_ROOM) {
-        // Room back arrow click
-        if (roomScene && roomScene.backButton.checkMouse(mouseX, mouseY)) {
-            roomScene.backButton.handleClick();
-            return;
-        }
+    } else if (state === STATE_ROOM || state === STATE_DAY_RUN) {
         // Pause button hit-test
-        let pbx = width - 70, pby = 65;
-        if (dist(mouseX, mouseY, pbx, pby) < 60) {
+        if (dist(mouseX, mouseY, width - 60, 50) < 25) {
             playSFX(sfxClick);
             togglePause();
-            pauseIndex = -1;
-            showRestartChoice = false;
-            showStoryRecap = false;
+            pauseIndex = 0;
         }
-    } else if (state === STATE_DAY_RUN) {
-        // Pause button hit-test
-        let pbx = width - 70, pby = 65;
-        if (dist(mouseX, mouseY, pbx, pby) < 60) {
-            playSFX(sfxClick);
-            togglePause();
-            pauseIndex = -1;
-            showRestartChoice = false;
-            showStoryRecap = false;
-        }
-    } else if (state === STATE_FAIL || state === STATE_WIN) {
-        if (endScreenManager) endScreenManager.handleClick(mouseX, mouseY);
     }
 
     if (gameState.currentState === STATE_INVENTORY) {
@@ -872,6 +539,7 @@ function mousePressed() {
  * Dispatches mouse release events to the active UI systems.
  */
 function mouseReleased() {
+    if (!gameState) return;
     if (mainMenu) mainMenu.handleRelease();
     if (gameState.currentState === STATE_INVENTORY) {
         if (backpackUI) backpackUI.handleMouseReleased(mouseX, mouseY);
@@ -882,6 +550,7 @@ function mouseReleased() {
  * Dispatches mouse drag events to the active UI systems.
  */
 function mouseDragged() {
+    if (!gameState) return;
     if (gameState.currentState === STATE_INVENTORY) {
         if (backpackUI) backpackUI.handleMouseDragged(mouseX, mouseY);
     }
@@ -890,26 +559,8 @@ function mouseDragged() {
 /**
  * Dispatches mouse move events to the active UI systems.
  */
-function mouseWheel(event) {
-    if (gameState.currentState === STATE_PAUSED && showStoryRecap) {
-        let recap = STORY_RECAPS[storyRecapDay];
-        if (!recap) return false;
-        let maxScroll = max(0, recap.lines.length - 10);
-        if (event.delta > 0) {
-            // Scroll down
-            storyScrollOffset = min(maxScroll, storyScrollOffset + 2);
-        } else {
-            // Scroll up
-            storyScrollOffset = max(0, storyScrollOffset - 2);
-        }
-        return false; // prevent page scroll
-    }
-}
-
 function mouseMoved() {
-    if (gameState.currentState === STATE_FAIL || gameState.currentState === STATE_WIN) {
-        if (endScreenManager) endScreenManager.handleMouseMove(mouseX, mouseY);
-    }
+    if (!gameState) return;
     if (gameState.currentState === STATE_INVENTORY) {
         if (backpackUI) backpackUI.handleMouseMoved(mouseX, mouseY);
     }
@@ -934,29 +585,12 @@ function togglePause() {
 function setupRun(dayID) {
     currentDayID = dayID;
     player.applyLevelStats(dayID);
-    player.x = 500;
-    player.y = height / 2;
+    player.x = GLOBAL_CONFIG.lanes.lane1;
+    player.y = PLAYER_RUN_FOOT_Y;  // Player foot anchor for day run
     roomScene.reset();
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
-    tutorialHints.roomPhase = 'DESK';
     gameState.setState(STATE_ROOM);
-}
-
-/**
- * [Role: Core Systems Developer]
- * LEVEL BOOTSTRAP: Starts a specific day directly into the RUN state, skipping the room.
- */
-function setupRunDirectly(dayID) {
-    currentDayID = dayID;
-    player.applyLevelStats(dayID);
-    
-    // Set position matching the "Exit Door" logic in RoomScene
-    player.x = width / 2; 
-    player.y = height - 200; 
-    
-    obstacleManager = new ObstacleManager();
-    gameState.setState(STATE_DAY_RUN);
 }
 
 
@@ -976,8 +610,8 @@ function drawLoadingScreen() {
     if (assets.uobLogo) {
         push();
         imageMode(CENTER);
-        let wave       = sin(frameCount * 0.05);
-        let imgScale   = 1.0 + wave * 0.05;
+        let wave = sin(frameCount * 0.05);
+        let imgScale = 1.0 + wave * 0.05;
         let alphaValue = 180 + wave * 75;
         tint(255, alphaValue);
         image(assets.uobLogo, cx, cy - 80, 120 * imgScale, 120 * imgScale);
@@ -1009,7 +643,7 @@ function drawLoadingScreen() {
  */
 function drawLoadingProgressBar(x, y, progress) {
     let totalSegments = 10;
-    let gap    = 8;
+    let gap = 8;
     let blockW = 24;
     let blockH = 16;
     let totalW = (blockW * totalSegments) + (gap * (totalSegments - 1));
@@ -1023,8 +657,8 @@ function drawLoadingProgressBar(x, y, progress) {
 
     rectMode(CORNER);
     for (let i = 0; i < totalSegments; i++) {
-        let bx        = (x - totalW / 2) + i * (blockW + gap);
-        let by        = y - blockH / 2;
+        let bx = (x - totalW / 2) + i * (blockW + gap);
+        let by = y - blockH / 2;
         let threshold = (i + 1) / totalSegments;
 
         if (progress >= threshold) {
@@ -1074,17 +708,17 @@ function drawSplashScreen() {
  */
 function drawLogoPlaceholder(x, y) {
     let isSplash = (gameState.currentState === STATE_SPLASH);
-    let t        = frameCount * 0.02;
-    let targetY  = isSplash ? (y + 160) : (y + 10);
+    let t = frameCount * 0.02;
+    let targetY = isSplash ? (y + 160) : (y + 10);
 
     // Drop-in physics
     if (!titleDrop.landed) {
         titleDrop.vy += 1.2;
-        titleDrop.y  += titleDrop.vy;
+        titleDrop.y += titleDrop.vy;
         if (titleDrop.y >= y + 160) {
-            titleDrop.y      = y + 160;
+            titleDrop.y = y + 160;
             titleDrop.landed = true;
-            titleDrop.shake  = 6;
+            titleDrop.shake = 6;
         }
     } else {
         titleDrop.y = lerp(titleDrop.y, targetY, 0.15);
@@ -1104,9 +738,9 @@ function drawLogoPlaceholder(x, y) {
         push();
         imageMode(CENTER);
         tint(255, 255, 255, 200);
-        image(assets.selectClouds[1], width * 0.1,  height * 0.9  + cos(t) * 10,  800, 480);
-        image(assets.selectClouds[2], width * 0.1,  height * 0.2  + sin(t) * 10,  700, 420);
-        image(assets.selectClouds[4], width * 1.0,  height * 0.09 + sin(t) * 10,  700, 420);
+        image(assets.selectClouds[1], width * 0.1, height * 0.9 + cos(t) * 10, 800, 480);
+        image(assets.selectClouds[2], width * 0.1, height * 0.2 + sin(t) * 10, 700, 420);
+        image(assets.selectClouds[4], width * 1.0, height * 0.09 + sin(t) * 10, 700, 420);
         pop();
     }
 
@@ -1187,22 +821,17 @@ function drawInteractionPrompts() {
  */
 function drawPauseButton() {
     push();
-    let sz = 120;
-    let bx = width - 70;
-    let by = 65;
-    let isHover = dist(mouseX, mouseY, bx, by) < sz / 2;
-
-    // Smooth breathing scale: hover targets 1.15, otherwise gentle pulse
-    let breathe = 1.0 + sin(frameCount * 0.06) * 0.03;
-    let targetScale = isHover ? 1.15 : breathe;
-    pauseBtnScale = lerp(pauseBtnScale, targetScale, 0.12);
-
-    imageMode(CENTER);
-    translate(bx, by);
-    scale(pauseBtnScale);
-    if (assets.pauseImg) {
-        image(assets.pauseImg, 0, 0, sz, sz);
-    }
+    let bx = width - 60;
+    let by = 50;
+    noFill();
+    stroke(255, 150);
+    strokeWeight(2);
+    ellipse(bx, by, 40, 40);
+    fill(255, 150);
+    noStroke();
+    rectMode(CENTER);
+    rect(bx - 5, by, 4, 15);
+    rect(bx + 5, by, 4, 15);
     pop();
 }
 
@@ -1211,387 +840,57 @@ function drawPauseButton() {
  */
 function renderPauseOverlay() {
     push();
-    drawOtherBgWithOverlay();
-
-    // Back arrow (top-left) — replaces RESUME, click to go back
-    if (assets.backImg) {
-        let bx = 70, by = 65;
-        let isBackHover = dist(mouseX, mouseY, bx, by) < 40;
-        push();
-        translate(bx, by);
-        if (isBackHover) scale(1.15);
-        imageMode(CENTER);
-        image(assets.backImg, 0, 0, 120, 120);
-        pop();
-    }
-
-    if (showStoryRecap) {
-        // ── Story Recap page ──
-        renderStoryRecap();
-    } else if (showRestartChoice) {
-        // ── Restart sub-menu ──
-        let titleY = height / 2 - 280;
-        textAlign(CENTER, CENTER);
-        textFont(fonts.title);
-        textSize(48);
-        stroke(0, 0, 0, 180); strokeWeight(6); fill(255, 215, 0);
-        text("RESTART?", width / 2, titleY);
-        noStroke(); fill(255, 215, 0);
-        text("RESTART?", width / 2, titleY);
-
-        let optW = 280, optH = 80;  
-        let spacing = 95;
-        let totalH = (RESTART_OPTIONS.length - 1) * spacing;
-        let startY = (height / 2) - (totalH / 2) + 20;
-
-        let anyRestartHover = false;
-        for (let i = 0; i < RESTART_OPTIONS.length; i++) {
-            let ox = width / 2;
-            let oy = startY + i * spacing;
-            
-            let isHover = (mouseX > ox - optW / 2 && mouseX < ox + optW / 2 &&
-                           mouseY > oy - optH / 2 && mouseY < oy + optH / 2);
-            if (isHover) { restartChoiceIndex = i; anyRestartHover = true; }
-            let isSelected = (i === restartChoiceIndex) && restartChoiceIndex >= 0;
-
-            push();
-            translate(ox, oy);
-            if (isSelected) scale(1.15);
-            imageMode(CENTER);
-            if (assets.btnImg) image(assets.btnImg, 0, 0, optW * 2, optH * 2);
-
-            textFont(fonts.body); textSize(24); textAlign(CENTER, CENTER);
-            stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
-            text(RESTART_OPTIONS[i], 0, -6);
-            noStroke(); fill(255, 215, 0);
-            text(RESTART_OPTIONS[i], 0, -6);
-            pop();
-        }
-        if (!anyRestartHover && !keyIsPressed) restartChoiceIndex = -1;
-        
+    if (assets.otherBg) {
+        imageMode(CORNER);
+        image(assets.otherBg, 0, 0, width, height);
+        rect(0, 0, width, height);
     } else {
-        // ── Normal pause menu ──
-        let options = getPauseOptions();
+        fill(0, 0, 0, 200);
+        rect(0, 0, width, height);
+    }
 
-        let titleY = height / 2 - 320;
-        textAlign(CENTER, CENTER);
-        textFont(fonts.title);
-        textSize(60);
-        stroke(0, 0, 0, 180); strokeWeight(6); fill(255, 215, 0);
-        text("PAUSED", width / 2, titleY);
-        noStroke(); fill(255, 215, 0);
-        text("PAUSED", width / 2, titleY);
+    textAlign(CENTER, CENTER);
+    textFont(fonts.title);
+    fill(255);
+    textSize(60);
+    text("PAUSED", width / 2, height / 2 - 100);
 
-        let optW = 280, optH = 80;  
-        let spacing = 95;
-        let totalH = (options.length - 1) * spacing;
-        let startY = (height / 2) - (totalH / 2) + 30;
-
-        let anyPauseHover = false;
-        for (let i = 0; i < options.length; i++) {
-            let ox = width / 2;
-            let oy = startY + i * spacing;
-            
-            let isHover = (mouseX > ox - optW / 2 && mouseX < ox + optW / 2 &&
-                           mouseY > oy - optH / 2 && mouseY < oy + optH / 2);
-            if (isHover) { pauseIndex = i; anyPauseHover = true; }
-            let isSelected = (i === pauseIndex) && pauseIndex >= 0;
-
-            push();
-            translate(ox, oy);
-            if (isSelected) scale(1.15);
-            imageMode(CENTER);
-            if (assets.btnImg) image(assets.btnImg, 0, 0, optW * 2, optH * 2);
-
-            textFont(fonts.body); textSize(24); textAlign(CENTER, CENTER);
-            stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
-            text(options[i], 0, -6);
-            noStroke(); fill(255, 215, 0);
-            text(options[i], 0, -6);
-            pop();
-        }
-        if (!anyPauseHover && !keyIsPressed) pauseIndex = -1;
+    textFont(fonts.body);
+    for (let i = 0; i < PAUSE_OPTIONS.length; i++) {
+        let isSelected = (i === pauseIndex);
+        fill(isSelected ? 255 : 150);
+        textSize(isSelected ? 32 : 28);
+        text(isSelected ? `> ${PAUSE_OPTIONS[i]} <` : PAUSE_OPTIONS[i], width / 2, height / 2 + 20 + i * 60);
     }
     pop();
 }
 
 /**
- * Renders the story recap sub-page inside the pause overlay.
- *
- * Layer order (bottom → top):
- *   L1  other_bg + overlay      — drawn by renderPauseOverlay() before this call
- *   L2a Left sidebar (day cards)
- *   L2b frame_shape.png         — full-canvas decorative background panel
- *   L3  Story CONTENT text      — clipped to textArea, sandwiched before cloud
- *   L4  frame_cloud.png         — full-canvas decorative overlay (covers content edges)
- *   L5  Title text              — always on top of everything
- *   L5  Up/Down arrows          — always on top, fully clickable
+ * Renders the win or fail end screen with a contextual message and retry prompt.
  */
-function renderStoryRecap() {
-    let dayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
-    let isUnlocked = (storyRecapDay < currentUnlockedDay) ||
-                     (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-    let recap = STORY_RECAPS[storyRecapDay];
+function drawEndScreen() {
+    if (assets.menuBg) image(assets.menuBg, 0, 0, width, height);
+    else background(20);
 
-    // ── L2a: Left sidebar — skewed day cards (moved right slightly) ──
-    let sidebarX     = width * 0.16;   // was 0.12 — shifted right
-    let sidebarBaseY = height * 0.45;
-    let cardSpacing  = 130;
-
-    push();
-    translate(sidebarX, sidebarBaseY);
-    for (let i = 0; i < 5; i++) {
-        let day  = i + 1;
-        let diff = i - (storyRecapDay - 1);
-        let distFromCenter = abs(diff);
-        let cardY = diff * cardSpacing;
-        let cardX = distFromCenter * 30;
-
-        let dayUnlocked = (day <= currentUnlockedDay) ||
-                          (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-        let isSelected = (day === storyRecapDay);
-        let alpha = map(distFromCenter, 0, 2, 255, 50);
-        let s     = map(distFromCenter, 0, 1, 1.15, 0.8);
-
-        push();
-        translate(cardX, cardY);
-        rotate(radians(-12));
-        scale(constrain(s, 0.5, 1.4));
-
-        noStroke();
-        fill(dayUnlocked
-            ? (isSelected ? [255, 20, 147, alpha] : [70, 20, 90, alpha * 0.6])
-            : [30, 30, 45, alpha * 0.7]);
-
-        beginShape();
-        vertex(-110, -32); vertex(130, -44);
-        vertex(110,   32); vertex(-130,  44);
-        endShape(CLOSE);
-
-        textAlign(LEFT, CENTER);
-        textFont(fonts.title); textSize(40);
-        fill(isSelected ? color(255, 215, 0, alpha) : color(255, alpha));
-        text(day.toString().padStart(2, '0'), -90, 4);
-
-        textFont(fonts.body); textSize(18);
-        if (dayUnlocked) {
-            fill(isSelected ? color(255, 215, 0, alpha) : color(255, 215, 0, alpha * 0.8));
-            text(dayNames[i], -10, 8);
-        } else {
-            fill(180, 60, 60, alpha); textSize(14);
-            text("LOCKED", -10, 8);
-        }
-        pop();
-    }
-    pop();
-
-    // ── L2b: frame_shape.png ──
-    if (assets.storyShape) {
-        push();
-        imageMode(CENTER);
-        image(assets.storyShape,
-              storyDebugData.shape.x, storyDebugData.shape.y,
-              storyDebugData.shape.w, storyDebugData.shape.h);
-        drawingContext.filter = 'none';
-        pop();
-    }
-
-    // ── L3: Story CONTENT lines — clipped to textArea, sandwiched before cloud ──
-    let textX = storyDebugData.textArea.x;
-    let textY = storyDebugData.textArea.y;
-    let textW = storyDebugData.textArea.w;
-    let textH = storyDebugData.textArea.h;
-
-    if (recap && isUnlocked) {
-        push();
-        drawingContext.save();
-        drawingContext.beginPath();
-        drawingContext.rect(textX - textW / 2, textY - textH / 2, textW, textH);
-        drawingContext.clip();
-
-        // Content lines only (title is drawn separately above the cloud)
-        textFont(fonts.body); textSize(25); textAlign(CENTER, CENTER);
-        let lineH      = 32;
-        let contentTop = textY - textH / 2 + 24;   // start near top of clip box
-        let maxScroll  = max(0, recap.lines.length - 10);
-        storyScrollOffset = constrain(storyScrollOffset, 0, maxScroll);
-
-        for (let j = 0; j < recap.lines.length; j++) {
-            let ly = contentTop + (j - storyScrollOffset) * lineH;
-            if (ly < textY - textH / 2 || ly > textY + textH / 2) continue;
-            let lineText = recap.lines[j];
-            if (lineText === "") continue;
-
-            let edgeFade = 255;
-            let topEdge  = textY - textH / 2 + 30;
-            let botEdge  = textY + textH / 2 - 28;
-            if (ly < topEdge) edgeFade = map(ly, textY - textH / 2, topEdge, 0, 255);
-            if (ly > botEdge) edgeFade = map(ly, botEdge, textY + textH / 2, 255, 0);
-            edgeFade = constrain(edgeFade, 0, 255);
-
-            stroke(0, 0, 0, edgeFade * 0.6); strokeWeight(3); fill(255, 240, 220, edgeFade);
-            text(lineText, textX, ly);
-            noStroke(); fill(255, 240, 220, edgeFade);
-            text(lineText, textX, ly);
-        }
-
-        drawingContext.restore();
-        pop();
-
-        // Scroll bar below text area
-        if (maxScroll > 0) {
-            let barW = 200, barH = 6;
-            noStroke();
-            fill(255, 255, 255, 40);
-            rect(textX - barW / 2, textY + textH / 2 + 18, barW, barH, 3);
-            fill(255, 215, 0, 150);
-            rect(textX - barW / 2, textY + textH / 2 + 18,
-                 map(storyScrollOffset, 0, maxScroll, 20, barW), barH, 3);
-        }
+    textAlign(CENTER, CENTER);
+    textFont(fonts.title);
+    if (gameState.currentState === STATE_WIN) {
+        fill(100, 255, 100);
+        textSize(80);
+        text("SUCCESS", width / 2, height / 2 - 50);
     } else {
-        push();
-
-        textAlign(CENTER, CENTER);
-        textFont(fonts.title);
-
-        textSize(45);
-        stroke(0, 0, 0, 180);
-        strokeWeight(6);
-        fill(255, 215, 0);
-        text("LOCKED", textX, textY);
-
-        noStroke();
-        fill(255, 215, 0);
-        text("LOCKED", textX, textY);
-
-        textFont(fonts.body);
-        textSize(20);
-        fill(200);
-        text("COMPLETE TODAY TO REVEAL", textX, textY + 40);
-        pop();
+        fill(255, 50, 50);
+        textSize(80);
+        text("FAILED", width / 2, height / 2 - 50);
     }
 
-    // ── L4: frame_cloud.png — sits on top of content, under title ──
-    if (assets.storyCloud) {
-        push();
-        imageMode(CENTER);
-        tint(255, storyDebugData.cloud.alpha);
-        image(assets.storyCloud,
-              storyDebugData.cloud.x, storyDebugData.cloud.y,
-              storyDebugData.cloud.w, storyDebugData.cloud.h);
-        noTint();
-        pop();
-    }
-
-    // ── L5: Title — drawn ABOVE the cloud ──
-    if (recap && isUnlocked) {
-        push();
-        textFont(fonts.title); textSize(35); textAlign(CENTER, CENTER);
-        stroke(0, 0, 0, 200); strokeWeight(6); fill(255, 105, 180);
-        text(recap.title, storyDebugData.titleArea.x, storyDebugData.titleArea.y);
-        noStroke(); fill(255, 105, 180);
-        text(recap.title, storyDebugData.titleArea.x, storyDebugData.titleArea.y);
-        pop();
-    }
-
-    // ── L5: Up/Down arrows + day indicator — identical to level-select arrows ──
-    let arrowX   = width - 90;
-    let centerY  = height / 2;
-    let arrowSz  = 60;
-    let arrowGap = 90;
-
-    if (assets.backImg) {
-        // Up arrow (previous day)
-        let canGoUp  = storyRecapDay > 1;
-        let upHover  = canGoUp && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35;
-        push();
-        translate(arrowX, centerY - arrowGap);
-        rotate(HALF_PI);
-        if (!canGoUp) tint(255, 60);
-        if (upHover)  scale(1.25);
-        imageMode(CENTER);
-        image(assets.backImg, 0, 0, arrowSz, arrowSz);
-        noTint();
-        pop();
-
-        // Day indicator between arrows
-        push();
-        textFont(fonts.title); textSize(20); textAlign(CENTER, CENTER);
-        stroke(0, 0, 0, 150); strokeWeight(3); fill(255, 215, 0);
-        text("DAY " + storyRecapDay, arrowX, centerY);
-        noStroke(); fill(255, 215, 0);
-        text("DAY " + storyRecapDay, arrowX, centerY);
-        pop();
-
-        // Down arrow (next day)
-        let nextDay   = storyRecapDay + 1;
-        let canGoDown = nextDay <= 5;
-        let downHover = canGoDown && dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35;
-
-        push();
-        translate(arrowX, centerY + arrowGap);
-        rotate(-HALF_PI);
-        if (!canGoDown) tint(255, 60);
-        if (downHover)  scale(1.25);
-        imageMode(CENTER);
-        image(assets.backImg, 0, 0, arrowSz, arrowSz);
-        noTint();
-        pop();
-    }
-
-    // ── DEV MODE: bounding boxes + controls hint ──
-    if (showStoryDebugControls) {
-        drawStoryDebugOverlay();
-    }
-}
-
-/**
- * Draws bounding-box overlays for each story layer during dev adjust mode.
- * Layers: [1] Shape  [2] Cloud  [3] TextArea  [4] TitleArea
- */
-function drawStoryDebugOverlay() {
-    push();
-    let layers = [
-        { key: 'shape',     label: 'SHAPE',      color: [255, 80,  80 ] },
-        { key: 'cloud',     label: 'CLOUD',      color: [80,  200, 255] },
-        { key: 'textArea',  label: 'CONTENT',    color: [80,  255, 80 ] },
-        { key: 'titleArea', label: 'TITLE',      color: [255, 200, 0  ] }
-    ];
-
-    for (let l = 0; l < layers.length; l++) {
-        let layerIdx = l + 1;
-        let d   = storyDebugData[layers[l].key];
-        let col = layers[l].color;
-        let active = (layerIdx === storyDebugActiveLayer);
-
-        stroke(col[0], col[1], col[2], active ? 255 : 100);
-        strokeWeight(active ? 3 : 1);
-        noFill();
-        rectMode(CENTER);
-        rect(d.x, d.y, d.w, d.h);
-
-        noStroke();
-        fill(col[0], col[1], col[2], active ? 230 : 130);
-        textFont(fonts.body); textSize(15); textAlign(LEFT, BOTTOM);
-        text(`[${layerIdx}] ${layers[l].label}: (${d.x}, ${d.y})  ${d.w}×${d.h}`,
-             d.x - d.w / 2 + 4, d.y - d.h / 2 - 4);
-    }
-
-    // Controls hint bar
-    fill(0, 0, 0, 170);
-    noStroke(); rectMode(CORNER);
-    rect(0, height - 50, width, 50);
-    fill(255, 255, 0, 220);
-    textFont(fonts.body); textSize(17); textAlign(CENTER, CENTER);
-    text("DEV  [1] Shape  [2] Cloud  [3] Content  [4] Title  |  Arrows: Move  |  Shift+Arrows: Resize  |  P: print",
-         width / 2, height - 25);
-    pop();
-}
-
-/**
- * Prints current storyDebugData to the browser console.
- */
-function printStoryDebugData() {
-    console.log("[DEV] Current storyDebugData:");
-    console.log(JSON.stringify(storyDebugData, null, 2));
+    textFont(fonts.body);
+    fill(255);
+    textSize(24);
+    let msg = (gameState.failReason === "HIT_BUS") ? "You were hit by a speeding bus." :
+        (gameState.failReason === "EXHAUSTED") ? "You ran out of energy." :
+            (gameState.failReason === "LATE") ? "You are fired!" : "Game Over.";
+    text(msg, width / 2, height / 2 + 20);
+    textSize(18);
+    text("Press ENTER to return to Room", width / 2, height / 2 + 100);
 }
