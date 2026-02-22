@@ -77,7 +77,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 29;
+const totalAssetsToLoad = 38;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,7 +104,8 @@ function preload() {
     assets.inventoryBg = loadImage('assets/inventory/table.png', itemLoaded);
     assets.backpackImg = loadImage('assets/inventory/backpack.png', itemLoaded);
     assets.studentCardImg = loadImage('assets/inventory/student_card.png', itemLoaded);
-    assets.computerImg = loadImage('assets/inventory/computer.png', itemLoaded);
+    assets.computerImg    = loadImage('assets/inventory/computer.png', itemLoaded);
+    assets.portraitPlayerNormal = loadImage('assets/characters/portrait/main.png', itemLoaded);
 
     assets.selectBg.unlock = loadImage('assets/select_background/day_unlock.jpg', itemLoaded);
     assets.selectBg.lock = loadImage('assets/select_background/day_lock.jpg', itemLoaded);

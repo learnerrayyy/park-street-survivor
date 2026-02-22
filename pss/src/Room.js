@@ -47,6 +47,34 @@ class RoomScene {
         // Timer for the "missing items" warning prompt (frames)
         this.doorBlockTimer = 0;
         this.doorBlockMessage = "";
+        // Dialog / Typewriter state
+        this.dialogActive = false;
+        this.dialogTimerMax = 120;   // 总时长（帧）2s
+        this.dialogTimer = 0;
+
+        this.dialogFullText = "";
+        this.dialogWords = [];
+        this.dialogWordIndex = 0;
+        this.dialogDisplayed = "";
+
+        // typing pacing (frames per word)
+        this.wordInterval = 4;
+        this.wordTick = 0;
+
+        // sound hook placeholder
+        this.typingSfx = null; // 找到音源后赋值，比如 sfxType
+
+        // Back arrow button — returns to level select
+        this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => {
+            triggerTransition(() => {
+                gameState.setState(STATE_LEVEL_SELECT);
+                if (mainMenu) {
+                    mainMenu.menuState = STATE_LEVEL_SELECT;
+                    mainMenu.timeWheel.bgAlpha = 0;
+                    mainMenu.timeWheel.triggerEntrance();
+                }
+            });
+        });
     }
 
     /**
@@ -62,6 +90,13 @@ class RoomScene {
         this.isPlayerNearDoor = false;
         this.doorBlockTimer = 0;
         this.doorBlockMessage = "";
+        this.dialogActive = false;
+        this.dialogTimer = 0;
+        this.dialogFullText = "";
+        this.dialogWords = [];
+        this.dialogWordIndex = 0;
+        this.dialogDisplayed = "";
+        this.wordTick = 0;
     }
 
     // ─── COLLISION ───────────────────────────────────────────────────────────
@@ -126,8 +161,7 @@ class RoomScene {
             // Check required items before leaving
             if (typeof backpackUI !== 'undefined' && backpackUI && !backpackUI.hasRequiredItems()) {
                 let missing = backpackUI.getMissingRequiredItems();
-                this.doorBlockMessage = "Pack your " + missing.join(" & ") + " before heading out!";
-                this.doorBlockTimer = 180; // show for 3 seconds
+                this.triggerDialog("I haven't packed my bag yet.");
                 console.log("[RoomScene] Exit blocked — missing: " + missing.join(", "));
                 return;
             }
@@ -142,6 +176,21 @@ class RoomScene {
             }
         }
     }
+
+    /**
+     * Trigger dialog box 
+     */
+    triggerDialog(text) {
+        this.dialogActive = true;
+        this.dialogTimer = this.dialogTimerMax;
+
+        this.dialogFullText = text;
+        this.dialogWords = text.trim().split(/\s+/); // 按空格分词
+        this.dialogWordIndex = 0;
+        this.dialogDisplayed = "";
+        this.wordTick = 0;
+    }
+
 
     // ─── RENDERING ───────────────────────────────────────────────────────────
 
@@ -266,30 +315,83 @@ class RoomScene {
      * Shows a timed warning when the player tries to leave without required items.
      */
     drawDoorBlockedPrompt() {
-        if (this.doorBlockTimer <= 0) return;
-        this.doorBlockTimer--;
+        if (!this.dialogActive || this.dialogTimer <= 0) return;
 
-        push();
-        let alpha = min(this.doorBlockTimer * 4, 220);
+        // countdown
+        this.dialogTimer--;
 
-        // Pill-shaped red banner centred at the bottom third of the screen
-        let bx = width / 2;
-        let by = height - 160;
-        let bw = 820;
-        let bh = 64;
+        // ---- Typewriter update (word-by-word) ----
+        // 只要还没显示完，就按节奏追加单词
+        if (this.dialogWordIndex < this.dialogWords.length) {
+            this.wordTick++;
+            if (this.wordTick >= this.wordInterval) {
+                this.wordTick = 0;
 
-        rectMode(CENTER);
+                // append next word
+                let w = this.dialogWords[this.dialogWordIndex];
+                this.dialogDisplayed += (this.dialogDisplayed ? " " : "") + w;
+                this.dialogWordIndex++;
+
+                // typing sfx hook (placeholder)
+                // 音源确定后：this.typingSfx = sfxType; 并确保 playSFX 存在
+                if (typeof playSFX === "function" && this.typingSfx) {
+                    playSFX(this.typingSfx);
+                }
+            }
+        }
+
+        // ---- Simple pop-in animation ----
+        let alpha = 230; // 90% black ≈ 230
+
+        // ---- Scale mapping from 1920x1080 design space ----
+        const DESIGN_W = 1920;
+        const DESIGN_H = 1080;
+        // 用统一缩放，避免图片/布局被拉伸
+        const s = min(width / DESIGN_W, height / DESIGN_H);
+
+        // ---- Dialog box: fixed 1920x220 in design space -> scaled to canvas ----
+        const boxH = 220 * s;
+        rectMode(CORNER);
         noStroke();
-        fill(180, 30, 30, alpha);
-        rect(bx, by, bw, bh, 12);
+        fill(56, 39, 96, alpha);
+        rect(0, height - boxH, width, boxH); 
 
-        // Warning text
-        textAlign(CENTER, CENTER);
+        // ---- Portrait: design (30,700) size 380x380 -> scaled ----
+        const px = 30 * s;
+        const py = 700 * s;
+        const pSize = 380 * s;
+
+        imageMode(CORNER);
+        if (assets && assets.portraitPlayerNormal) {
+            image(assets.portraitPlayerNormal, px, py, pSize, pSize);
+        } else {
+            fill(255, 255, 255, 40);
+            rect(px, py, pSize, pSize, 18 * s);
+        }
+
+        // ---- Text: fixed top-left at (496,932) in design space -> scaled ----
+        const tx = 496 * s;
+        const ty = 932 * s;
+
+        // 文本框宽高也按设计值缩放（右边留 40px，上下留白自己调）
+        const tw = (1920 - 496 - 40) * s;
+        const th = (220 - 30) * s;
+
         textFont(fonts.body);
-        textSize(22);
-        fill(255, 240, 100, alpha);
-        text(this.doorBlockMessage, bx, by);
+        textSize(48);
+        fill(255);
+        noStroke();
+        textAlign(LEFT, TOP);
+
+        // p5 自动换行：传入 w/h
+        text(this.dialogDisplayed, tx, ty, tw, th);
+
         pop();
+
+        // timer finished -> close
+        if (this.dialogTimer <= 0) {
+            this.dialogActive = false;
+        }
     }
 
     /**
