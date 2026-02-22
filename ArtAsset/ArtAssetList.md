@@ -8,9 +8,9 @@ All background assets are standard **1920x1080** resolution unless otherwise spe
 | **bg_light_rain**  | 1920x1080      | Overcast with grey clouds and minor puddles; features muted lighting and a grounded yet surreal tone.       |                              |
 | **bg_heavy_rain**  | 1920x1080      | Dark, heavy overcast with significant puddles and intense rain effects; realistic and somber color palette. |                              |
 | **bg_game_start**  | 1920x1080      | Uphill view of Bristol featuring a pixel filter; the Wills Memorial Building serves as the focal point.     | ArtAsset\Background          |
-| **bg_destination** | 1920x1080      | The end of road, the Wills Memorial Building.                                                               | ArtAsset\Background\bg_sunny |
+| **bg_destination** | 1920x1920      | The end of road, the Wills Memorial Building.                                                               | ArtAsset\Background\bg_sunny |
 | **bg_library**     | 1920x1080      | In library, player and NPC dialogue scene.                                                                  | ArtAsset\Background          |
-| **bg_news**        | 1920x1080      | News report on incident.                                                                                    |                              |
+| **bg_news**        | 1920x1080      | News report on incident.                                                                                    | ArtAsset\Background         |
 ## Dialogue & UI Backgrounds
 | **Asset Name**  | **Dimensions** | Description**                                                    | Path                        |
 | --------------- | -------------- | ---------------------------------------------------------------- | --------------------------- |
@@ -65,3 +65,9 @@ The gameplay area is divided into four lanes: Lanes 1 & 4 (Sidewalks, 200px) and
 | **bag_tangle**    | 300x300        | tangle                 | ArtAsset\Backpack |
 | **bag_headphone** | 300x300        | Noise cancel earphone. | ArtAsset\Backpack |
 | **bag_boots**     | 300x300        | rain boots             | ArtAsset\Backpack |
+
+# 5. UI Related
+| **Asset Name**    | **Dimensions** | **Description**        | Path              |
+| ----------------- | -------------- | ---------------------- | ----------------- |
+| **icon_success**   | 300x300        | Iris celebrating. Used in success page.    | ArtAsset\UI |
+| **Frame**    | 1920x1080        | Story background frame            | ArtAsset\UI |
