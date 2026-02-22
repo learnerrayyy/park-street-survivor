@@ -434,35 +434,38 @@ class Player {
     }
 
     /**
-     * Homeless crowd-control: knock player 2 lanes toward road center direction.
-     * Applies an overshoot displacement, then lane spring pulls back to lane center.
+     * Homeless crowd-control:
+     * - Hit from L1 homeless -> snap to L3 edge, then bounce to L3 center
+     * - Hit from L4 homeless -> snap to L2 edge, then bounce to L2 center
      */
     applyHomelessForcedLaneSwitch(sourceLane) {
-        const laneCount = this.runLaneCenters.length;
-        const baseLaneIndex = this.currentLaneIndex;
+        let targetLaneIndex = this.targetLaneIndex;
+        if (sourceLane === 1) targetLaneIndex = 2;      // L3 (0-based index)
+        else if (sourceLane === 4) targetLaneIndex = 1; // L2
+        else {
+            // Fallback: toward center side lane.
+            targetLaneIndex = (this.currentLaneIndex <= 1) ? 2 : 1;
+        }
+        this.targetLaneIndex = targetLaneIndex;
 
-        // Lane 1 homeless pushes right; lane 4 homeless pushes left.
-        let knockDir = 0;
-        if (sourceLane === 1) knockDir = 1;
-        else if (sourceLane === 4) knockDir = -1;
-        else knockDir = (this.x <= (GLOBAL_CONFIG.lanes.lane2 + GLOBAL_CONFIG.lanes.lane3) / 2) ? 1 : -1;
+        const lane2Center = this.runLaneCenters[1];
+        const lane3Center = this.runLaneCenters[2];
+        const centerDividerX = (lane2Center + lane3Center) / 2;
+        const targetCenterX = this.runLaneCenters[targetLaneIndex];
 
-        // Requirement change: knock across 2 lanes.
-        const laneJump = 2;
-        const nextLaneIndex = constrain(baseLaneIndex + knockDir * laneJump, 0, laneCount - 1);
-        this.targetLaneIndex = nextLaneIndex;
+        // Place player at target-lane edge near the center divider.
+        let edgeX = centerDividerX;
+        if (targetLaneIndex === 2) edgeX -= 8; // L3 left edge bias
+        if (targetLaneIndex === 1) edgeX += 8; // L2 right edge bias
 
-        // Visual feel: overshoot off the lane center, then spring returns to center.
-        const baseCenterX = this.runLaneCenters[baseLaneIndex];
-        const targetCenterX = this.runLaneCenters[nextLaneIndex];
-        const laneSpan = abs(targetCenterX - baseCenterX);
-        const overshoot = min(220, laneSpan * 0.35);
-        const displacedX = targetCenterX + knockDir * overshoot;
-        this.x = constrain(displacedX, this.minX, this.maxX);
-        this.laneVelocityX = -knockDir * max(12, overshoot * 0.35);
+        this.x = constrain(edgeX, this.minX, this.maxX);
 
-        // Briefly suppress manual lane input so the knockback reads clearly.
-        this.laneDelayFramesRemaining = max(this.laneDelayFramesRemaining, floor(0.35 * 60));
+        // Elastic feel: strong initial velocity from edge toward lane center.
+        const toCenterDir = targetCenterX >= this.x ? 1 : -1;
+        this.laneVelocityX = toCenterDir * 30;
+
+        // Small lock so player input doesn't cancel the bounce animation immediately.
+        this.laneDelayFramesRemaining = max(this.laneDelayFramesRemaining, floor(0.32 * 60));
         this.leftHeld = false;
         this.rightHeld = false;
     }
