@@ -12,6 +12,8 @@ class Environment {
 
         // Background Images
         this.defaultBg = null;      // Default running background
+        this.defaultBgCycle = [];   // Optional cycle for varied running backgrounds
+        this.defaultBgHeadIndex = 0; // Which tile is currently the lower tile in seamless pair
         this.destinationBg = null;  // Victory zone background
 
         // [STRICT LAYOUT CONFIGURATION]
@@ -67,6 +69,11 @@ class Environment {
         // Only loop the scrollPos if we're still in RUNNING phase
         if (levelPhase === "RUNNING" && this.scrollPos > bgHeight) {
             this.scrollPos -= bgHeight;
+            if (this.defaultBgCycle && this.defaultBgCycle.length > 0) {
+                const n = this.defaultBgCycle.length;
+                // The top tile becomes the next full-screen tile after wrap.
+                this.defaultBgHeadIndex = ((this.defaultBgHeadIndex - 1) % n + n) % n;
+            }
         }
     }
 
@@ -87,13 +94,14 @@ class Environment {
 
         if (levelPhase === "RUNNING") {
             // RUNNING: Display scrolling default background
-            if (defaultBg) {
-                const bgHeight = 1080;
-                const scrollY = this.scrollPos % bgHeight;
-
-                // Seamless scrolling with two tiles
-                image(defaultBg, 0, scrollY);
-                image(defaultBg, 0, scrollY - bgHeight);
+            const bgHeight = 1080;
+            const scrollY = this.scrollPos % bgHeight;
+            const bgA = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex) || defaultBg;
+            const bgB = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - 1) || defaultBg;
+            if (bgA && bgB) {
+                // Seamless scrolling with two tiles (cycle selection does not change scroll math)
+                image(bgA, 0, scrollY);
+                image(bgB, 0, scrollY - bgHeight);
             }
         }
         else if (levelPhase === "VICTORY_TRANSITION") {
@@ -101,11 +109,13 @@ class Environment {
 
             const bgHeight = 1080;
             const scrollY = this.scrollPos % bgHeight;
+            const bgA = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex) || defaultBg;
+            const bgB = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - 1) || defaultBg;
 
-            if (defaultBg) {
+            if (bgA && bgB) {
                 // Continue scrolling the default background normally
-                image(defaultBg, 0, scrollY);
-                image(defaultBg, 0, scrollY - bgHeight);
+                image(bgA, 0, scrollY);
+                image(bgB, 0, scrollY - bgHeight);
             }
 
             if (destinationBg) {
@@ -180,5 +190,12 @@ class Environment {
             line(centerX, y, centerX, y + 60);
         }
         pop();
+    }
+
+    getDefaultBgByTileIndex(tileIndex) {
+        if (!this.defaultBgCycle || this.defaultBgCycle.length === 0) return null;
+        const n = this.defaultBgCycle.length;
+        const idx = ((tileIndex % n) + n) % n;
+        return this.defaultBgCycle[idx];
     }
 }
