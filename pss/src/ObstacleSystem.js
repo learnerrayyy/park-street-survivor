@@ -300,24 +300,7 @@ class ObstacleManager {
 
 
             if (obs.spritePath) {
-                let img = this.spriteCache[obs.spritePath];
-                if (!img && assets && assets.previews) {
-                    const fileNameKey = obs.spritePath.split('/').pop().replace('.png', '').toLowerCase();
-                    let keyToTry = obs.variant && obs.variant.name ? obs.variant.name.toLowerCase() : obs.type.toLowerCase();
-                    img = assets.previews[keyToTry];
-
-                    if (!img) {
-                        keyToTry = obs.type.toLowerCase();
-                        img = assets.previews[keyToTry];
-                    }
-                    if (!img) {
-                        img = assets.previews[fileNameKey];
-                    }
-                }
-                if (!img) {
-                    img = loadImage(obs.spritePath);
-                    this.spriteCache[obs.spritePath] = img;
-                }
+                const img = this.getSpriteImage(obs.spritePath);
                 if (img) {
                     imageMode(CENTER);
                     image(img, obs.x, obs.y, obs.width, obs.height);
@@ -520,7 +503,13 @@ class ObstacleManager {
         this.promoterInteraction.active = true;
         this.promoterInteraction.spacePressCount = 0;
         this.promoterInteraction.spacePressRequired = config.spacePressRequired || 10;
-        this.promoterInteraction.overlaySpritePath = obs && obs.spritePath ? obs.spritePath : null;
+        const flyers = Array.isArray(config.leafletSprites) ? config.leafletSprites : [];
+        if (flyers.length > 0) {
+            const randomFlyer = flyers[Math.floor(Math.random() * flyers.length)];
+            this.promoterInteraction.overlaySpritePath = randomFlyer;
+        } else {
+            this.promoterInteraction.overlaySpritePath = null;
+        }
         this.promoterInteraction.projectile = null;
         this.promoterCooldownFramesRemaining = this.secondsToFrames(config.interactionCooldown || 5.0);
     }
@@ -582,7 +571,11 @@ class ObstacleManager {
 
         imageMode(CORNER);
         if (overlayImg) {
-            image(overlayImg, 0, 0, width, height);
+            const overlayW = 810;
+            const overlayH = 970.;
+            const overlayX = (width - overlayW) / 2;
+            const overlayY = (height - overlayH) / 2;
+            image(overlayImg, overlayX, overlayY, overlayW, overlayH);
         } else {
             noStroke();
             fill(20, 40, 80, 235);

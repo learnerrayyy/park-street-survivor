@@ -14,8 +14,8 @@ class Player {
         this.playTimeFrames = 0;
 
         // Sprite dimensions (flat pixel aesthetic)
-        this.width = 140;
-        this.height = 140;
+        this.width = 160;
+        this.height = 160;
         this.hitboxW = 60;
 
         // Walkable X range: left sidewalk (500) to right sidewalk (1420)

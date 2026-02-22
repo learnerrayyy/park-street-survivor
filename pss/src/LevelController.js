@@ -33,6 +33,7 @@ class LevelController {
       console.log(`[LevelController] Initializing Level - Day ${dayID}`);
 
       this.currentDayID = dayID;
+      this.resetRunPhaseState();
       const levelConfig = DAYS_CONFIG[dayID];
 
       if (!levelConfig) {
@@ -50,6 +51,22 @@ class LevelController {
       this.loadLevelBackgrounds(dayID);
 
       return true;
+   }
+
+   /**
+    * SESSION RESET: PREPARE A FRESH RUN
+    * Ensures re-entering a day after WIN/FAIL starts from RUNNING phase.
+    */
+   resetRunPhaseState() {
+      this.levelPhase = "RUNNING";
+      this.victoryStartScrollPos = 0;
+      this.victoryZoneFrames = 0;
+      this.victoryZoneStartY = 0;
+
+      if (typeof env !== "undefined" && env) {
+         env.scrollPos = 0;
+         env.defaultBgHeadIndex = 0;
+      }
    }
 
    /**
@@ -245,7 +262,9 @@ class LevelController {
     */
    checkSettlementPoint() {
       if (this.levelPhase === "VICTORY_TRANSITION") {
-         const bgHeight = 1080;
+         const bgHeight = (env && env.destinationBg && env.destinationBg.height)
+            ? env.destinationBg.height
+            : 1080;
          const scrolledSinceVictory = env.scrollPos - this.victoryStartScrollPos;
          console.log(`[checkSettlementPoint] TRANSITION: scrolled=${scrolledSinceVictory.toFixed(1)}, target=${bgHeight}`);
 

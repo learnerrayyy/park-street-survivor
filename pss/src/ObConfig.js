@@ -75,7 +75,8 @@ const OBSTACLE_CONFIG = {
 
       // Physical parameters
       speed: { min: 1.3, max: 1.4 },
-      size: { width: 88, height: 138 },
+      // Keep near original sprite aspect ratio (110:230) to avoid horizontal stretch.
+      size: { width: 66, height: 138 },
 
       // Damage parameters
       damage: 0,
@@ -156,7 +157,8 @@ const OBSTACLE_CONFIG = {
 
       // Physical parameters
       speed: { min: 0, max: 0 },  // Stationary on the road
-      size: { width: 150, height: 160 },
+      // Keep near original sprite aspect ratio (120:220) to avoid horizontal stretch.
+      size: { width: 87, height: 160 },
 
       // Damage parameters
       damage: 0,
@@ -167,6 +169,10 @@ const OBSTACLE_CONFIG = {
       leafletHeight: 970,
       spacePressRequired: 10,        // Press SPACE 10 times
       clearNearestObstacle: true,    // Clear the first obstacle in the current lane
+      leafletSprites: [
+         "assets/obstacles/obstacle_flyer1.png",
+         "assets/obstacles/obstacle_flyer2.png"
+      ],
 
       // Cooldown mechanism: Cooldown time after hitting the promoter
       interactionCooldown: 5.0,      // 5 seconds cooldown after interaction
@@ -176,10 +182,9 @@ const OBSTACLE_CONFIG = {
       allowedLanes: [1, 4],          // Only on the edges of the sidewalk
       mutualExclusion: ["LARGE_CAR"],
 
-      // Variants: 2 leaflet sprites
+      // World sprite: promoter NPC on street. Flyer sprites are overlay assets.
       variants: [
-         { id: "promoter_leaflet_1", name: "Leaflet 1", sprite: "assets/obstacles/obstacle_flyer1.png" },
-         { id: "promoter_leaflet_2", name: "Leaflet 2", sprite: "assets/obstacles/obstacle_flyer2.png" }
+         { id: "promoter_npc_1", name: "Promoter", sprite: "assets/obstacles/obstacle_promoter.png" }
       ]
    },
 

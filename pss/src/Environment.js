@@ -96,8 +96,9 @@ class Environment {
             // RUNNING: Display scrolling default background
             const bgHeight = 1080;
             const scrollY = this.scrollPos % bgHeight;
-            const bgA = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex) || defaultBg;
-            const bgB = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - 1) || defaultBg;
+            const tileShift = Math.floor(this.scrollPos / bgHeight);
+            const bgA = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - tileShift) || defaultBg;
+            const bgB = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - tileShift - 1) || defaultBg;
             if (bgA && bgB) {
                 // Seamless scrolling with two tiles (cycle selection does not change scroll math)
                 image(bgA, 0, scrollY);
@@ -109,8 +110,9 @@ class Environment {
 
             const bgHeight = 1080;
             const scrollY = this.scrollPos % bgHeight;
-            const bgA = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex) || defaultBg;
-            const bgB = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - 1) || defaultBg;
+            const tileShift = Math.floor(this.scrollPos / bgHeight);
+            const bgA = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - tileShift) || defaultBg;
+            const bgB = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - tileShift - 1) || defaultBg;
 
             if (bgA && bgB) {
                 // Continue scrolling the default background normally
@@ -121,10 +123,11 @@ class Environment {
             if (destinationBg) {
                 // Victory background enters based on how much we've scrolled since victory
                 const scrolledSinceVictory = this.scrollPos - levelController.victoryStartScrollPos;
+                const destinationBgHeight = destinationBg.height || 1080;
 
                 if (scrolledSinceVictory >= 0) {
                     // Victory background position: enters from bottom as we scroll
-                    const victoryEntryY = scrolledSinceVictory - bgHeight;
+                    const victoryEntryY = scrolledSinceVictory - destinationBgHeight;
 
                     // Only display single tile
                     image(destinationBg, 0, victoryEntryY);
@@ -135,7 +138,7 @@ class Environment {
             // VICTORY_ZONE: Display static victory background at frozen position
             if (destinationBg) {
                 // Use the Y position recorded when entering VICTORY_ZONE
-                const bgHeight = 1080;
+                const bgHeight = destinationBg.height || 1080;
                 const victoryY = levelController.victoryZoneStartY;
 
                 // Display with potential tile for seamless appearance
