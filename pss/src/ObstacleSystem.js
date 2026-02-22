@@ -21,8 +21,8 @@ class ObstacleManager {
      */
     update(scrollSpeed, player) {
         // [Logic Disabled] No obstacles will spawn or translate on the Y-axis.
-        // Forces the array to remain empty to ensure zero visual noise during environment testing.
-        this.obstacles = [];
+        // Reuse the existing array instead of allocating a new one every frame.
+        this.obstacles.length = 0;
     }
 
     /**
@@ -50,7 +50,6 @@ class ObstacleManager {
      */
     stopSpawning() {
         console.log("[ObstacleManager] Spawning stopped - Victory phase active");
-        // Simply clear obstacles and ensure no new ones spawn
-        this.obstacles = [];
+        this.obstacles.length = 0;
     }
 }

@@ -28,6 +28,26 @@ class MainMenu {
         this.isSFXMuted = false;
         this.preMuteBGMVolume = masterVolumeBGM;
         this.preMuteSFXVolume = masterVolumeSFX;
+
+        // ── PERFORMANCE: Cache help-page data to avoid per-frame allocation ──
+        this._helpControls = [
+            { id: 'move_combo', a: "MOVEMENT", d: "WASD or Arrows to navigate." },
+            { id: 'enter',      a: "NEXT PAGE", d: "Cycle through system intel." },
+            { id: 'space',      a: "PARKOUR",   d: "Interact during the run."    },
+            { id: 'e',          a: "INTERACT",  d: "Talk to NPCs or use items."  },
+            { id: 'p',          a: "PAUSE",     d: "Freeze time & system menu."  }
+        ];
+        this._helpCharacters = [
+            { name: "IRIS",      desc: "UoB student rushing to class.",  imgKey: "player",       unlockDay: 1 },
+            { name: "WIOLA",     desc: "Always prepared. Always calm.",  imgKey: "npc_1",        unlockDay: 1 },
+            { name: "LAYLA",     desc: "Lived on coffee and questions.", imgKey: "bus_driver",   unlockDay: 2 },
+            { name: "YUKI",      desc: "Quiet. Observant.",              imgKey: "npc_promoter", unlockDay: 3 },
+            { name: "RAYMOND",   desc: "Steady and practical.",          imgKey: "npc_promoter", unlockDay: 4 },
+            { name: "CHARLOTTE", desc: "Thoughtful. Direct.",            imgKey: "npc_promoter", unlockDay: 5 }
+        ];
+        // Pre-filter ITEM_WIKI once — avoids Array.filter() on every draw frame
+        this._helpBuffs   = ITEM_WIKI.filter(item => item.type === 'BUFF');
+        this._helpHazards = ITEM_WIKI.filter(item => item.type === 'HAZARD');
     }
 
     /**
@@ -52,6 +72,7 @@ class MainMenu {
         }));
         this.buttons.push(new UIButton(width / 2 + spacing, centerY, 256, 96, "SETTINGS", () => {
             triggerTransition(() => {
+                this.diffToastTimer = 0;   // clear any stale difficulty toast
                 this.menuState = STATE_SETTINGS;
                 gameState.currentState = STATE_SETTINGS;
             });
@@ -300,13 +321,13 @@ class MainMenu {
 
         // PAGE 0: Animated control key cards
         if (this.helpPage === 0) {
-            let controls = [
-                { id: 'move_combo', a: "MOVEMENT", d: "WASD or Arrows to navigate." },
-                { id: 'enter',      a: "NEXT PAGE", d: "Cycle through system intel." },
-                { id: 'space',      a: "PARKOUR",   d: "Interact during the run."    },
-                { id: 'e',          a: "INTERACT",  d: "Talk to NPCs or use items."  },
-                { id: 'p',          a: "PAUSE",     d: "Freeze time & system menu."  }
-            ];
+            // Use pre-cached array (no per-frame allocation)
+            let controls = this._helpControls;
+
+            // Pre-compute animation indices once per frame (shared across all cards)
+            let moveSeqIdx = floor(frameCount / 25) & 7; // & 7 == % 8, sequence has 8 entries
+            let animFrame3 = floor(frameCount / 10) % 3;
+            let animFrame15 = floor(frameCount / 15) % 3;
 
             controls.forEach((c, i) => {
                 let x       = sx + (i % 2) * (cw + gap);
@@ -318,17 +339,15 @@ class MainMenu {
                 rect(x, y, cw, ch, 12);
 
                 if (c.id === 'move_combo') {
-                    // Cycle through all 8 directional keys in sequence
-                    let sequence   = ['w', 'up', 'a', 'left', 's', 'down', 'd', 'right'];
-                    let currentIdx = floor(frameCount / 25) % sequence.length;
-                    let activeKey  = sequence[currentIdx];
-                    let sheet      = assets.keys[activeKey];
+                    // Cycle through all 8 directional keys — use pre-computed index
+                    const _seq  = ['w', 'up', 'a', 'left', 's', 'down', 'd', 'right'];
+                    let activeKey = _seq[moveSeqIdx];
+                    let sheet     = assets.keys[activeKey];
 
                     if (sheet) {
-                        let animFrame = floor(frameCount / 10) % 3;
                         let sw = sheet.width / 3;
                         let sh = sheet.height;
-                        image(sheet, x + 25, y + 35, 100, 70, animFrame * sw, 0, sw, sh);
+                        image(sheet, x + 25, y + 35, 100, 70, animFrame3 * sw, 0, sw, sh);
                         textAlign(CENTER, CENTER);
                         fill(100);
                         textFont(fonts.body);
@@ -336,12 +355,11 @@ class MainMenu {
                         text(activeKey.toUpperCase(), x + 75, y + 115);
                     }
                 } else {
-                    // Regular functional keys (ENTER, SPACE, E, P)
+                    // Regular functional keys (ENTER, SPACE, E, P) — use pre-computed index
                     let sheet = assets.keys[c.id];
                     if (sheet) {
-                        let animFrame = floor(frameCount / 15) % 3;
                         let sw = sheet.width / 3, sh = sheet.height;
-                        image(sheet, x + 25, y + 35, 100, 70, animFrame * sw, 0, sw, sh);
+                        image(sheet, x + 25, y + 35, 100, 70, animFrame15 * sw, 0, sw, sh);
                     }
                 }
 
@@ -352,14 +370,9 @@ class MainMenu {
         }
         // PAGE 1: Character wiki with per-day unlock states
         else if (this.helpPage === 1) {
-            let characters = [
-                { name: "IRIS",      desc: "UoB student rushing to class.",  imgKey: "player",       unlockDay: 1 },
-                { name: "WIOLA",     desc: "Always prepared. Always calm.",  imgKey: "npc_1",        unlockDay: 1 },
-                { name: "LAYLA",     desc: "Lived on coffee and questions.", imgKey: "bus_driver",   unlockDay: 2 },
-                { name: "YUKI",      desc: "Quiet. Observant.",              imgKey: "npc_promoter", unlockDay: 3 },
-                { name: "RAYMOND",   desc: "Steady and practical.",          imgKey: "npc_promoter", unlockDay: 4 },
-                { name: "CHARLOTTE", desc: "Thoughtful. Direct.",            imgKey: "npc_promoter", unlockDay: 5 }
-            ];
+            // Use pre-cached array (no per-frame allocation)
+            let characters = this._helpCharacters;
+            let pulse = sin(frameCount * 0.1) * 30 + 80; // calculate once for all locked cards
 
             characters.forEach((char, i) => {
                 let x          = sx + (i % 2) * (cw + gap);
@@ -379,11 +392,10 @@ class MainMenu {
                     textFont(fonts.title); fill(20); textSize(18); text(char.name, x + 145, y + 35);
                     textFont(fonts.body);  fill(80); textSize(16); text(char.desc, x + 145, y + 70, cw - 165);
                 } else {
-                    // Locked state: dark card with a pulsing "LOCKED // DAY N" label
+                    // Locked state: dark card — use pre-computed pulse value
                     fill(30); noStroke(); rect(x, y, cw, ch, 12);
                     textAlign(CENTER, CENTER);
                     textFont(fonts.title);
-                    let pulse = sin(frameCount * 0.1) * 30 + 80;
                     fill(pulse); textSize(18);
                     text(`LOCKED // DAY ${char.unlockDay}`, x + cw / 2, y + ch / 2);
                 }
@@ -391,8 +403,10 @@ class MainMenu {
         }
         // PAGE 2 & 3: Item encyclopedia (Buffs or Hazards)
         else {
-            let type  = (this.helpPage === 2) ? 'BUFF' : 'HAZARD';
-            let items = ITEM_WIKI.filter(item => item.type === type);
+            // Use pre-filtered cached arrays — no per-frame Array.filter()
+            let items = (this.helpPage === 2) ? this._helpBuffs : this._helpHazards;
+            let pulse = sin(frameCount * 0.1) * 30 + 80; // calculate once for all locked cards
+            let animIdx30 = floor(frameCount / 30); // base index for animated multi-sprite items
 
             items.forEach((item, i) => {
                 let x          = sx + (i % 2) * (cw + gap);
@@ -405,9 +419,8 @@ class MainMenu {
                     if (item.imgKey) {
                         let hazardImg;
                         if (Array.isArray(item.imgKey)) {
-                            // Cycle through multiple sprites for animated items
-                            let animIdx = floor(frameCount / 30) % item.imgKey.length;
-                            hazardImg   = assets.previews[item.imgKey[animIdx]];
+                            // Cycle through multiple sprites using pre-computed base index
+                            hazardImg = assets.previews[item.imgKey[animIdx30 % item.imgKey.length]];
                         } else {
                             hazardImg = assets.previews[item.imgKey];
                         }
@@ -424,11 +437,10 @@ class MainMenu {
                     textFont(fonts.title); fill(20); textSize(18); text(item.name, x + 145, y + 40);
                     textFont(fonts.body);  fill(80); textSize(16); text(item.desc, x + 145, y + 75, cw - 165);
                 } else {
-                    // Locked state: dark card with a pulsing label
+                    // Locked state: dark card — use pre-computed pulse value
                     fill(30); noStroke(); rect(x, y, cw, ch, 12);
                     textAlign(CENTER, CENTER);
                     textFont(fonts.title);
-                    let pulse = sin(frameCount * 0.1) * 30 + 80;
                     fill(pulse); textSize(18);
                     text(`LOCKED // DAY ${item.unlockDay}`, x + cw / 2, y + ch / 2);
                 }
@@ -529,8 +541,9 @@ class MainMenu {
 
             if (keyCode === ENTER || keyCode === 13) {
                 let selectedDay = this.timeWheel.selectedDay;
-                // Day 1 first press: unlock visually, don't enter yet
-                if (selectedDay === 1 &&
+                // Day 1 first press: unlock visually, don't enter yet (skipped in dev mode)
+                if (!developerMode &&
+                    selectedDay === 1 &&
                     typeof tutorialHints !== 'undefined' &&
                     !tutorialHints.day1VisuallyUnlocked) {
                     tutorialHints.day1VisuallyUnlocked = true;
@@ -616,8 +629,9 @@ class MainMenu {
                 if (mx > cloudX - cloudW / 2 && mx < cloudX + cloudW / 2 &&
                     my > cloudY - cloudH / 2 && my < cloudY + cloudH / 2) {
                     let selectedDay = this.timeWheel.selectedDay;
-                    // Day 1 first click: unlock visually, don't enter the game yet
-                    if (selectedDay === 1 &&
+                    // Day 1 first click: unlock visually, don't enter the game yet (skipped in dev mode)
+                    if (!developerMode &&
+                        selectedDay === 1 &&
                         typeof tutorialHints !== 'undefined' &&
                         !tutorialHints.day1VisuallyUnlocked) {
                         tutorialHints.day1VisuallyUnlocked = true;

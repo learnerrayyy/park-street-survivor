@@ -119,7 +119,7 @@ class TimeWheel {
         let delays = [0, 4, 10, 6, 2];
         for (let i = 0; i < this.totalDays; i++) {
             this._drops.push({
-                y:       -600 - random(200),
+                y:       -400 - random(100),
                 vy:      0,
                 landed:  false,
                 delay:   delays[i],
@@ -153,7 +153,7 @@ class TimeWheel {
         let delays = [0, 4, 10, 6, 2];
         for (let i = 0; i < this.totalDays; i++) {
             this._drops[i] = {
-                y:       -600 - random(200),
+                y:       -400 - random(100),
                 vy:      0,
                 landed:  false,
                 delay:   delays[i],
@@ -194,7 +194,7 @@ class TimeWheel {
                 }
             }
 
-            if (this._drops.every(d => d.landed) && this.entryTimer > 35) {
+            if (this._drops.every(d => d.landed) && this.entryTimer > 20) {
                 this.isEntering = false;
             }
         }
@@ -274,7 +274,8 @@ class TimeWheel {
      * Applies to both sidebar cards and cloud preview.
      */
     _updateDropPhysics() {
-        const gravity = 2.8;
+        const cardGravity  = 6.0; // sidebar day-cards (sped up)
+        const cloudGravity = 4.5; // cloud preview — original first-version value
 
         // Sidebar cards
         for (let i = 0; i < this.totalDays; i++) {
@@ -286,7 +287,7 @@ class TimeWheel {
             let diff = i - this.currentIndex;
             let targetY = diff * this.verticalSpacing;
 
-            drop.vy += gravity;
+            drop.vy += cardGravity;
             drop.y  += drop.vy;
             drop.rotation *= 0.88;
 
@@ -302,14 +303,12 @@ class TimeWheel {
         let cloud = this._cloudDrop;
         if (!cloud.landed) {
             if (this.entryTimer >= cloud.delay) {
-                let targetY = 0;
-
-                cloud.vy += gravity;
+                cloud.vy += cloudGravity;
                 cloud.y  += cloud.vy;
                 cloud.rotation *= 0.88;
 
-                if (cloud.y >= targetY) {
-                    cloud.y        = targetY;
+                if (cloud.y >= 0) {
+                    cloud.y        = 0;
                     cloud.vy       = 0;
                     cloud.landed   = true;
                     cloud.rotation = 0;
@@ -326,13 +325,13 @@ class TimeWheel {
      */
     drawDynamicBackground() {
         let isLocked = (this.selectedDay > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
-        // Day 1 stays visually locked until the player clicks once
-        if (this.selectedDay === 1 && !tutorialHints.day1VisuallyUnlocked) {
+        // Day 1 stays visually locked until the player clicks once (skipped in dev mode)
+        if (this.selectedDay === 1 && !tutorialHints.day1VisuallyUnlocked && !developerMode) {
             isLocked = true;
         }
 
         let targetAlpha = isLocked ? 0 : 255;
-        this.bgAlpha = lerp(this.bgAlpha, targetAlpha, 0.02);
+        this.bgAlpha = lerp(this.bgAlpha, targetAlpha, 0.04);
 
         imageMode(CORNER);
         if (assets.selectBg.lock)   image(assets.selectBg.lock,   0, 0, width, height);
@@ -385,11 +384,12 @@ class TimeWheel {
         let isCloudHover = (mouseX > x - cloudW / 2 && mouseX < x + cloudW / 2 &&
                             mouseY > y - cloudH / 2 && mouseY < y + cloudH / 2);
 
-        // Day 1 is "visually locked" (grayscale, same as Days 2-5) until the player clicks once
+        // Day 1 is "visually locked" (grayscale, same as Days 2-5) until the player clicks once (skipped in dev mode)
         let visuallyLocked = isLocked ||
             (dayID === 1 &&
              typeof tutorialHints !== 'undefined' &&
-             !tutorialHints.day1VisuallyUnlocked);
+             !tutorialHints.day1VisuallyUnlocked &&
+             !developerMode);
 
         let targetScale = (isCloudHover && !visuallyLocked && !this.isEntering) ? 1.08 : 1.0;
         this._cloudScale = lerp(this._cloudScale, targetScale, 0.1);
@@ -464,8 +464,8 @@ class TimeWheel {
         let isSelected = (i === this.selectedDay - 1);
         let isLocked = (i + 1 > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
 
-        if (i === 0 && typeof tutorialHints !== 'undefined' && !tutorialHints.day1VisuallyUnlocked) {
-            isLocked = true; 
+        if (i === 0 && typeof tutorialHints !== 'undefined' && !tutorialHints.day1VisuallyUnlocked && !developerMode) {
+            isLocked = true;
         }
 
         let alpha = map(distFromCenter, 0, 2, 255, 50);

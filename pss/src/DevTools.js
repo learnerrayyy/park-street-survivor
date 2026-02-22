@@ -17,7 +17,7 @@ let developerMode = false;
  * true  → all days are always selectable regardless of progress.
  * false → only unlocked days are selectable.
  */
-const DEBUG_UNLOCK_ALL = false;
+const DEBUG_UNLOCK_ALL = developerMode;  // auto-unlocks all days when dev mode is on
 
 /**
  * Which scene to jump to immediately on startup (only active when developerMode = true).
@@ -40,7 +40,7 @@ const DEBUG_DAY_ID = 1;
 /**
  * Developer flag to show the story recap screen.
  */
-const DEBUG_STORY_RECAP = true;
+const DEBUG_STORY_RECAP = false;
 
 /**
  * Developer data for the story recap screen.

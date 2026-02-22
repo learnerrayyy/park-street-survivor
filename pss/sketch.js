@@ -43,19 +43,29 @@ const DIFFICULTY_LABELS = ["EASY", "NORMAL", "HARD"];
 
 // ─── GLOBAL BACKGROUND WITH OVERLAY ──────────────────────────────────────────
 /**
+ * Shared dark-overlay alpha for every screen that renders otherBg.
+ * Change this ONE value to adjust the darkness uniformly across
+ * settings, help, pause, story, and the room wallpaper.
+ */
+const SHARED_BG_OVERLAY_ALPHA = 100;
+
+/**
  * Draws the standard otherBg background with a unified dark overlay.
+ * Uses cover-scale (imageMode CENTER, max-scale) so the image fills the
+ * canvas without stretching — identical to the room scene wallpaper.
  * Used in settings, help, pause, and story screens for consistent look.
  */
 function drawOtherBgWithOverlay() {
     push();
     if (assets && assets.otherBg) {
-        imageMode(CORNER);
-        image(assets.otherBg, 0, 0, width, height);
+        let s = max(width / assets.otherBg.width, height / assets.otherBg.height);
+        imageMode(CENTER);
+        image(assets.otherBg, width / 2, height / 2, assets.otherBg.width * s, assets.otherBg.height * s);
     } else {
         background(20);
     }
     noStroke();
-    fill(0, 0, 0, 120);
+    fill(0, 0, 0, SHARED_BG_OVERLAY_ALPHA);
     rectMode(CORNER);
     rect(0, 0, width, height);
     imageMode(CORNER);
@@ -194,6 +204,10 @@ function preload() {
     assets.backpackImg    = loadImage('assets/inventory/backpack.png', itemLoaded);
     assets.studentCardImg = loadImage('assets/inventory/student_card.png', itemLoaded);
     assets.computerImg    = loadImage('assets/inventory/computer.png', itemLoaded);
+    assets.vitaminImg     = loadImage('assets/inventory/vitamin.png', itemLoaded);
+    assets.tangleImg      = loadImage('assets/inventory/tangle.png', itemLoaded);
+    assets.headphoneImg   = loadImage('assets/inventory/headphone.png', itemLoaded);
+    assets.rainbootImg    = loadImage('assets/inventory/rainboot.png', itemLoaded);
 
     assets.selectBg.unlock = loadImage('assets/select_background/day_unlock.jpg', itemLoaded);
     assets.selectBg.lock   = loadImage('assets/select_background/day_lock.jpg', itemLoaded);
@@ -683,6 +697,7 @@ function handlePauseSelection() {
     } else if (selected === "SETTINGS") {
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
+        mainMenu.diffToastTimer = 0;   // clear any stale difficulty toast
         gameState.currentState = STATE_SETTINGS;
         mainMenu.menuState     = STATE_SETTINGS;
     } else if (selected === "HELP") {
@@ -1077,9 +1092,9 @@ function drawLogoPlaceholder(x, y) {
     let t        = frameCount * 0.02;
     let targetY  = isSplash ? (y + 160) : (y + 10);
 
-    // Drop-in physics
+    // Drop-in physics (gravity 1.2 → 3.0 for a snappier drop)
     if (!titleDrop.landed) {
-        titleDrop.vy += 1.2;
+        titleDrop.vy += 2.0;
         titleDrop.y  += titleDrop.vy;
         if (titleDrop.y >= y + 160) {
             titleDrop.y      = y + 160;
@@ -1110,9 +1125,10 @@ function drawLogoPlaceholder(x, y) {
         pop();
     }
 
-    // "PARK STREET" title
+    // "PARK STREET" title — only apply random shake while it's perceptible (>= 0.5px)
     push();
-    translate(x + random(-titleDrop.shake, titleDrop.shake), titleDrop.y);
+    let shakeX = (titleDrop.shake >= 0.5) ? random(-titleDrop.shake, titleDrop.shake) : 0;
+    translate(x + shakeX, titleDrop.y);
     drawSplitTitle("PARK STREET", 300, -130, 25);
     pop();
 
@@ -1125,9 +1141,9 @@ function drawLogoPlaceholder(x, y) {
         pop();
     }
 
-    // "SURVIVOR" subtitle
+    // "SURVIVOR" subtitle — reuse the same shake offset computed above
     push();
-    translate(x + random(-titleDrop.shake, titleDrop.shake), titleDrop.y);
+    translate(x + shakeX, titleDrop.y);
     drawSplitTitle("SURVIVOR", 200, 80, 20);
     pop();
 

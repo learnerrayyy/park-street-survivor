@@ -9,17 +9,6 @@ class BackpackVisual {
         this.inventory = inventorySystem;
         this.room      = roomScene;
 
-        // Emoji lookup for item icons
-        // ── TO ADD / CHANGE AN ITEM ICON: edit the matching entry below ──────
-        this.itemEmojis = {
-            "UoB Student ID":      "🪪",
-            "Laptop Computer":     "💻",
-            "Soft Gummy Vitamins": "🍬",
-            "Tangle Coffee":       "☕",
-            "Headphones":          "🎧",
-            "Rain Boots":          "🥾"
-        };
-
         // ── BACKPACK SLOT PANEL (top of screen) ───────────────────────────────
         // ← adjust topBarY to move the panel up/down
         this.topBarX     = width / 2;
@@ -67,6 +56,23 @@ class BackpackVisual {
             bottom: 898
         };
 
+        // ── FIXED ITEM POSITIONS (absolute canvas coordinates) ───────────────
+        // Each item on the desk always snaps back to its fixed position.
+        // ← In developer mode, drag the gold crosshair handles to reposition.
+        //   The console will log the new coordinates on release.
+        // ← To set positions for a specific day, run the game on that day with
+        //   developerMode = true, adjust, then copy the logged values here.
+        // size = render scale multiplier (1.0 = default base size).
+        // ← In developer mode drag the pink handle to resize, then copy logged values here.
+        this.itemFixedPositions = {
+            "UoB Student ID":      { x: 1209, y: 748, rot: -5,  size: 1.335 },
+            "Laptop Computer":     { x: 1413, y: 460, rot:  3,  size: 1.169 },
+            "Soft Gummy Vitamins": { x: 915,  y: 767, rot: -10, size: 1.483 },
+            "Tangle":              { x: 1488, y: 731, rot:  7,  size: 1.161 },
+            "Headphones":          { x: 1042, y: 516, rot:  4,  size: 1.679 },
+            "Rain Boots":          { x: 1716, y: 733, rot: -6,  size: 1.876 }
+        };
+
         // Items scattered on the desk surface
         this.scatteredItems = [];
         this.initScatteredItems();
@@ -105,8 +111,11 @@ class BackpackVisual {
             startVal: null     // snapshot of the value being edited
         };
 
-        // Back arrow button — returns to room
+        // Back arrow button — returns to room and advances tutorial phase
         this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => {
+            if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'CLOSE_BP') {
+                tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
+            }
             gameState.currentState = STATE_ROOM;
         });
     }
@@ -119,23 +128,12 @@ class BackpackVisual {
     initScatteredItems() {
         this.scatteredItems = [];
         let availableItems = this.getAvailableItemsForDay(currentDayID);
-        let z = this.itemZone;
 
-        // ← positions are spaced so that no two items' interaction radii overlap.
-        // Student ID (radius 100) → upper-left; Computer (radius 150) → right-centre;
-        // emoji items (radius 60) fill the remaining area.
-        let positions = [
-            { x: z.left + 130, y: z.top  + 100, rot:  -5 },   // 0 Student ID
-            { x: z.left + 600, y: z.top  + 200, rot:   3 },   // 1 Computer
-            { x: z.left + 200, y: z.top  + 340, rot: -10 },   // 2 emoji
-            { x: z.left + 400, y: z.top  + 100, rot:   7 },   // 3 emoji
-            { x: z.left + 310, y: z.top  + 360, rot:   4 },   // 4 emoji
-            { x: z.left + 450, y: z.top  + 390, rot:  -6 }    // 5 emoji
-        ];
-
-        availableItems.forEach((item, i) => {
+        availableItems.forEach(item => {
             if (this.topSlots.includes(item.name)) return;
-            let pos = positions[i] || { x: z.left + 200, y: z.top + 200, rot: 0 };
+            // Each item always starts at its fixed position
+            let pos = this.itemFixedPositions[item.name] ||
+                      { x: this.itemZone.left + 200, y: this.itemZone.top + 200, rot: 0 };
             this.scatteredItems.push({ item: item, x: pos.x, y: pos.y, rotation: pos.rot });
         });
     }
@@ -150,7 +148,7 @@ class BackpackVisual {
         if (studentID) items.push(studentID);
         if (computer)  items.push(computer);
         if (day >= 2) { let gummy      = this.inventory.items.find(i => i.name === "Soft Gummy Vitamins"); if (gummy)      items.push(gummy);      }
-        if (day >= 3) { let coffee     = this.inventory.items.find(i => i.name === "Tangle Coffee");       if (coffee)     items.push(coffee);     }
+        if (day >= 3) { let coffee     = this.inventory.items.find(i => i.name === "Tangle");              if (coffee)     items.push(coffee);     }
         if (day >= 4) { let headphones = this.inventory.items.find(i => i.name === "Headphones");          if (headphones) items.push(headphones); }
         if (day >= 5) { let boots      = this.inventory.items.find(i => i.name === "Rain Boots");          if (boots)      items.push(boots);      }
         return items;
@@ -236,7 +234,7 @@ class BackpackVisual {
         textFont(fonts.body);
         textSize(22);
         fill(255, 215, 0);
-        text("Only ONE friend's gift allowed per run", cx, cy - 42);
+        text("ONE friend's gift allowed per run", cx, cy - 42);
 
         // ── Divider line below label ──────────────────────────────────────────
         stroke(150, 80, 230, 80 + pulse * 30);
@@ -286,14 +284,17 @@ class BackpackVisual {
                 let itemName = this.topSlots[i];
                 let itemImg  = this._getItemImage(itemName);
                 if (itemImg) {
-                    this._drawImageAspect(itemImg, sx, sy, this.slotSize - 14, this.slotSize - 14);
+                    imageMode(CENTER);
+                    image(itemImg, sx, sy, this.slotSize - 10, this.slotSize - 10);
                 } else {
-                    let emoji = this.itemEmojis[itemName] || "📦";
-                    textSize(46);
+                    fill(80, 40, 120);
                     noStroke();
+                    rectMode(CENTER);
+                    rect(sx, sy, this.slotSize - 20, this.slotSize - 20, 6);
                     fill(255);
+                    textSize(11);
                     textAlign(CENTER, CENTER);
-                    text(emoji, sx, sy - 1);
+                    text(itemName.split(" ")[0].substring(0, 6).toUpperCase(), sx, sy);
                 }
                 if (isHovered && !this.draggedItem) {
                     let item = this.findItemByName(itemName);
@@ -317,8 +318,12 @@ class BackpackVisual {
      * @param {string} itemName
      */
     _getItemImage(itemName) {
-        if (itemName === "UoB Student ID"  && assets.studentCardImg) return assets.studentCardImg;
-        if (itemName === "Laptop Computer" && assets.computerImg)    return assets.computerImg;
+        if (itemName === "UoB Student ID"      && assets.studentCardImg) return assets.studentCardImg;
+        if (itemName === "Laptop Computer"     && assets.computerImg)    return assets.computerImg;
+        if (itemName === "Soft Gummy Vitamins" && assets.vitaminImg)     return assets.vitaminImg;
+        if (itemName === "Tangle"              && assets.tangleImg)      return assets.tangleImg;
+        if (itemName === "Headphones"          && assets.headphoneImg)   return assets.headphoneImg;
+        if (itemName === "Rain Boots"          && assets.rainbootImg)    return assets.rainbootImg;
         return null;
     }
 
@@ -342,6 +347,18 @@ class BackpackVisual {
         if (itemName === "Laptop Computer") return 150;
         if (itemName === "UoB Student ID")  return 100;
         return 60; // emoji-based items
+    }
+
+    /**
+     * Returns true if the mouse point is inside (or near) the backpack slot panel.
+     * Used to determine whether a slot-item drag should stay in the panel or
+     * be returned to the desk.
+     */
+    _isNearTopBar(mx, my) {
+        let hw = this.topBarW / 2 + 60;
+        let hh = this.topBarH / 2 + 30;
+        return (mx > this.topBarX - hw && mx < this.topBarX + hw &&
+                my > this.topBarY - hh && my < this.topBarY + hh);
     }
 
     /**
@@ -383,7 +400,6 @@ class BackpackVisual {
             rect(0, 30, this.backpackW * 0.5, this.backpackH * 0.5, 15);
             textSize(100);
             textAlign(CENTER, CENTER);
-            text("🎒", 0, 10);
         }
         pop();
     }
@@ -409,18 +425,24 @@ class BackpackVisual {
             }
             let itemImg = this._getItemImage(scattered.item.name);
             if (itemImg) {
-                let maxSize = (scattered.item.name === "Laptop Computer") ? 800 : 400;
+                let baseSize = (scattered.item.name === "Laptop Computer") ? 300 : 180;
+                let posData  = this.itemFixedPositions[scattered.item.name];
+                let maxSize  = baseSize * (posData ? (posData.size || 1.0) : 1.0);
                 this._drawImageAspect(itemImg, 0, 0, maxSize, maxSize);
             } else {
-                let emoji = this.itemEmojis[scattered.item.name] || "📦";
-                textSize(60);
+                fill(80, 40, 120);
+                noStroke();
+                rectMode(CENTER);
+                rect(0, 0, 80, 80, 8);
+                fill(255);
+                textSize(12);
                 textAlign(CENTER, CENTER);
-                text(emoji, 0, 0);
+                text(scattered.item.name.split(" ")[0].substring(0, 6).toUpperCase(), 0, 0);
             }
             pop();
 
             if (isHovered && !this.draggedItem) {
-                this.drawTooltip(scattered.item, mouseX, mouseY);
+                this.drawTooltip(scattered.item, scattered.x, scattered.y);
             }
         });
     }
@@ -434,54 +456,64 @@ class BackpackVisual {
         let itemImg = this._getItemImage(this.draggedItem.name);
         if (itemImg) {
             tint(255, 220);
-            let dragMax = (this.draggedItem.name === "Laptop Computer") ? 400 : 200;
+            let baseSize = (this.draggedItem.name === "Laptop Computer") ? 150 : 90;
+            let posData  = this.itemFixedPositions[this.draggedItem.name];
+            let dragMax  = baseSize * (posData ? (posData.size || 1.0) : 1.0);
             this._drawImageAspect(itemImg, mouseX, mouseY, dragMax, dragMax);
             noTint();
         } else {
-            let emoji = this.itemEmojis[this.draggedItem.name] || "📦";
-            textSize(72);
-            textAlign(CENTER, CENTER);
+            fill(80, 40, 120, 200);
+            noStroke();
+            rectMode(CENTER);
+            rect(mouseX, mouseY, 80, 80, 8);
             fill(255, 255, 255, 220);
-            text(emoji, mouseX, mouseY);
+            textSize(12);
+            textAlign(CENTER, CENTER);
+            text(this.draggedItem.name.split(" ")[0].substring(0, 6).toUpperCase(), mouseX, mouseY);
         }
         pop();
     }
 
     /**
-     * Renders a tooltip card near the cursor for a desk item.
+     * Renders a tooltip card to the right of a desk item.
+     * @param {object} item - inventory item
+     * @param {number} itemX - world x of the item centre
+     * @param {number} itemY - world y of the item centre
      */
-    drawTooltip(item, mx, my) {
+    drawTooltip(item, itemX, itemY) {
         push();
         let title = item.name;
         let desc  = item.description || "";
 
+        textSize(20);
+        let w  = max(textWidth(title), textSize(16) || 0, 220) + 40;
         textSize(16);
-        let w  = max(textWidth(title), textWidth(desc), 180) + 30;
-        let h  = desc ? 85 : 60;
-        let tx = constrain(mx + 20, 10, width - w - 10);
-        let ty = constrain(my - h / 2, 10, height - h - 10);
+        if (desc) w = max(w, textWidth(desc) + 40);
+        let h  = desc ? 110 : 75;
+        let tx = constrain(itemX + 80, 10, width - w - 10);
+        let ty = constrain(itemY - h / 2, 10, height - h - 10);
 
         rectMode(CORNER);
         fill(22, 10, 48, 240);
         stroke(255, 215, 0);
         strokeWeight(2);
-        rect(tx, ty, w, h, 6);
+        rect(tx, ty, w, h, 8);
 
         noStroke();
         fill(255, 215, 0);
         textAlign(LEFT, TOP);
-        textSize(16);
-        text(title, tx + 15, ty + 12);
+        textSize(20);
+        text(title, tx + 16, ty + 14);
 
         if (desc) {
             fill(200, 160, 255);
-            textSize(13);
-            text(desc, tx + 15, ty + 38);
+            textSize(16);
+            text(desc, tx + 16, ty + 46);
         }
 
         fill(140, 100, 200);
-        textSize(11);
-        text("Drag to backpack", tx + 15, ty + h - 20);
+        textSize(13);
+        text("Drag to backpack", tx + 16, ty + h - 24);
         pop();
     }
 
@@ -493,9 +525,11 @@ class BackpackVisual {
         let title = item.name;
         let desc  = item.description || "";
 
+        textSize(20);
+        let w  = max(textWidth(title), 220) + 40;
         textSize(16);
-        let w  = max(textWidth(title), textWidth(desc), 180) + 30;
-        let h  = desc ? 85 : 60;
+        if (desc) w = max(w, textWidth(desc) + 40);
+        let h  = desc ? 110 : 75;
         let tx = constrain(slotX - w / 2, 10, width - w - 10);
         let ty = slotY + this.slotSize / 2 + 12;
 
@@ -503,23 +537,23 @@ class BackpackVisual {
         fill(22, 10, 48, 240);
         stroke(255, 215, 0);
         strokeWeight(2);
-        rect(tx, ty, w, h, 6);
+        rect(tx, ty, w, h, 8);
 
         noStroke();
         fill(255, 215, 0);
         textAlign(LEFT, TOP);
-        textSize(16);
-        text(title, tx + 15, ty + 12);
+        textSize(20);
+        text(title, tx + 16, ty + 14);
 
         if (desc) {
             fill(200, 160, 255);
-            textSize(13);
-            text(desc, tx + 15, ty + 38);
+            textSize(16);
+            text(desc, tx + 16, ty + 46);
         }
 
         fill(140, 100, 200);
-        textSize(11);
-        text("Drag back to desk", tx + 15, ty + h - 20);
+        textSize(13);
+        text("Drag back to desk", tx + 16, ty + h - 24);
         pop();
     }
 
@@ -544,26 +578,40 @@ class BackpackVisual {
         noStroke();
         fill(255, 215, 0);
         textSize(22);
-        text("⚠️ BACKPACK FULL", boxX, boxY - 75);
+        text("BACKPACK FULL", boxX, boxY - 75);
 
         fill(255);
         textSize(16);
-        text("书包只能装三个物品,",        boxX, boxY - 35);
-        text("还要装学生卡和电脑!",        boxX, boxY - 10);
-        text("Replace existing NPC item?", boxX, boxY + 20);
+        text("Only 1 NPC item allowed at a time.", boxX, boxY - 20);
+        text("Replace the current NPC item?",      boxX, boxY + 10);
 
-        let btnY = boxY + 75, btnW = 90, btnH = 40;
-        let yesHover = (mouseX > boxX - 60 - btnW / 2 && mouseX < boxX - 60 + btnW / 2 &&
+        let btnY = boxY + 75, btnW = 120, btnH = 50;
+        let yesHover = (mouseX > boxX - 80 - btnW / 2 && mouseX < boxX - 80 + btnW / 2 &&
                         mouseY > btnY - btnH / 2 && mouseY < btnY + btnH / 2);
-        fill(yesHover ? color(120, 255, 120) : color(60, 180, 60));
-        rect(boxX - 60, btnY, btnW, btnH, 8);
-        fill(0); textSize(18); text("YES", boxX - 60, btnY);
+        let noHover  = (mouseX > boxX + 80 - btnW / 2 && mouseX < boxX + 80 + btnW / 2 &&
+                        mouseY > btnY - btnH / 2 && mouseY < btnY + btnH / 2);
 
-        let noHover = (mouseX > boxX + 60 - btnW / 2 && mouseX < boxX + 60 + btnW / 2 &&
-                       mouseY > btnY - btnH / 2 && mouseY < btnY + btnH / 2);
-        fill(noHover ? color(255, 120, 120) : color(180, 60, 60));
-        rect(boxX + 60, btnY, btnW, btnH, 8);
-        fill(0); text("NO", boxX + 60, btnY);
+        // YES button
+        push();
+        translate(boxX - 80, btnY);
+        if (yesHover) scale(1.08);
+        imageMode(CENTER);
+        if (assets && assets.btnImg) image(assets.btnImg, 0, 0, btnW * 2, btnH * 2);
+        else { fill(60, 180, 60); rectMode(CENTER); rect(0, 0, btnW, btnH, 8); }
+        noStroke(); fill(255, 215, 0); textSize(20); textAlign(CENTER, CENTER);
+        text("YES", 0, -4);
+        pop();
+
+        // NO button
+        push();
+        translate(boxX + 80, btnY);
+        if (noHover) scale(1.08);
+        imageMode(CENTER);
+        if (assets && assets.btnImg) image(assets.btnImg, 0, 0, btnW * 2, btnH * 2);
+        else { fill(180, 60, 60); rectMode(CENTER); rect(0, 0, btnW, btnH, 8); }
+        noStroke(); fill(255, 215, 0); textSize(20); textAlign(CENTER, CENTER);
+        text("NO", 0, -4);
+        pop();
         pop();
     }
 
@@ -618,6 +666,39 @@ class BackpackVisual {
         this.drawDevZoneBox(this.itemZone,  'itemZone',  [255, 80,  80]);
         // Backpack — cyan
         this.drawDevBackpackBox();
+        // Item fixed positions — gold crosshairs (drag to reposition)
+        this.drawDevItemHandles();
+        pop();
+    }
+
+    /**
+     * Draws a draggable gold crosshair for each item's fixed position.
+     * Drag to move; release logs the new coordinates to the console.
+     */
+    drawDevItemHandles() {
+        push();
+        for (let [name, pos] of Object.entries(this.itemFixedPositions)) {
+            // Gold crosshair — drag to reposition
+            stroke(255, 200, 0, 200);
+            strokeWeight(1);
+            line(pos.x - 24, pos.y, pos.x + 24, pos.y);
+            line(pos.x, pos.y - 24, pos.x, pos.y + 24);
+            this.drawDevHandle(pos.x, pos.y, [255, 200, 0]);
+            noStroke();
+            fill(255, 200, 0, 220);
+            textAlign(LEFT, BOTTOM);
+            textSize(12);
+            text(`[DEV] "${name}"  x:${round(pos.x)}  y:${round(pos.y)}`, pos.x + 12, pos.y - 2);
+
+            // Pink resize handle — drag left/right to shrink/grow
+            let sh = { x: pos.x + 28, y: pos.y + 28 };
+            this.drawDevHandle(sh.x, sh.y, [255, 80, 200]);
+            noStroke();
+            fill(255, 80, 200, 220);
+            textAlign(LEFT, TOP);
+            textSize(11);
+            text(`size:${(pos.size || 1.0).toFixed(2)}  ←drag→`, sh.x + 10, sh.y - 6);
+        }
         pop();
     }
 
@@ -715,6 +796,14 @@ class BackpackVisual {
             console.log(`[DEV] deskZone  → left:${round(z.left)}  right:${round(z.right)}  top:${round(z.top)}  bottom:${round(z.bottom)}`);
         } else if (target === 'backpack') {
             console.log(`[DEV] backpack  → x:${round(this.backpackX)}  y:${round(this.backpackY)}  w:${round(this.backpackW)}  h:${round(this.backpackH)}`);
+        } else if (target === 'itemPos') {
+            let name = this.devDrag.handle;
+            let pos  = this.itemFixedPositions[name];
+            console.log(`[DEV] itemPos "${name}"  → x:${round(pos.x)}  y:${round(pos.y)}`);
+        } else if (target === 'itemSize') {
+            let name = this.devDrag.handle;
+            let pos  = this.itemFixedPositions[name];
+            console.log(`[DEV] itemSize "${name}"  → size:${pos.size.toFixed(3)}`);
         }
     }
 
@@ -741,6 +830,21 @@ class BackpackVisual {
             if (abs(mx - (x+w))  < HS && abs(my - y)      < HS) return { target: name, handle: 'ne'   };
             if (abs(mx - x)      < HS && abs(my - (y+h))  < HS) return { target: name, handle: 'sw'   };
             if (abs(mx - (x+w))  < HS && abs(my - (y+h))  < HS) return { target: name, handle: 'se'   };
+        }
+
+        // Item fixed-position handles (gold crosshairs)
+        for (let [name, pos] of Object.entries(this.itemFixedPositions)) {
+            if (abs(mx - pos.x) < HS && abs(my - pos.y) < HS) {
+                return { target: 'itemPos', handle: name };
+            }
+        }
+
+        // Item size handles (pink squares — offset +28,+28 from crosshair)
+        for (let [name, pos] of Object.entries(this.itemFixedPositions)) {
+            let sh = { x: pos.x + 28, y: pos.y + 28 };
+            if (abs(mx - sh.x) < HS && abs(my - sh.y) < HS) {
+                return { target: 'itemSize', handle: name };
+            }
         }
 
         // Backpack handles
@@ -774,6 +878,23 @@ class BackpackVisual {
               else if (h === 'ne') { zone.right = sv.right  + dx; zone.top    = sv.top    + dy; }
               else if (h === 'sw') { zone.left  = sv.left   + dx; zone.bottom = sv.bottom + dy; }
               else if (h === 'se') { zone.right = sv.right  + dx; zone.bottom = sv.bottom + dy; }
+
+        } else if (t === 'itemPos') {
+            // h is the item name; move the fixed position and live-update desk display
+            let pos = this.itemFixedPositions[h];
+            if (pos) {
+                pos.x = sv.x + dx;
+                pos.y = sv.y + dy;
+                let sc = this.scatteredItems.find(s => s.item.name === h);
+                if (sc) { sc.x = pos.x; sc.y = pos.y; }
+            }
+
+        } else if (t === 'itemSize') {
+            // h is the item name; drag right = bigger, drag left = smaller
+            let pos = this.itemFixedPositions[h];
+            if (pos) {
+                pos.size = max(0.1, min(5.0, sv.size + dx / 120));
+            }
 
         } else if (t === 'backpack') {
             if (h === 'move') {
@@ -813,7 +934,7 @@ class BackpackVisual {
         for (let i = 0; i < this.scatteredItems.length; i++) {
             if (this.dragSource === 'desk' && this.dragIndex === i) continue;
             let s = this.scatteredItems[i];
-            if (dist(mx, my, s.x, s.y) < 70) { this.hoveredItem = i; break; }
+            if (dist(mx, my, s.x, s.y) < 100) { this.hoveredItem = i; break; }
         }
 
         // Check backpack slots
@@ -854,6 +975,12 @@ class BackpackVisual {
                 } else if (hit.target === 'backpack') {
                     this.devDrag.startVal = { x: this.backpackX, y: this.backpackY,
                                               w: this.backpackW,  h: this.backpackH };
+                } else if (hit.target === 'itemPos') {
+                    let pos = this.itemFixedPositions[hit.handle];
+                    this.devDrag.startVal = { x: pos.x, y: pos.y };
+                } else if (hit.target === 'itemSize') {
+                    let pos = this.itemFixedPositions[hit.handle];
+                    this.devDrag.startVal = { size: pos.size || 1.0 };
                 }
                 return;  // Don't process normal game mouse logic
             }
@@ -862,12 +989,12 @@ class BackpackVisual {
         // ── Normal gameplay mouse handling ────────────────────────────────────
         if (this.showReplaceDialog) {
             let boxX = width / 2, boxY = height / 2;
-            let btnY = boxY + 75, btnW = 90, btnH = 40;
-            if (mx > boxX - 60 - btnW / 2 && mx < boxX - 60 + btnW / 2 &&
+            let btnY = boxY + 75, btnW = 120, btnH = 50;
+            if (mx > boxX - 80 - btnW / 2 && mx < boxX - 80 + btnW / 2 &&
                 my > btnY - btnH / 2       && my < btnY + btnH / 2) {
                 this.executeReplace(); return;
             }
-            if (mx > boxX + 60 - btnW / 2 && mx < boxX + 60 + btnW / 2 &&
+            if (mx > boxX + 80 - btnW / 2 && mx < boxX + 80 + btnW / 2 &&
                 my > btnY - btnH / 2       && my < btnY + btnH / 2) {
                 this.showReplaceDialog = false;
                 this.replaceNewItem    = null;
@@ -895,7 +1022,7 @@ class BackpackVisual {
         // Drag from desk — record original position for potential snap-back
         for (let i = this.scatteredItems.length - 1; i >= 0; i--) {
             let s = this.scatteredItems[i];
-            if (dist(mx, my, s.x, s.y) < 70) {
+            if (dist(mx, my, s.x, s.y) < 100) {
                 this.draggedItem = s.item;
                 this.dragSource  = 'desk';
                 this.dragIndex   = i;
@@ -923,15 +1050,13 @@ class BackpackVisual {
      * Resolves the drag on mouse release.
      *
      * Desk items:
-     *   - Drop on backpack  → pack item
-     *   - Drop on slot      → slot item
-     *   - Drop inside zone  → update item position (free reposition)
-     *   - Drop outside zone → snap back to dragStartX / dragStartY
+     *   - Drop on backpack image → auto-pack into an empty slot
+     *   - Drop on a slot         → place directly into that slot
+     *   - Anywhere else          → snap back to fixed desk position (no free reposition)
      *
      * Slot items:
-     *   - Drop on another slot → swap
-     *   - Drop inside zone     → return to desk
-     *   - Drop outside zone    → stays in slot
+     *   - Released inside top-bar area → swap if hovering another slot, else stay in original slot
+     *   - Released outside top-bar     → remove from slot and snap to fixed desk position
      */
     handleMouseReleased(mx, my) {
         // ── Finalize dev drag ─────────────────────────────────────────────────
@@ -945,57 +1070,30 @@ class BackpackVisual {
 
         if (!this.draggedItem) return;
         let item = this.draggedItem;
-        let z    = this.itemZone;
-        let inItemZone = (mx > z.left && mx < z.right && my > z.top && my < z.bottom);
 
         if (this.dragSource === 'desk') {
             if (this.backpackHighlight) {
+                // Drop on backpack image → auto-pack
                 this.tryAddToBackpack(item);
             } else if (this.hoveredSlot !== -1) {
+                // Drop directly on a slot
                 this.tryAddToSlot(item, this.hoveredSlot);
-            } else if (inItemZone) {
-                // Only reposition if the target spot does not overlap another item
-                if (this._wouldOverlap(mx, my, item.name, this.dragIndex)) {
-                    this.showMessage("Can't place here — items would overlap!");
-                    // scatteredItems[dragIndex] keeps dragStartX/Y → snap-back
-                } else {
-                    this.scatteredItems[this.dragIndex].x        = mx;
-                    this.scatteredItems[this.dragIndex].y        = my;
-                    this.scatteredItems[this.dragIndex].rotation = random(-12, 12);
-                }
             }
-            // Dropped outside zone → scatteredItems[dragIndex] retains dragStartX/Y → snap-back
+            // Anywhere else → scatteredItems[dragIndex] keeps its fixed x/y → visual snap-back
 
         } else if (this.dragSource === 'slot') {
-            if (this.hoveredSlot !== -1) {
-                this.tryAddToSlot(item, this.hoveredSlot);
-            } else if (inItemZone) {
-                // Find a non-overlapping spot near the drop point
-                if (!this._wouldOverlap(mx, my, item.name, -1)) {
-                    this.topSlots[this.dragIndex] = null;
-                    this.addToDeskAtPosition(item, mx, my);
-                    this.showMessage("✓ " + item.name + " returned to desk");
-                } else {
-                    // Try nearby offsets until a clear spot is found
-                    let placed = false;
-                    let r = this._getItemRadius(item.name) * 2 + 20;
-                    for (let angle = 0; angle < 360 && !placed; angle += 30) {
-                        let tx = mx + r * cos(radians(angle));
-                        let ty = my + r * sin(radians(angle));
-                        let z2 = this.itemZone;
-                        if (tx > z2.left && tx < z2.right && ty > z2.top && ty < z2.bottom) {
-                            if (!this._wouldOverlap(tx, ty, item.name, -1)) {
-                                this.topSlots[this.dragIndex] = null;
-                                this.addToDeskAtPosition(item, tx, ty);
-                                this.showMessage("✓ " + item.name + " returned to desk");
-                                placed = true;
-                            }
-                        }
-                    }
-                    if (!placed) this.showMessage("No free space — drag the item first!");
+            if (this._isNearTopBar(mx, my)) {
+                // In backpack panel area: swap if hovering a different slot, else snap back to original
+                if (this.hoveredSlot !== -1 && this.hoveredSlot !== this.dragIndex) {
+                    this.tryAddToSlot(item, this.hoveredSlot);
                 }
+                // hoveredSlot === dragIndex or -1 → item stays in original slot (no change needed)
+            } else {
+                // Released near desk → remove from slot and snap to fixed desk position
+                this.topSlots[this.dragIndex] = null;
+                this.addToDesk(item);
+                this.showMessage("✓ " + item.name + " returned to desk");
             }
-            // Outside zone → stays in slot (snap-back)
         }
 
         this.draggedItem = null;
@@ -1009,32 +1107,27 @@ class BackpackVisual {
      * Attempts to add an item to the backpack via the drop target.
      */
     tryAddToBackpack(item) {
-        let hasStudentID = this.topSlots.includes("UoB Student ID");
-        let hasComputer  = this.topSlots.includes("Laptop Computer");
-        let npcCount     = this.topSlots.filter(id => id && !id.includes("Student") && !id.includes("Computer")).length;
+        let isRequired = (item.name === "UoB Student ID" || item.name === "Laptop Computer");
+        let npcCount   = this.topSlots.filter(id => id && id !== "UoB Student ID" && id !== "Laptop Computer").length;
 
-        if (item.name === "UoB Student ID" || item.name === "Laptop Computer") {
+        if (isRequired) {
             let emptySlot = this.topSlots.indexOf(null);
             if (emptySlot !== -1) {
                 this.topSlots[emptySlot] = item.name;
                 this.removeFromDesk(item.name);
                 this.showMessage("✓ " + item.name + " packed!");
             }
+        } else if (npcCount >= 1) {
+            let existingIndex = this.topSlots.findIndex(id => id && id !== "UoB Student ID" && id !== "Laptop Computer");
+            this.showReplaceDialog = true;
+            this.replaceNewItem    = item;
+            this.replaceSlotIndex  = existingIndex;
         } else {
-            if (!hasStudentID || !hasComputer) {
-                this.showMessage("❌ Pack Student ID and Laptop first!");
-            } else if (npcCount >= 1) {
-                let existingIndex = this.topSlots.findIndex(id => id && !id.includes("Student") && !id.includes("Computer"));
-                this.showReplaceDialog = true;
-                this.replaceNewItem    = item;
-                this.replaceSlotIndex  = existingIndex;
-            } else {
-                let emptySlot = this.topSlots.indexOf(null);
-                if (emptySlot !== -1) {
-                    this.topSlots[emptySlot] = item.name;
-                    this.removeFromDesk(item.name);
-                    this.showMessage("✓ " + item.name + " packed!");
-                }
+            let emptySlot = this.topSlots.indexOf(null);
+            if (emptySlot !== -1) {
+                this.topSlots[emptySlot] = item.name;
+                this.removeFromDesk(item.name);
+                this.showMessage("✓ " + item.name + " packed!");
             }
         }
     }
@@ -1085,24 +1178,15 @@ class BackpackVisual {
 
     addToDesk(item) {
         if (!item) return;
-        let z = this.itemZone;
-        this.scatteredItems.push({
-            item:     item,
-            x:        random(z.left + 60, z.right  - 60),
-            y:        random(z.top  + 60, z.bottom - 60),
-            rotation: random(-15, 15)
-        });
+        // Always snap to the item's designated fixed position
+        let pos = this.itemFixedPositions[item.name] ||
+                  { x: this.itemZone.left + 200, y: this.itemZone.top + 200, rot: 0 };
+        this.scatteredItems.push({ item: item, x: pos.x, y: pos.y, rotation: pos.rot });
     }
 
-    addToDeskAtPosition(item, x, y) {
-        if (!item) return;
-        let z = this.itemZone;
-        this.scatteredItems.push({
-            item:     item,
-            x:        constrain(x, z.left + 50, z.right  - 50),
-            y:        constrain(y, z.top  + 50, z.bottom - 50),
-            rotation: random(-15, 15)
-        });
+    addToDeskAtPosition(item, _x, _y) {
+        // Ignore drop coordinates — always snap to fixed position
+        this.addToDesk(item);
     }
 
     // ─── UTILITIES ───────────────────────────────────────────────────────────
