@@ -123,11 +123,14 @@ class Environment {
             if (destinationBg) {
                 // Victory background enters based on how much we've scrolled since victory
                 const scrolledSinceVictory = this.scrollPos - levelController.victoryStartScrollPos;
+                const preRoll = Math.max(0, Number(levelController.victoryPreRollDistance) || 0);
+                const destinationProgress = scrolledSinceVictory - preRoll;
                 const destinationBgHeight = destinationBg.height || 1080;
 
-                if (scrolledSinceVictory >= 0) {
+                // Enter only after current run tile finishes scrolling out.
+                if (destinationProgress >= 0) {
                     // Victory background position: enters from bottom as we scroll
-                    const victoryEntryY = scrolledSinceVictory - destinationBgHeight;
+                    const victoryEntryY = destinationProgress - destinationBgHeight;
 
                     // Only display single tile
                     image(destinationBg, 0, victoryEntryY);

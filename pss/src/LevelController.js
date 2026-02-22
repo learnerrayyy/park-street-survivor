@@ -20,6 +20,7 @@ class LevelController {
       // Victory Phase Management
       this.levelPhase = "RUNNING"; // RUNNING, VICTORY_TRANSITION, or VICTORY_ZONE
       this.victoryStartScrollPos = 0; // Record scrollPos when victory triggers
+      this.victoryPreRollDistance = 0; // Pixels to finish current run tile before destination enters
       this.victoryZoneFrames = 0; // Frames spent in victory zone (1.5s = 90 frames)
       this.victoryZoneStartY = 0; // Y position of victory bg when entering VICTORY_ZONE
    }
@@ -60,6 +61,7 @@ class LevelController {
    resetRunPhaseState() {
       this.levelPhase = "RUNNING";
       this.victoryStartScrollPos = 0;
+      this.victoryPreRollDistance = 0;
       this.victoryZoneFrames = 0;
       this.victoryZoneStartY = 0;
 
@@ -248,7 +250,11 @@ class LevelController {
       console.log(`  - Level Phase: ${this.levelPhase}`);
       this.levelPhase = "VICTORY_TRANSITION";
       this.victoryStartScrollPos = env.scrollPos;
+      const runTileHeight = (env && env.defaultBg && env.defaultBg.height) ? env.defaultBg.height : 1080;
+      const normalizedOffset = ((env.scrollPos % runTileHeight) + runTileHeight) % runTileHeight;
+      this.victoryPreRollDistance = normalizedOffset === 0 ? 0 : (runTileHeight - normalizedOffset);
       console.log(`  - Victory Start ScrollPos: ${this.victoryStartScrollPos}`);
+      console.log(`  - Victory Pre-Roll Distance: ${this.victoryPreRollDistance}`);
 
       // Notify ObstacleManager to stop spawning
       if (obstacleManager) {
@@ -265,15 +271,17 @@ class LevelController {
          const bgHeight = (env && env.destinationBg && env.destinationBg.height)
             ? env.destinationBg.height
             : 1080;
+         const preRoll = Math.max(0, Number(this.victoryPreRollDistance) || 0);
          const scrolledSinceVictory = env.scrollPos - this.victoryStartScrollPos;
-         console.log(`[checkSettlementPoint] TRANSITION: scrolled=${scrolledSinceVictory.toFixed(1)}, target=${bgHeight}`);
+         const targetDistance = preRoll + bgHeight;
+         console.log(`[checkSettlementPoint] TRANSITION: scrolled=${scrolledSinceVictory.toFixed(1)}, preRoll=${preRoll.toFixed(1)}, target=${targetDistance}`);
 
-         if (scrolledSinceVictory >= bgHeight) {
+         if (scrolledSinceVictory >= targetDistance) {
             console.log(`[LevelController] 🎉 Victory Background Fully Visible! Entering settlement.`);
             this.levelPhase = "VICTORY_ZONE";
             this.victoryZoneFrames = 0;
             // Record victory bg Y position when entering VICTORY_ZONE (should be 0, bg top aligned with screen top)
-            this.victoryZoneStartY = scrolledSinceVictory - bgHeight;
+            this.victoryZoneStartY = (scrolledSinceVictory - preRoll) - bgHeight;
             GLOBAL_CONFIG.scrollSpeed = 0;
          }
          // Continue to next check without returning false yet
