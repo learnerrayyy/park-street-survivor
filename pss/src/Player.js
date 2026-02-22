@@ -434,24 +434,35 @@ class Player {
     }
 
     /**
-     * Homeless crowd-control: push player to an adjacent lane.
-     * If source lane is known, push away from that side toward road center.
+     * Homeless crowd-control: knock player 2 lanes toward road center direction.
+     * Applies an overshoot displacement, then lane spring pulls back to lane center.
      */
     applyHomelessForcedLaneSwitch(sourceLane) {
         const laneCount = this.runLaneCenters.length;
-        let nextLaneIndex = this.targetLaneIndex;
+        const baseLaneIndex = this.currentLaneIndex;
 
-        if (sourceLane === 1) {
-            nextLaneIndex = min(laneCount - 1, this.targetLaneIndex + 1);
-        } else if (sourceLane === 4) {
-            nextLaneIndex = max(0, this.targetLaneIndex - 1);
-        } else {
-            const nudge = (this.targetLaneIndex <= 1) ? 1 : -1;
-            nextLaneIndex = constrain(this.targetLaneIndex + nudge, 0, laneCount - 1);
-        }
+        // Lane 1 homeless pushes right; lane 4 homeless pushes left.
+        let knockDir = 0;
+        if (sourceLane === 1) knockDir = 1;
+        else if (sourceLane === 4) knockDir = -1;
+        else knockDir = (this.x <= (GLOBAL_CONFIG.lanes.lane2 + GLOBAL_CONFIG.lanes.lane3) / 2) ? 1 : -1;
 
+        // Requirement change: knock across 2 lanes.
+        const laneJump = 2;
+        const nextLaneIndex = constrain(baseLaneIndex + knockDir * laneJump, 0, laneCount - 1);
         this.targetLaneIndex = nextLaneIndex;
-        this.laneDelayFramesRemaining = max(this.laneDelayFramesRemaining, floor(0.25 * 60));
+
+        // Visual feel: overshoot off the lane center, then spring returns to center.
+        const baseCenterX = this.runLaneCenters[baseLaneIndex];
+        const targetCenterX = this.runLaneCenters[nextLaneIndex];
+        const laneSpan = abs(targetCenterX - baseCenterX);
+        const overshoot = min(220, laneSpan * 0.35);
+        const displacedX = targetCenterX + knockDir * overshoot;
+        this.x = constrain(displacedX, this.minX, this.maxX);
+        this.laneVelocityX = -knockDir * max(12, overshoot * 0.35);
+
+        // Briefly suppress manual lane input so the knockback reads clearly.
+        this.laneDelayFramesRemaining = max(this.laneDelayFramesRemaining, floor(0.35 * 60));
         this.leftHeld = false;
         this.rightHeld = false;
     }
