@@ -5,6 +5,7 @@
 let gameState, mainMenu, roomScene, inventory, env, player, obstacleManager, levelController;
 let backpackUI;
 let endScreenManager;
+let testingPanel;
 
 // ─── GAME PROGRESS STATE ─────────────────────────────────────────────────────
 let currentUnlockedDay = 1;
@@ -131,18 +132,130 @@ let showStoryRecap = false;
 let storyRecapDay = 1;
 let storyScrollOffset = 0;  // scroll offset within current day's text
 
+// ─── STORY RECAP CONTENT ──────────────────────────────────────────────────────
+/**
+ * Story summary text for each day's recap panel.
+ * Each entry has a title (shown above the cloud) and lines[] (scrollable body text).
+ */
+const STORY_RECAPS = {
+    1: {
+        title: "Day 1 — Monday",
+        lines: [
+            "First day of term.",
+            "The alarm went off at 8:15.",
+            "",
+            "You threw on your hoodie, grabbed your",
+            "laptop, and sprinted out the door.",
+            "",
+            "Park Street looked deceptively calm.",
+            "Then the buses came.",
+            "",
+            "You wove between parked scooters,",
+            "ducked past a leaflet-handing promoter,",
+            "and somehow made it to the Arts Complex",
+            "with two minutes to spare.",
+            "",
+            "You rewarded yourself with a coffee.",
+            "It helped. A little."
+        ]
+    },
+    2: {
+        title: "Day 2 — Tuesday",
+        lines: [
+            "Seminar at 9:00.",
+            "You left at 8:48.",
+            "",
+            "The hill felt steeper than yesterday.",
+            "A scooter nearly clipped your shoulder.",
+            "",
+            "You spotted an empty scooter by the kerb",
+            "and hopped on for a short burst —",
+            "probably not legal, definitely worth it.",
+            "",
+            "You arrived breathless but present.",
+            "The lecturer hadn't even started yet.",
+            "",
+            "Small victories."
+        ]
+    },
+    3: {
+        title: "Day 3 — Wednesday",
+        lines: [
+            "Midweek. The city felt busier.",
+            "",
+            "A street vendor was handing out flyers",
+            "right in the middle of the pavement.",
+            "You pressed SPACE ten times and",
+            "launched a paper ball to clear the path.",
+            "",
+            "A homeless man stepped out unexpectedly",
+            "and bumped you into the wrong lane.",
+            "You recovered. Barely.",
+            "",
+            "The coffee from Tuesday was wearing off.",
+            "You found another one on the kerb.",
+            "",
+            "Somehow, you kept moving."
+        ]
+    },
+    4: {
+        title: "Day 4 — Thursday",
+        lines: [
+            "It was raining.",
+            "",
+            "Your rain boots kept your feet dry",
+            "through three separate puddles.",
+            "Your headphones blocked out the noise",
+            "of two separate promoters.",
+            "",
+            "The large car came out of nowhere.",
+            "You felt it before you saw it.",
+            "",
+            "You stumbled. Lost momentum.",
+            "But you kept running.",
+            "",
+            "The library was in sight.",
+            "It always felt further in the rain."
+        ]
+    },
+    5: {
+        title: "Day 5 — Friday",
+        lines: [
+            "Final submission day.",
+            "",
+            "Your laptop was heavy in the bag.",
+            "Your Student ID was clipped to your jacket.",
+            "Everything you needed was with you.",
+            "",
+            "The street threw everything at you.",
+            "Buses. Scooters. Promoters. Rain.",
+            "",
+            "You used every skill you'd picked up",
+            "across the week.",
+            "",
+            "And then — the Arts Complex doors.",
+            "Open. Waiting.",
+            "",
+            "You made it.",
+            "You actually made it."
+        ]
+    }
+};
+
 // ─── TUTORIAL HINT SYSTEM ─────────────────────────────────────────────────────
 /**
  * Tracks which tutorial hints are active.
- *   day1VisuallyUnlocked   — false until the player clicks Day 1's cloud for the first time;
+ *   dayVisuallyUnlocked    — object {dayID: bool}; each day starts gray until player clicks once.
  *                            on that click the background turns color and the warning disappears,
  *                            but the game does NOT start yet (a second click is required).
  *   levelSelectShownForDay — last day whose cloud was clicked to ENTER the game;
  *                            hint icon shows on days above this value.
+ *   dayVisuallyUnlocked    — object {dayID: bool}; each day starts gray until player clicks once.
+ *   levelSelectShownForDay — last day whose cloud was clicked to ENTER the game.
  *   roomPhase              — 'DESK' | 'CLOSE_BP' | 'DOOR' | 'DONE'
  */
 let tutorialHints = {
-    day1VisuallyUnlocked: false,
+    dayVisuallyUnlocked: {},   // { 1: true/false, 2: true/false, … } per-day first-click unlock
     levelSelectShownForDay: 0,
     roomPhase: 'DESK'
 };
@@ -321,6 +434,7 @@ function setup() {
     backpackUI      = new BackpackVisual(inventory, roomScene);
     levelController  = new LevelController();
     endScreenManager = new EndScreenManager();
+    testingPanel     = new TestingPanel();
 
     textFont(fonts.body);
     gameState.currentState = STATE_LOADING;
@@ -365,18 +479,6 @@ function draw() {
 
             case STATE_INVENTORY:
                 if (backpackUI) backpackUI.display();
-                // Tutorial: show close-backpack hint when required items are packed
-                if (tutorialHints.roomPhase === 'CLOSE_BP' && backpackUI && backpackUI.hasRequiredItems()) {
-                    drawWarningIcon(width / 2, height - 75, 48);
-                    push();
-                    textFont(fonts.body);
-                    textSize(20);
-                    textAlign(CENTER, CENTER);
-                    fill(255, 215, 0, 200 + sin(frameCount * 0.1) * 55);
-                    noStroke();
-                    text("PACK COMPLETE! PRESS ESC TO CLOSE BACKPACK", width / 2, height - 45);
-                    pop();
-                }
                 break;
 
             case STATE_DAY_RUN:
@@ -401,11 +503,25 @@ function draw() {
                 if (env) env.display();
                 if (obstacleManager) obstacleManager.display();
                 if (player) player.display();
-                if (endScreenManager) endScreenManager.display();
+                if (endScreenManager) {
+                    if (!endScreenManager._activeScreen) {
+                        endScreenManager.activateFail(gameState.failReason || "EXHAUSTED");
+                    }
+                    endScreenManager.display();
+                }
                 break;
 
             case STATE_WIN:
-                if (endScreenManager) endScreenManager.display();
+                if (endScreenManager) {
+                    if (!endScreenManager._activeScreen) {
+                        // Unlock next day immediately so its warning icon appears on level select
+                        if (currentDayID < 5) {
+                            currentUnlockedDay = Math.max(currentUnlockedDay, currentDayID + 1);
+                        }
+                        endScreenManager.activateSuccess();
+                    }
+                    endScreenManager.display();
+                }
                 break;
         }
     } catch (e) {
@@ -413,6 +529,9 @@ function draw() {
     }
 
     renderGlobalFade();
+
+    // TestingPanel always draws on top of everything (dev overlay)
+    if (testingPanel) testingPanel.draw();
 }
 
 /**
@@ -421,7 +540,7 @@ function draw() {
 function runGameLoop() {
     if (levelController) { levelController.update(); }
     if (env)             { env.update(GLOBAL_CONFIG.scrollSpeed); env.display(); }
-    if (obstacleManager) { obstacleManager.update(GLOBAL_CONFIG.scrollSpeed, player); obstacleManager.display(); }
+    if (obstacleManager) { obstacleManager.update(GLOBAL_CONFIG.scrollSpeed, player, levelController ? levelController.levelPhase : "RUNNING"); obstacleManager.display(); }
     if (player)          { player.update(); player.display(); }
     if (levelController) { levelController.display(); }
 
@@ -505,6 +624,18 @@ function keyPressed() {
 
     // Toggle developer mode
     if (key === '0') devToggle();
+
+    // Toggle TestingPanel with backtick (`) or F2
+    if (key === '`' || keyCode === 113) {
+        if (testingPanel) testingPanel.toggle();
+        return;
+    }
+
+    // If TestingPanel is open, route all keys to it and block everything else
+    if (testingPanel && testingPanel.isVisible()) {
+        testingPanel.handleKeyPressed(key, keyCode);
+        return;
+    }
 
     // Dev shortcuts: 8 = instant WIN, 9 = instant FAIL
     if (developerMode) {
@@ -751,6 +882,7 @@ function handleRestartChoice() {
             player.y = height / 2;
             obstacleManager = new ObstacleManager();
             levelController.initializeLevel(currentDayID);
+            if (endScreenManager) endScreenManager._activeScreen = null;
             gameState.setState(STATE_DAY_RUN);
             pauseFromState = null;
         });
@@ -762,6 +894,13 @@ function handleRestartChoice() {
  */
 function mousePressed() {
     if (globalFade.isFading) return;
+
+    // TestingPanel intercepts all clicks when visible
+    if (testingPanel && testingPanel.isVisible()) {
+        testingPanel.handleMousePressed(mouseX, mouseY);
+        return;
+    }
+
     let state = gameState.currentState;
 
     // Splash screen: unlock audio and transition to main menu
@@ -955,6 +1094,8 @@ function setupRun(dayID) {
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
     tutorialHints.roomPhase = 'DESK';
+    if (backpackUI) backpackUI.resetForNewDay();
+    if (endScreenManager) endScreenManager._activeScreen = null;
     gameState.setState(STATE_ROOM);
 }
 
@@ -965,12 +1106,15 @@ function setupRun(dayID) {
 function setupRunDirectly(dayID) {
     currentDayID = dayID;
     player.applyLevelStats(dayID);
-    
+
     // Set position matching the "Exit Door" logic in RoomScene
-    player.x = width / 2; 
-    player.y = height - 200; 
-    
+    player.x = width / 2;
+    player.y = height - 200;
+
     obstacleManager = new ObstacleManager();
+    levelController.initializeLevel(dayID);
+    if (backpackUI) backpackUI.resetForNewDay();
+    if (endScreenManager) endScreenManager._activeScreen = null;
     gameState.setState(STATE_DAY_RUN);
 }
 
@@ -1397,6 +1541,15 @@ function renderStoryRecap() {
             fill(180, 60, 60, alpha); textSize(14);
             text("LOCKED", -10, 8);
         }
+
+        // Warning icon on any day that is unlocked but not yet visually unlocked (first click pending)
+        let showRecapHint = day <= currentUnlockedDay &&
+                            !tutorialHints.dayVisuallyUnlocked[day] &&
+                            assets.warningImg;
+        if (showRecapHint) {
+            drawWarningIcon(100, -38, 50);
+        }
+
         pop();
     }
     pop();

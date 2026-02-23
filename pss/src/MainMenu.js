@@ -541,12 +541,12 @@ class MainMenu {
 
             if (keyCode === ENTER || keyCode === 13) {
                 let selectedDay = this.timeWheel.selectedDay;
-                // Day 1 first press: unlock visually, don't enter yet (skipped in dev mode)
-                if (!developerMode &&
-                    selectedDay === 1 &&
+                // First press on any available day: unlock visually, don't enter yet (skipped in dev mode)
+                if (!developerMode && !DEBUG_UNLOCK_ALL &&
                     typeof tutorialHints !== 'undefined' &&
-                    !tutorialHints.day1VisuallyUnlocked) {
-                    tutorialHints.day1VisuallyUnlocked = true;
+                    selectedDay <= currentUnlockedDay &&
+                    !tutorialHints.dayVisuallyUnlocked[selectedDay]) {
+                    tutorialHints.dayVisuallyUnlocked[selectedDay] = true;
                     playSFX(sfxClick);
                     return;
                 }
@@ -629,16 +629,16 @@ class MainMenu {
                 if (mx > cloudX - cloudW / 2 && mx < cloudX + cloudW / 2 &&
                     my > cloudY - cloudH / 2 && my < cloudY + cloudH / 2) {
                     let selectedDay = this.timeWheel.selectedDay;
-                    // Day 1 first click: unlock visually, don't enter the game yet (skipped in dev mode)
-                    if (!developerMode &&
-                        selectedDay === 1 &&
+                    // First click on any available day: unlock visually, don't enter yet (skipped in dev mode)
+                    if (!developerMode && !DEBUG_UNLOCK_ALL &&
                         typeof tutorialHints !== 'undefined' &&
-                        !tutorialHints.day1VisuallyUnlocked) {
-                        tutorialHints.day1VisuallyUnlocked = true;
+                        selectedDay <= currentUnlockedDay &&
+                        !tutorialHints.dayVisuallyUnlocked[selectedDay]) {
+                        tutorialHints.dayVisuallyUnlocked[selectedDay] = true;
                         playSFX(sfxClick);
                         return;
                     }
-                    // Normal entry (Day 1 already unlocked, or Days 2-5)
+                    // Normal entry: day already visually unlocked or dev mode
                     if (DEBUG_UNLOCK_ALL || selectedDay <= currentUnlockedDay) {
                         if (typeof tutorialHints !== 'undefined') {
                             tutorialHints.levelSelectShownForDay = selectedDay;

@@ -74,8 +74,9 @@ const OBSTACLE_CONFIG = {
       description: "Stun 0.5s + Lane delay 1s + Camera shake",
 
       // Physical parameters
-      speed: { min: 1.2, max: 1.2 },
-      size: { width: 110, height: 230 },
+      speed: { min: 1.3, max: 1.4 },
+      // Keep near original sprite aspect ratio (110:230) to avoid horizontal stretch.
+      size: { width: 66, height: 138 },
 
       // Damage parameters
       damage: 0,
@@ -86,6 +87,11 @@ const OBSTACLE_CONFIG = {
       stunDuration: 0.5,              // Stage 1: Stun 0.5s
       laneDelayDuration: 1.0,         // Stage 2: Lane change delay 1s (starts after stun)
       // cameraShakeDuration: 1.0,    // TODO: Stage 3: Camera shake (to be implemented)
+
+      // Lane-change behaviour on road (dynamic space pressure)
+      laneChangeInterval: { min: 0.45, max: 0.95 },  // seconds between lane decisions
+      laneChangeDuration: { min: 0.18, max: 0.28 },  // linear move duration per lane switch
+      //less is fast if switching from lane 
 
       // Generation constraints
       allowedLanes: [1, 2, 3, 4],  // Any lane
@@ -116,6 +122,18 @@ const OBSTACLE_CONFIG = {
       instantKill: false,
       effect: "forcedLaneSwitch",
 
+      // Dialogue test copy (fallback for all days until day-specific lines are authored)
+      defaultDialogue: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die.",
+      dialoguesByDay: {
+         1: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die.",
+         2: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die.",
+         3: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die.",
+         4: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die.",
+         5: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die."
+      },
+      bubbleOffsetX: 0,      // Horizontal offset relative to homeless X (pixels)
+      bubbleTextSize: 14,    // Speech bubble font size
+
       // Generation constraints
       allowedLanes: [1, 4], // Only on the edges of the sidewalk
       mutualExclusion: ["LARGE_CAR"],
@@ -139,7 +157,8 @@ const OBSTACLE_CONFIG = {
 
       // Physical parameters
       speed: { min: 0, max: 0 },  // Stationary on the road
-      size: { width: 150, height: 160 },
+      // Keep near original sprite aspect ratio (120:220) to avoid horizontal stretch.
+      size: { width: 87, height: 160 },
 
       // Damage parameters
       damage: 0,
@@ -150,6 +169,10 @@ const OBSTACLE_CONFIG = {
       leafletHeight: 970,
       spacePressRequired: 10,        // Press SPACE 10 times
       clearNearestObstacle: true,    // Clear the first obstacle in the current lane
+      leafletSprites: [
+         "assets/obstacles/obstacle_flyer1.png",
+         "assets/obstacles/obstacle_flyer2.png"
+      ],
 
       // Cooldown mechanism: Cooldown time after hitting the promoter
       interactionCooldown: 5.0,      // 5 seconds cooldown after interaction
@@ -159,11 +182,40 @@ const OBSTACLE_CONFIG = {
       allowedLanes: [1, 4],          // Only on the edges of the sidewalk
       mutualExclusion: ["LARGE_CAR"],
 
-      // Variants: 2 leaflet sprites
+      // World sprite: promoter NPC on street. Flyer sprites are overlay assets.
       variants: [
-         { id: "promoter_leaflet_1", name: "Leaflet 1", sprite: "assets/obstacles/obstacle_flyer1.png" },
-         { id: "promoter_leaflet_2", name: "Leaflet 2", sprite: "assets/obstacles/obstacle_flyer2.png" }
+         { id: "promoter_npc_1", name: "Promoter", sprite: "assets/obstacles/obstacle_promoter.png" }
       ]
+   },
+
+   /**
+    * Fantasy Coffee (TODO)
+    * Characteristics: 10 damage + full-screen distortion effect
+    * NOTE: Visual distortion pipeline is not implemented yet.
+    */
+   FANTASY_COFFEE: {
+      baseType: "FANTASY_COFFEE",
+      type: "HAZARD",
+      name: "Fantasy Coffee",
+      description: "TODO: Deals 10 damage and distorts the whole screen",
+
+      // Physical parameters
+      speed: { min: 0, max: 0 },  // Stationary pickup-like hazard
+      size: { width: 110, height: 120 },
+
+      // Damage / effect parameters
+      damage: 10,
+      instantKill: false,
+      effect: "screenDistortion",
+      distortionDuration: 2.5,     // seconds
+      distortionIntensity: 1.0,    // TODO visual parameter
+
+      // Generation constraints
+      allowedLanes: [1, 4],        // Sidewalk spawn by default
+      mutualExclusion: [],
+
+      // TODO art placeholder path (asset not provided yet)
+      sprite: "assets/obstacles/obstacle_fantasy_coffee.png"
    },
 
    /**
@@ -254,7 +306,10 @@ const OBSTACLE_CONFIG = {
       allowedLanes: [1, 2, 3, 4],  // Anywhere
       mutualExclusion: [],
 
-
-      sprite: "assets/power_up/powerup_scooter.png"
+      // Variants
+      variants: [
+         { name: "Scooter", sprite: "assets/power_up/powerup_scooter.png", weight: 1 },
+         { name: "Motorcycle", sprite: "assets/power_up/powerup_motorcycle.png", weight: 1 }
+      ]
    }
 };

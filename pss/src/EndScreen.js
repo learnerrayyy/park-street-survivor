@@ -451,7 +451,13 @@ class SuccessScreen extends EndScreenBase {
                     gameState.resetFlags();
                     if (currentDayID < 5) currentUnlockedDay = Math.max(currentUnlockedDay, currentDayID + 1);
                     gameState.setState(STATE_LEVEL_SELECT);
-                    if (mainMenu && mainMenu.timeWheel) mainMenu.timeWheel.triggerEntrance();
+                    if (mainMenu && mainMenu.timeWheel) {
+                        // Auto-select the next day so the level select opens on it
+                        if (currentDayID < 5) {
+                            mainMenu.timeWheel.selectedDay = currentDayID + 1;
+                        }
+                        mainMenu.timeWheel.triggerEntrance();
+                    }
                 });
             } else if (option === "RESTART") {
                 // Switch to sub-menu layer

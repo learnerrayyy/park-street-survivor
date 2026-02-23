@@ -321,12 +321,14 @@ class TimeWheel {
      * RENDERER: BACKGROUND BLEND
      * Lerps bgAlpha (0=lock image, 255=unlock image) based on whether the selected day
      * is locked. Day 1 is treated as locked until the player clicks once, so flipping
-     * day1VisuallyUnlocked automatically starts the fade-in to the colorful background.
+     * dayVisuallyUnlocked[day] flipping to true automatically starts the fade-in to the colorful background.
      */
     drawDynamicBackground() {
         let isLocked = (this.selectedDay > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
-        // Day 1 stays visually locked until the player clicks once (skipped in dev mode)
-        if (this.selectedDay === 1 && !tutorialHints.day1VisuallyUnlocked && !developerMode) {
+        // Every newly-unlocked day stays visually locked until the player clicks once
+        if (!developerMode && !DEBUG_UNLOCK_ALL &&
+            typeof tutorialHints !== 'undefined' &&
+            !tutorialHints.dayVisuallyUnlocked[this.selectedDay]) {
             isLocked = true;
         }
 
@@ -384,12 +386,11 @@ class TimeWheel {
         let isCloudHover = (mouseX > x - cloudW / 2 && mouseX < x + cloudW / 2 &&
                             mouseY > y - cloudH / 2 && mouseY < y + cloudH / 2);
 
-        // Day 1 is "visually locked" (grayscale, same as Days 2-5) until the player clicks once (skipped in dev mode)
+        // Any available day stays visually locked (grayscale) until the player clicks once
         let visuallyLocked = isLocked ||
-            (dayID === 1 &&
+            (!developerMode && !DEBUG_UNLOCK_ALL &&
              typeof tutorialHints !== 'undefined' &&
-             !tutorialHints.day1VisuallyUnlocked &&
-             !developerMode);
+             !tutorialHints.dayVisuallyUnlocked[dayID]);
 
         let targetScale = (isCloudHover && !visuallyLocked && !this.isEntering) ? 1.08 : 1.0;
         this._cloudScale = lerp(this._cloudScale, targetScale, 0.1);
@@ -414,17 +415,12 @@ class TimeWheel {
         drawingContext.filter = 'none';
 
         // ── Tutorial hint: breathing warning icon on cloud top-right ──
-        // Day 1: show while still visually locked (first-click prompt)
-        // Days 2-5: show on the newest-unlocked day before first entry
-        let showDay1Hint = typeof tutorialHints !== 'undefined' &&
-                           dayID === 1 &&
-                           !tutorialHints.day1VisuallyUnlocked;
-        let showNewDayHint = typeof tutorialHints !== 'undefined' &&
-                             typeof currentUnlockedDay !== 'undefined' &&
-                             !isLocked && dayID > 1 &&
-                             dayID === currentUnlockedDay &&
-                             tutorialHints.levelSelectShownForDay < currentUnlockedDay;
-        if ((showDay1Hint || showNewDayHint) && typeof assets !== 'undefined' && assets.warningImg) {
+        // Show on any available day that hasn't been visually unlocked yet (first-click prompt)
+        let showHint = !developerMode && !DEBUG_UNLOCK_ALL &&
+                       typeof tutorialHints !== 'undefined' &&
+                       !isLocked &&
+                       !tutorialHints.dayVisuallyUnlocked[dayID];
+        if (showHint && typeof assets !== 'undefined' && assets.warningImg) {
             let warnX = cloudW / 2 - 80;
             let warnY = -cloudH / 2 + 55;
             drawWarningIcon(warnX, warnY, 100);
@@ -462,9 +458,13 @@ class TimeWheel {
         }
 
         let isSelected = (i === this.selectedDay - 1);
-        let isLocked = (i + 1 > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
+        let dayID = i + 1;
+        let isLocked = (dayID > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
 
-        if (i === 0 && typeof tutorialHints !== 'undefined' && !tutorialHints.day1VisuallyUnlocked && !developerMode) {
+        // Any available day shows as locked/grey until the player clicks once
+        if (!developerMode && !DEBUG_UNLOCK_ALL &&
+            typeof tutorialHints !== 'undefined' &&
+            !tutorialHints.dayVisuallyUnlocked[dayID]) {
             isLocked = true;
         }
 

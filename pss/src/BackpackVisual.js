@@ -121,6 +121,24 @@ class BackpackVisual {
     }
 
     /**
+     * Resets the backpack to a clean state for a new day:
+     * clears all packed slots and puts every day-appropriate item back on the desk.
+     * Call this from setupRun() / setupRunDirectly() when starting any new level.
+     */
+    resetForNewDay() {
+        this.topSlots = [null, null, null];
+        this.draggedItem       = null;
+        this.dragSource        = null;
+        this.dragIndex         = -1;
+        this.showReplaceDialog = false;
+        this.replaceNewItem    = null;
+        this.replaceSlotIndex  = -1;
+        this.messageText       = "";
+        this.messageTimer      = 0;
+        this.initScatteredItems();
+    }
+
+    /**
      * Populates the desk with items available for the current day.
      * Items already in the backpack slots are excluded.
      * ── TO CHANGE STARTING POSITIONS: edit the positions[] array below ───────
@@ -154,6 +172,17 @@ class BackpackVisual {
         return items;
     }
 
+    /**
+     * Returns the name of the item first introduced on the given day, or null for Day 1.
+     */
+    _getNewItemName(day) {
+        if (day === 2) return "Soft Gummy Vitamins";
+        if (day === 3) return "Tangle";
+        if (day === 4) return "Headphones";
+        if (day === 5) return "Rain Boots";
+        return null;
+    }
+
     // ─── RENDERING ───────────────────────────────────────────────────────────
 
     /**
@@ -173,10 +202,20 @@ class BackpackVisual {
             this.messageTimer--;
         }
         this.drawInstructions();
-        // Back arrow button (top-left)
+        // Back arrow button (top-left): breathes when required items are packed
         this.backButton.isFocused = this.backButton.checkMouse(mouseX, mouseY);
         this.backButton.update();
-        this.backButton.display();
+        if (this.hasRequiredItems()) {
+            let breathe = 1.0 + sin(frameCount * 0.06) * 0.12; // 0.88 → 1.12 pulse
+            push();
+            translate(this.backButton.x, this.backButton.y);
+            scale(breathe);
+            translate(-this.backButton.x, -this.backButton.y);
+            this.backButton.display();
+            pop();
+        } else {
+            this.backButton.display();
+        }
         // Dev overlays are drawn last so they are always on top
         if (developerMode) this.drawDevOverlays();
         pop();
@@ -417,6 +456,11 @@ class BackpackVisual {
             push();
             translate(scattered.x, scattered.y);
             rotate(radians(scattered.rotation));
+            // Breathe if this item is newly unlocked on the current day
+            if (scattered.item.name === this._getNewItemName(currentDayID)) {
+                let breathe = 1.0 + sin(frameCount * 0.06) * 0.10;
+                scale(breathe);
+            }
             let isHovered = (this.hoveredItem === i);
             if (isHovered) {
                 fill(200, 150, 255, 90);

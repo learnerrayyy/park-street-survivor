@@ -24,23 +24,22 @@ class GameState {
     setState(newState) {
         // Logic: Backup current state before pausing to allow for later resumption
         if (newState === STATE_PAUSED) {
-            this.previousState = this.currentState; 
+            this.previousState = this.currentState;
         }
-        
-        // Debugging: Log transition for developer console tracking
-        console.log(`[GameState] Switch: ${this.currentState} -> ${newState}`);
-        
-        // Finalize state update
-        this.currentState = newState;
 
-        // Activate end screen overlays on transition
-        if (typeof endScreenManager !== 'undefined' && endScreenManager) {
-            if (newState === STATE_FAIL) {
-                endScreenManager.activateFail(this.failReason);
-            } else if (newState === STATE_WIN) {
-                endScreenManager.activateSuccess();
+        // Reset end screen when leaving WIN/FAIL so it re-activates correctly next visit
+        if ((this.currentState === STATE_WIN || this.currentState === STATE_FAIL) &&
+            newState !== STATE_WIN && newState !== STATE_FAIL) {
+            if (typeof endScreenManager !== "undefined" && endScreenManager) {
+                endScreenManager._activeScreen = null;
             }
         }
+
+        // Debugging: Log transition for developer console tracking
+        console.log(`[GameState] Switch: ${this.currentState} -> ${newState}`);
+
+        // Finalize state update
+        this.currentState = newState;
     }
 
     /**

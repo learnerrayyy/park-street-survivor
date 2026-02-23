@@ -12,6 +12,8 @@ class Environment {
 
         // Background Images
         this.defaultBg = null;      // Default running background
+        this.defaultBgCycle = [];   // Optional cycle for varied running backgrounds
+        this.defaultBgHeadIndex = 0; // Which tile is currently the lower tile in seamless pair
         this.destinationBg = null;  // Victory zone background
 
         // [STRICT LAYOUT CONFIGURATION]
@@ -23,10 +25,6 @@ class Environment {
             roadStart: 700, // Calculated as 500 + 200
             roadEnd: 1220   // Calculated as 700 + (260 * 2)
         };
-
-        // ── PERFORMANCE: Pre-compute constants used every frame ──
-        this.bgHeight = 1080; // matches background image height
-        this.centerX  = 960;  // exact horizontal centre of the 1920px canvas
 
         // Flat Visual Palette (No Glow for consistent pixel aesthetic)
         this.colors = {
@@ -64,11 +62,18 @@ class Environment {
         // Always update scroll position
         this.scrollPos += speed;
 
+        // Loop the position based on background height (1080px) to maintain seamless continuity
+        const bgHeight = 1080;
         const levelPhase = levelController ? levelController.getLevelPhase() : "RUNNING";
 
         // Only loop the scrollPos if we're still in RUNNING phase
-        if (levelPhase === "RUNNING" && this.scrollPos > this.bgHeight) {
-            this.scrollPos -= this.bgHeight;
+        if (levelPhase === "RUNNING" && this.scrollPos > bgHeight) {
+            this.scrollPos -= bgHeight;
+            if (this.defaultBgCycle && this.defaultBgCycle.length > 0) {
+                const n = this.defaultBgCycle.length;
+                // The top tile becomes the next full-screen tile after wrap.
+                this.defaultBgHeadIndex = ((this.defaultBgHeadIndex - 1) % n + n) % n;
+            }
         }
     }
 
@@ -89,26 +94,45 @@ class Environment {
 
         if (levelPhase === "RUNNING") {
             // RUNNING: Display scrolling default background
-            if (defaultBg) {
-                const scrollY = this.scrollPos % this.bgHeight;
-                image(defaultBg, 0, scrollY);
-                // Only draw second tile when it is actually visible (scrollY > 0)
-                if (scrollY > 0) image(defaultBg, 0, scrollY - this.bgHeight);
+            const bgHeight = 1080;
+            const scrollY = this.scrollPos % bgHeight;
+            const tileShift = Math.floor(this.scrollPos / bgHeight);
+            const bgA = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - tileShift) || defaultBg;
+            const bgB = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - tileShift - 1) || defaultBg;
+            if (bgA && bgB) {
+                // Seamless scrolling with two tiles (cycle selection does not change scroll math)
+                image(bgA, 0, scrollY);
+                image(bgB, 0, scrollY - bgHeight);
             }
         }
         else if (levelPhase === "VICTORY_TRANSITION") {
             // VICTORY_TRANSITION: Default continues scrolling, victory enters from top
-            const scrollY = this.scrollPos % this.bgHeight;
 
-            if (defaultBg) {
-                image(defaultBg, 0, scrollY);
-                if (scrollY > 0) image(defaultBg, 0, scrollY - this.bgHeight);
+            const bgHeight = 1080;
+            const scrollY = this.scrollPos % bgHeight;
+            const tileShift = Math.floor(this.scrollPos / bgHeight);
+            const bgA = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - tileShift) || defaultBg;
+            const bgB = this.getDefaultBgByTileIndex(this.defaultBgHeadIndex - tileShift - 1) || defaultBg;
+
+            if (bgA && bgB) {
+                // Continue scrolling the default background normally
+                image(bgA, 0, scrollY);
+                image(bgB, 0, scrollY - bgHeight);
             }
 
             if (destinationBg) {
+                // Victory background enters based on how much we've scrolled since victory
                 const scrolledSinceVictory = this.scrollPos - levelController.victoryStartScrollPos;
-                if (scrolledSinceVictory >= 0) {
-                    const victoryEntryY = scrolledSinceVictory - this.bgHeight;
+                const preRoll = Math.max(0, Number(levelController.victoryPreRollDistance) || 0);
+                const destinationProgress = scrolledSinceVictory - preRoll;
+                const destinationBgHeight = destinationBg.height || 1080;
+
+                // Enter only after current run tile finishes scrolling out.
+                if (destinationProgress >= 0) {
+                    // Victory background position: enters from bottom as we scroll
+                    const victoryEntryY = destinationProgress - destinationBgHeight;
+
+                    // Only display single tile
                     image(destinationBg, 0, victoryEntryY);
                 }
             }
@@ -116,10 +140,15 @@ class Environment {
         else if (levelPhase === "VICTORY_ZONE") {
             // VICTORY_ZONE: Display static victory background at frozen position
             if (destinationBg) {
+                // Use the Y position recorded when entering VICTORY_ZONE
+                const bgHeight = destinationBg.height || 1080;
                 const victoryY = levelController.victoryZoneStartY;
+
+                // Display with potential tile for seamless appearance
                 image(destinationBg, 0, victoryY);
+                // Draw second tile if needed for full coverage
                 if (victoryY < 0) {
-                    image(destinationBg, 0, victoryY + this.bgHeight);
+                    image(destinationBg, 0, victoryY + bgHeight);
                 }
             }
         }
@@ -159,13 +188,20 @@ class Environment {
         stroke(colors.marking);
         strokeWeight(6);
 
-        const segment = 120; // Dash (60) + Gap (60)
-        // Use cached centerX — avoids the literal 960 being re-resolved each call
-        const cx = this.centerX;
+        let centerX = 960; // Exact center of the 1920px canvas configuration
+        let segment = 120; // Represents Dash (60) + Gap (60)
 
+        // Iterate through the Y-axis using the scroll offset to create motion
         for (let y = this.scrollPos - segment; y < height; y += segment) {
-            line(cx, y, cx, y + 60);
+            line(centerX, y, centerX, y + 60);
         }
         pop();
+    }
+
+    getDefaultBgByTileIndex(tileIndex) {
+        if (!this.defaultBgCycle || this.defaultBgCycle.length === 0) return null;
+        const n = this.defaultBgCycle.length;
+        const idx = ((tileIndex % n) + n) % n;
+        return this.defaultBgCycle[idx];
     }
 }
