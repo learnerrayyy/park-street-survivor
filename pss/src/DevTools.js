@@ -36,6 +36,76 @@ const DEBUG_PLAYER_Y = 550;
  */
 const DEBUG_DAY_ID = 1;
 
+// ─── STORY RECAP ─────────────────────────────────────────────────────
+/**
+ * Developer flag to show the story recap screen.
+ */
+const DEBUG_STORY_RECAP = false;
+
+/**
+ * Developer data for the story recap screen.
+ * All x/y values are CENTER coordinates (imageMode CENTER).
+ * Adjust using arrow keys (move) + SHIFT+arrow keys (resize) in dev mode.
+ */
+let storyDebugData = {
+    shape: {
+        x: 925,    // center X of frame_shape panel
+        y: 520,    // center Y
+        w: 1620,   // width
+        h: 1050,   // height
+        alpha: 255
+    },
+    cloud: {
+        x: 895,    // center X of decorative frame_cloud overlay
+        y: 545,    // center Y (on top of shape + content)
+        w: 1660,   // width
+        h: 1065,   // height
+        alpha: 255
+    },
+    textArea: {
+        x: 1125,   // center X of clipped story CONTENT region (lines only)
+        y: 530,    // center Y
+        w: 735,    // width
+        h: 490     // height
+    },
+    titleArea: {
+        x: 1125,   // center X of story title (drawn above cloud)
+        y: 250,    // center Y — sits above the content, on top of all layers
+        w: 700,    // width (for debug box display)
+        h: 60      // height (for debug box display)
+    }
+};
+
+/**
+ * Developer flag to show on-screen controls for adjusting the story recap layout in real-time.
+ */
+let showStoryDebugControls = false;
+
+/**
+ * Currently selected layer in story debug mode.
+ * 1 = shape (frame_shape), 2 = cloud (frame_cloud), 3 = textArea
+ */
+let storyDebugActiveLayer = 1;
+
+/**
+ * Enters the story recap debug mode, allowing real-time adjustments of the recap layout.
+ */
+function devGoToStoryRecap() {
+    console.log("[DEV] Entering STORY RECAP debug mode");
+    gameState.currentState = STATE_PAUSED;
+    gameState.previousState = STATE_MENU; // 设置一个安全的 previousState
+    showStoryRecap = true;
+    storyRecapDay = 1;
+    storyScrollOffset = 0;
+    pauseIndex = -1;
+    showStoryDebugControls = true;
+    currentUnlockedDay = 5;  // unlock all days so arrows are navigable in dev mode
+
+    console.log("[DEV] Story Debug Controls activated");
+    console.log("[DEV] Press 'C' to toggle control panel");
+    console.log("[DEV] Use arrow keys + SHIFT to adjust selected layer");
+    console.log("[DEV] Press '1' for Shape, '2' for Cloud, '3' for Text Area");
+}
 
 // ─── RUNTIME TOGGLE ──────────────────────────────────────────────────────────
 

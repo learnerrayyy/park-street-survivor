@@ -166,6 +166,9 @@ class Player {
         let s = 8;
         let oldX = this.x;
         let oldY = this.y;
+        let s = 12; // was 8 — increased for snappier room navigation
+        let oldX = this.x;
+        let oldY = this.y;
         let moveX = 0;
         let moveY = 0;
 
@@ -308,22 +311,28 @@ class Player {
      * Translates elapsed frames into a digital clock display starting at 08:30:00.
      */
     drawClock(x, y) {
-        let startSeconds = 8.5 * 3600; // Fixed start time: 08:30:00
-        let elapsedSeconds = this.playTimeFrames / 60;
-        let totalTime = startSeconds + elapsedSeconds;
-
-        let hh = Math.floor(totalTime / 3600);
-        let mm = Math.floor((totalTime % 3600) / 60);
-        let ss = Math.floor(totalTime % 60);
+        // Rebuild the formatted string only when the displayed second changes
+        let currentSec = Math.floor(this.playTimeFrames / 60);
+        if (currentSec !== this._lastClockSec) {
+            this._lastClockSec = currentSec;
+            const START = 8.5 * 3600; // 08:30:00 in seconds
+            let total = START + currentSec;
+            let hh = Math.floor(total / 3600);
+            let mm = Math.floor((total % 3600) / 60);
+            let ss = Math.floor(total % 60);
+            // Simple zero-pad without nf() overhead
+            this._clockStr = (hh < 10 ? '0' : '') + hh + ':' +
+                (mm < 10 ? '0' : '') + mm + ':' +
+                (ss < 10 ? '0' : '') + ss;
+            this._clockRed = (hh >= 9);
+        }
 
         textAlign(CENTER, CENTER);
         textSize(44);
         textStyle(BOLD);
-        fill(255, 215, 0);
-        text(`${nf(hh, 2)}:${nf(mm, 2)}:${nf(ss, 2)}`, x, y);
+        fill(this._clockRed ? color(255, 50, 50) : color(255, 215, 0));
+        text(this._clockStr, x, y);
 
-        // Turn red once the 09:00 deadline is passed
-        if (hh >= 9) fill(255, 50, 50);
         textSize(12);
         fill(150);
         textStyle(NORMAL);
