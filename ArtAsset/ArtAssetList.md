@@ -21,9 +21,9 @@ All background assets are standard **1920x1080** resolution unless otherwise spe
 ## Portraits
 | **Asset Name**         | **Dimensions** | **Description**                                                              | Path                                    |
 | ---------------------- | -------------- | ---------------------------------------------------------------------------- | --------------------------------------- |
-| **portrait_Iris**      | 380x380        | Dialogue portrait of the protagonist wearing a helmet and riding a scooter.  | ArtAsset\Character\main_player\portrait |
-| **portrait_wiola**     | 380x380        | Brown long hair, gentle, no glasses, wearing windbreaker.                    | ArtAsset\Character\wiola                |
-| **portrait_layla**     | 380x380        | mysterious, short-haired, wearing a hoodie.                                  |                                         |
+| **portrait_Iris**      | 380x380        | Dialogue portrait of the protagonist wearing a helmet and riding a scooter.  | ArtAsset\Character\Iris\portrait |
+| **portrait_wiola**     | 380x380        | Brown long hair, gentle, no glasses, wearing windbreaker.                    | ArtAsset\Character\Wiola                |
+| **portrait_layla**     | 380x380        | mysterious, short-haired, wearing a hoodie.                                  | ArtAsset\Character\Layla              |
 | **portrait_yuki**      | 380x380        | irritable, repetitive in speech, appears artificial/fake, curly hair, dress. |                                         |
 | **portrait_raymond**   | 380x380        | robot, abstract, eerie expression, long straight black hair T-shirt.         |                                         |
 | **portrait_charlotte** | 380x380        | Most normal, a true friend, short hair, red hair, leather jacket.            |                                         |
