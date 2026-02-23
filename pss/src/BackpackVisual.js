@@ -173,6 +173,9 @@ class BackpackVisual {
             this.messageTimer--;
         }
         this.drawInstructions();
+        this.backButton.isFocused = this.backButton.checkMouse(mouseX, mouseY);
+        this.backButton.update();
+        this.backButton.display();
         // Dev overlays are drawn last so they are always on top
         if (developerMode) this.drawDevOverlays();
         pop();
@@ -948,6 +951,11 @@ class BackpackVisual {
      * In dev mode, checks for dev handles first before normal game interaction.
      */
     handleMousePressed(mx, my) {
+        if (this.backButton.checkMouse(mx, my)) {
+            this.backButton.handleClick();
+            return;
+        }
+
         // ── Dev mode: check for dev handles first ─────────────────────────────
         if (developerMode && !this.showReplaceDialog) {
             let hit = this.getDevHit(mx, my);

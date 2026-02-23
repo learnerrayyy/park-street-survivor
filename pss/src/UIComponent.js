@@ -141,6 +141,7 @@ class TimeWheel {
             delay: 8,
             rotation: random(-15, 15)
         };
+        this._cloudScale = 1.0;
     }
 
     /**
@@ -170,6 +171,7 @@ class TimeWheel {
             delay: 8,
             rotation: random(-15, 15)
         };
+        this._cloudScale = 1.0;
     }
 
     /**
@@ -273,7 +275,10 @@ class TimeWheel {
     drawDynamicBackground() {
         let isLocked = (this.selectedDay > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
         // Day 1 stays visually locked until the player clicks once (skipped in dev mode)
-        if (this.selectedDay === 1 && !tutorialHints.day1VisuallyUnlocked && !developerMode) {
+        if (this.selectedDay === 1 &&
+            typeof tutorialHints !== 'undefined' &&
+            !tutorialHints.day1VisuallyUnlocked &&
+            !developerMode) {
             isLocked = true;
         }
 

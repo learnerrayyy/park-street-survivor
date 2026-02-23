@@ -4,6 +4,7 @@
 // ─── GLOBAL SYSTEM INSTANCES ─────────────────────────────────────────────────
 let gameState, mainMenu, roomScene, inventory, env, player, obstacleManager, levelController;
 let backpackUI;
+let endScreenManager;
 let testingPanel;
 
 // ─── GAME PROGRESS STATE ─────────────────────────────────────────────────────
@@ -14,6 +15,7 @@ let currentDayID = 1;
 let assets = {
     menuBg: null,
     otherBg: null,
+    warningImg: null,
     keys: {},
     selectClouds: [],
     selectBg: {
@@ -110,6 +112,13 @@ let pauseIndex = 0;
 const PAUSE_OPTIONS = ["RESUME", "HELP", "QUIT TO MENU"];
 let pauseFromState = null;
 
+// ─── TUTORIAL HINT STATE ──────────────────────────────────────────────────────
+let tutorialHints = {
+    day1VisuallyUnlocked: false,
+    levelSelectShownForDay: 0,
+    roomPhase: 'DESK'
+};
+
 // ─── SPLASH LOGO ANIMATION STATE ─────────────────────────────────────────────
 let titleDrop = { y: -200, vy: 0, landed: false, shake: 0 };
 
@@ -137,7 +146,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 29;
+const totalAssetsToLoad = 30;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,6 +222,7 @@ function preload() {
     ];
 
     assets.uobLogo = loadImage('assets/logo/uob_logo.png', itemLoaded);
+    assets.warningImg = loadImage('assets/buttons/warning.png', itemLoaded);
 
     // Entity preview sprites (no progress tracking — non-critical)
     if (!assets.previews) assets.previews = {};
@@ -293,6 +303,7 @@ function setup() {
     testingPanel = new TestingPanel();
     backpackUI = new BackpackVisual(inventory, roomScene);
     levelController = new LevelController();
+    endScreenManager = new EndScreenManager();
 
     textFont(fonts.body);
     gameState.currentState = STATE_LOADING;
@@ -337,6 +348,18 @@ function draw() {
 
             case STATE_INVENTORY:
                 if (backpackUI) backpackUI.display();
+                // Tutorial: once required items are packed, guide player to close backpack.
+                if (tutorialHints.roomPhase === 'CLOSE_BP' && backpackUI && backpackUI.hasRequiredItems()) {
+                    drawWarningIcon(width / 2, height - 75, 48);
+                    push();
+                    textFont(fonts.body);
+                    textSize(20);
+                    textAlign(CENTER, CENTER);
+                    fill(255, 215, 0, 200 + sin(frameCount * 0.1) * 55);
+                    noStroke();
+                    text("PACK COMPLETE! PRESS ESC TO CLOSE BACKPACK", width / 2, height - 45);
+                    pop();
+                }
                 break;
 
             case STATE_DAY_RUN:
@@ -361,7 +384,8 @@ function draw() {
 
             case STATE_FAIL:
             case STATE_WIN:
-                drawEndScreen();
+                if (endScreenManager) endScreenManager.display();
+                else drawEndScreen();
                 break;
         }
     } catch (e) {
@@ -525,7 +549,8 @@ function keyPressed() {
     }
     // Retry from end screen
     else if (state === STATE_FAIL || state === STATE_WIN) {
-        if (keyCode === ENTER || keyCode === 13) {
+        if (endScreenManager) endScreenManager.handleKeyPress(keyCode);
+        else if (keyCode === ENTER || keyCode === 13) {
             playSFX(sfxClick);
             setupRun(currentDayID);
         }
@@ -533,6 +558,9 @@ function keyPressed() {
 
     // Close inventory with ESC
     if (gameState.currentState === STATE_INVENTORY && keyCode === ESCAPE) {
+        if (tutorialHints.roomPhase === 'CLOSE_BP') {
+            tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
+        }
         gameState.currentState = STATE_ROOM;
         return false;
     }
@@ -546,12 +574,6 @@ function handlePauseSelection() {
         togglePause();
         pauseFromState = null;
     } else if (PAUSE_OPTIONS[pauseIndex] === "HELP") {
-        pauseFromState = gameState.previousState;
-        if (typeof playSFX === 'function') playSFX(sfxClick);
-        mainMenu.diffToastTimer = 0;   // clear any stale difficulty toast
-        gameState.currentState = STATE_SETTINGS;
-        mainMenu.menuState = STATE_SETTINGS;
-    } else if (selected === "HELP") {
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         gameState.currentState = STATE_HELP;
@@ -591,7 +613,12 @@ function mousePressed() {
     if (state === STATE_MENU || state === STATE_LEVEL_SELECT ||
         state === STATE_SETTINGS || state === STATE_HELP) {
         if (mainMenu) mainMenu.handleClick(mouseX, mouseY);
+    } else if (state === STATE_FAIL || state === STATE_WIN) {
+        if (endScreenManager) endScreenManager.handleClick(mouseX, mouseY);
     } else if (state === STATE_ROOM || state === STATE_DAY_RUN) {
+        if (state === STATE_ROOM && roomScene && roomScene.handleMousePressed(mouseX, mouseY)) {
+            return false;
+        }
         // Pause button hit-test
         if (dist(mouseX, mouseY, width - 60, 50) < 25) {
             playSFX(sfxClick);
@@ -631,6 +658,9 @@ function mouseDragged() {
  */
 function mouseMoved() {
     if (!gameState) return;
+    if (gameState.currentState === STATE_FAIL || gameState.currentState === STATE_WIN) {
+        if (endScreenManager) endScreenManager.handleMouseMove(mouseX, mouseY);
+    }
     if (gameState.currentState === STATE_INVENTORY) {
         if (backpackUI) backpackUI.handleMouseMoved(mouseX, mouseY);
     }
@@ -660,6 +690,7 @@ function setupRun(dayID) {
     roomScene.reset();
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
+    if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DESK';
     gameState.setState(STATE_ROOM);
 }
 

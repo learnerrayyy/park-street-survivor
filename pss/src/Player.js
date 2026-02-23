@@ -163,9 +163,6 @@ class Player {
      * 4-directional movement for the bedroom scene, with collision detection via RoomScene.
      */
     handleRoomMovement() {
-        let s = 8;
-        let oldX = this.x;
-        let oldY = this.y;
         let s = 12; // was 8 — increased for snappier room navigation
         let oldX = this.x;
         let oldY = this.y;

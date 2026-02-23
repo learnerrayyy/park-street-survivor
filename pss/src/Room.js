@@ -218,11 +218,29 @@ class RoomScene {
 
         // 4. Door-blocked warning prompt
         this.drawDoorBlockedPrompt();
+        this.drawTutorialHints();
 
-        // 5. Developer overlay
+        // 5. Back button
+        this.backButton.isFocused = this.backButton.checkMouse(mouseX, mouseY);
+        this.backButton.update();
+        this.backButton.display();
+
+        // 6. Developer overlay
         this.drawRoomDevTools();
 
         pop();
+    }
+
+    /**
+     * Handles room-specific mouse clicks.
+     * @returns {boolean} True if the click was consumed.
+     */
+    handleMousePressed(mx, my) {
+        if (this.backButton.checkMouse(mx, my)) {
+            this.backButton.handleClick();
+            return true;
+        }
+        return false;
     }
 
     /**

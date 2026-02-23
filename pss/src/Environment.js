@@ -69,8 +69,8 @@ class Environment {
         const levelPhase = levelController ? levelController.getLevelPhase() : "RUNNING";
 
         // Only loop the scrollPos if we're still in RUNNING phase
-        if (levelPhase === "RUNNING" && this.scrollPos > bgHeight) {
-            this.scrollPos -= bgHeight;
+        if (levelPhase === "RUNNING" && this.scrollPos > this.bgHeight) {
+            this.scrollPos -= this.bgHeight;
             if (this.defaultBgCycle && this.defaultBgCycle.length > 0) {
                 const n = this.defaultBgCycle.length;
                 // The top tile becomes the next full-screen tile after wrap.

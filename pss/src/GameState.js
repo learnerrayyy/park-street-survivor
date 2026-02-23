@@ -32,6 +32,15 @@ class GameState {
         
         // Finalize state update
         this.currentState = newState;
+
+        // Activate end screen overlays on transition
+        if (typeof endScreenManager !== 'undefined' && endScreenManager) {
+            if (newState === STATE_FAIL) {
+                endScreenManager.activateFail(this.failReason);
+            } else if (newState === STATE_WIN) {
+                endScreenManager.activateSuccess();
+            }
+        }
     }
 
     /**
