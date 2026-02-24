@@ -422,14 +422,32 @@ class SuccessScreen extends EndScreenBase {
         text(msg, cx, box.y + box.h * 0.38);
         pop();
 
-        // Character illustration in place of the progress bar
-        if (assets.irisSuccess) {
-            let imgH = box.h * 0.36;
-            let imgW = imgH * (assets.irisSuccess.width / assets.irisSuccess.height);
-            push();
-            imageMode(CENTER);
-            image(assets.irisSuccess, cx, box.y + box.h * 0.60, imgW, imgH);
-            pop();
+        if (assets.irisSuccess && assets.irisSuccess.length > 0) {
+            const smoothSequence = [
+                0, 0,
+                1, 
+                2, 
+                3, 3,
+                4, 4,
+                3, 3,
+                2, 
+                1
+            ]; 
+    
+        let playSpeed = 5; 
+        let totalTicks = smoothSequence.length * playSpeed;
+        let sequenceIdx = floor((frameCount % totalTicks) / playSpeed);
+    
+        let displayIdx = smoothSequence[sequenceIdx];
+
+        let imgH = box.h * 0.45;
+        let imgW = imgH * (assets.irisSuccess[0].width / assets.irisSuccess[0].height);
+    
+        push();
+        imageMode(CENTER);
+        translate(cx, box.y + box.h * 0.60);
+        image(assets.irisSuccess[displayIdx], 0, 0, imgW, imgH);
+        pop();
         }
         }
         this.drawButtons(cx, this._getButtonStartY());

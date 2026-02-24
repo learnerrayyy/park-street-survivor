@@ -18,7 +18,8 @@ let assets = {
     warningImg: null,
     bbg: null,
     libraryBg: null,
-    irisSuccess: null,
+    irisSuccess: [],
+    celebrateSheet: null,
     storyShape: null,
     storyCloud: null,
     keys: {},
@@ -329,7 +330,15 @@ function preload() {
 
     assets.bbg         = loadImage('assets/background/bbg.png', itemLoaded);
     assets.libraryBg   = loadImage('assets/background/library.jpg', itemLoaded);
-    assets.irisSuccess = loadImage('assets/end_screen/iris_success.png', itemLoaded);
+
+    loadImage('assets/end_screen/spritesheet_celebrate.png', (img) => {
+        let fW = img.width / 5;
+        let fH = img.height;
+        for (let i = 0; i < 5; i++) {
+            assets.irisSuccess.push(img.get(i * fW, 0, fW, fH));
+        }
+    });
+
     assets.storyShape  = loadImage('assets/story/frame_shape.png', itemLoaded);
     assets.storyCloud  = loadImage('assets/story/frame_cloud.png', itemLoaded);
 
