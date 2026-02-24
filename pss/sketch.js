@@ -146,7 +146,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 38;
+const totalAssetsToLoad = 41;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -224,6 +224,9 @@ function preload() {
 
     assets.uobLogo = loadImage('assets/logo/uob_logo.png', itemLoaded);
     assets.warningImg = loadImage('assets/buttons/warning.png', itemLoaded);
+    assets.btnImg = loadImage('assets/buttons/button.png', itemLoaded);
+    assets.backImg = loadImage('assets/buttons/back.png', itemLoaded);
+    assets.pauseImg = loadImage('assets/buttons/pause.png', itemLoaded);
 
     // Entity preview sprites (no progress tracking — non-critical)
     if (!assets.previews) assets.previews = {};
@@ -942,15 +945,21 @@ function drawPauseButton() {
     push();
     let bx = width - 60;
     let by = 50;
-    noFill();
-    stroke(255, 150);
-    strokeWeight(2);
-    ellipse(bx, by, 40, 40);
-    fill(255, 150);
-    noStroke();
-    rectMode(CENTER);
-    rect(bx - 5, by, 4, 15);
-    rect(bx + 5, by, 4, 15);
+
+    if (assets.pauseImg) {
+        imageMode(CENTER);
+        image(assets.pauseImg, bx, by, 52, 52);
+    } else {
+        noFill();
+        stroke(255, 150);
+        strokeWeight(2);
+        ellipse(bx, by, 40, 40);
+        fill(255, 150);
+        noStroke();
+        rectMode(CENTER);
+        rect(bx - 5, by, 4, 15);
+        rect(bx + 5, by, 4, 15);
+    }
     pop();
 }
 
