@@ -42,22 +42,17 @@ class Player {
         this.y = PLAYER_RUN_FOOT_Y;
 
         // Walking animation state
-        this.dir = 'south';
-        this.animFrame = 0;
-        this.isWalking = false;
-        this.animSpeed = 0.18;
-        this.runAnimSpeed = 0.28;
+        this.dir        = 'south';
+        this.animFrame  = 0;
+        this.isWalking  = false;
+        this.animSpeed  = 0.18;
 
-        // Status effects
-        this.stunFramesRemaining = 0;
-        this.laneDelayFramesRemaining = 0;
-        this.speedBoostFramesRemaining = 0;
-        this.invincibleFramesRemaining = 0;
-        this.hpLockFramesRemaining = 0;
-        this.hpLockValue = 0;
-        this.activeSpeedMultiplier = 1;
-        this.baseRunScrollSpeed = null;
-        this.wasSpeedBoostActive = false;
+        // ── PERFORMANCE: Clock display cache ──
+        // Rebuild the formatted time string only once per second (every 60 frames),
+        // not on every single draw call.
+        this._clockStr    = "08:30:00";
+        this._clockRed    = false;
+        this._lastClockSec = -1;
     }
 
     /**
@@ -163,9 +158,9 @@ class Player {
      * 4-directional movement for the bedroom scene, with collision detection via RoomScene.
      */
     handleRoomMovement() {
-        let s = 12; // was 8 — increased for snappier room navigation
-        let oldX = this.x;
-        let oldY = this.y;
+        let s     = 12; // was 8 — increased for snappier room navigation
+        let oldX  = this.x;
+        let oldY  = this.y;
         let moveX = 0;
         let moveY = 0;
 
@@ -293,96 +288,116 @@ class Player {
      */
     drawTopBar() {
         push();
-        fill(20, 20, 30);
+        /*fill(56, 39, 96);
         noStroke();
-        rect(0, 0, width, 100);
+        rect(0, 0, width, 170);*/
 
-        this.drawClock(width / 2, 50);
-        this.drawHealthBar(50, 50);
-        this.drawProgressBar(width - 450, 50);
-        this.drawPauseIcon(width - 60, 50);
+        this.drawHealthBar(165, 65);
+        this.drawBackpackIcon(98, 85);
+        
+        const leftMargin = 70;
+        const topBarH = 170;
+        this.drawProgressBar(leftMargin, topBarH + 100);
+
         pop();
     }
 
-    /**
-     * Translates elapsed frames into a digital clock display starting at 08:30:00.
-     */
-    drawClock(x, y) {
-        // Rebuild the formatted string only when the displayed second changes
-        let currentSec = Math.floor(this.playTimeFrames / 60);
-        if (currentSec !== this._lastClockSec) {
-            this._lastClockSec = currentSec;
-            const START = 8.5 * 3600; // 08:30:00 in seconds
-            let total = START + currentSec;
-            let hh = Math.floor(total / 3600);
-            let mm = Math.floor((total % 3600) / 60);
-            let ss = Math.floor(total % 60);
-            // Simple zero-pad without nf() overhead
-            this._clockStr = (hh < 10 ? '0' : '') + hh + ':' +
-                (mm < 10 ? '0' : '') + mm + ':' +
-                (ss < 10 ? '0' : '') + ss;
-            this._clockRed = (hh >= 9);
-        }
-
-        textAlign(CENTER, CENTER);
-        textSize(44);
-        textStyle(BOLD);
-        fill(this._clockRed ? color(255, 50, 50) : color(255, 215, 0));
-        text(this._clockStr, x, y);
-
-        textSize(12);
-        fill(150);
-        textStyle(NORMAL);
-        text("BRISTOL TIME", x, y + 32);
-    }
-
-    /**
+     /**
      * Renders the energy bar with a green fill that depletes as stamina drops.
      */
     drawHealthBar(x, y) {
         fill(255);
-        textSize(14);
+        textSize(32);
         textStyle(BOLD);
         text("ENERGY", x, y - 22);
 
         fill(50);
-        rect(x, y, 200, 24, 4);
+        stroke(0);
+        strokeWeight(5);
+        rect(x, y, 400, 50, 4);
 
         let pct = constrain(this.health / this.maxHealth, 0, 1);
         fill(0, 255, 100);
-        rect(x + 2, y + 2, (200 - 4) * pct, 20, 3);
+        rect(x + 2, y + 2, (400 - 4) * pct, 45, 3);
     }
 
+    /**
+     * Backpack HUD: circular base plate + overlay item icon (slightly larger than plate)
+     * - plate: white fill + black stroke (static)
+     * - icon: backpack.png by default; if buff item carried, show item.icon
+     * Returns layout metrics so caller can place the health bar tightly beside it.
+     */
+    drawBackpackIcon(x, y) {
+        // --- layout ---
+        const plateD = 136;          // Base plate diameter
+        const iconD  = 188;          // Icon slightly larger(visual appeal).
+
+        // --- draw base plate ---
+        push();
+        ellipseMode(CENTER);
+        stroke(0);
+        strokeWeight(5);
+        fill(255);
+        circle(x, y, plateD);
+
+        // --- decide what to show ---
+        // 需要把这里的“拿当前携带道具”的逻辑替换成真实的接口/字段
+        let heldItem = null;
+        if (typeof inventorySystem !== "undefined" && inventorySystem.getHeldItem) {
+            heldItem = inventorySystem.getHeldItem();
+        } else if (gameState && gameState.heldItem) {
+            heldItem = gameState.heldItem;
+        }
+
+        // 默认显示基础背包图
+        let iconImg = assets.backpackImg;
+
+        // 如果携带了 buff 道具且有图标，则显示该道具图
+        // （type/isBuff 字段按实际数据结构改）
+       if (heldItem && (heldItem.type === "BUFF" || heldItem.isBuff === true) && heldItem.icon) {
+            iconImg = heldItem.icon;
+        }
+
+        // --- draw icon (slightly larger than plate) ---
+        if (iconImg) {
+            push();
+            imageMode(CENTER);
+            translate(x, y);
+            rotate(radians(-20));
+            image(iconImg, 0, -8, iconD, iconD);
+            pop();
+        } else {
+            // Placeholder (to avoid blank spaces)
+            noStroke();
+            fill(0);
+            textAlign(CENTER, CENTER);
+            textSize(32);
+            text("NO ICON", x, y);
+        }
+
+        pop();
+    }
+   
     /**
      * Renders the distance progress bar mapped against the level's total distance target.
      */
     drawProgressBar(x, y) {
-        fill(255);
-        textSize(14);
-        textStyle(BOLD);
-        text("PROGRESS", x, y - 22);
+        const barWidth = 70;
+        const barHeight = 500;
+        const padding = 4;
 
-        fill(50);
-        rect(x, y, 300, 24, 4);
+        fill(255);
+        stroke(0);
+        strokeWeight(5);
+        rect(x, y, barWidth, barHeight, padding);
 
         let total = DAYS_CONFIG[currentDayID].totalDistance;
-        let pct = constrain(this.distanceRun / total, 0, 1);
-        fill(50, 150, 255);
-        rect(x + 2, y + 2, (300 - 4) * pct, 20, 3);
-    }
+        let pct   = constrain(this.distanceRun / total, 0, 1);
 
-    /**
-     * Renders the pause icon (two vertical bars inside a circle) in the HUD.
-     */
-    drawPauseIcon(x, y) {
-        noFill();
-        stroke(255);
-        strokeWeight(2);
-        circle(x, y, 50);
-        fill(255);
-        noStroke();
-        rect(x - 8, y, 6, 22);
-        rect(x + 8, y, 6, 22);
+        fill(255, 212, 104);
+        let innerMaxH = barHeight - padding; // Maximum internal height
+        let currentH = innerMaxH * pct;      // Current progress height
+        rect(x + 2, y + barHeight - 2, barWidth - 4, -currentH, 3);
     }
 
     drawSpeedBoostBanner() {

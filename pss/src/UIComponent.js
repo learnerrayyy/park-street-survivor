@@ -30,44 +30,36 @@ class UIButton {
     display() {
         push();
         translate(this.x, this.y);
-        scale(this.currentScale);
+        scale(this.currentScale);  // lerp scale handles the zoom effect
 
+        imageMode(CENTER);
         rectMode(CENTER);
         textAlign(CENTER, CENTER);
         textFont(fonts.body);
 
-        // 1. Visual Style: Focus vs Default
-        if (this.isFocused) {
-            fill(255, 215, 0); // Gold
-            stroke(255);
-            strokeWeight(4);
-        } else {
-            fill(0, 0, 0, 180);
-            stroke(255, 215, 0);
-            strokeWeight(2);
-        }
-
-        // Draw the button body
-        rect(0, 0, this.w, this.h, 10);
-
-        // 2. Content Layer: Render Icon or Text
-        noStroke();
-        fill(this.isFocused ? 0 : 255);
-
         if (this.label === "BACK_ARROW") {
-            // [Vector Graphics] Draw a clean back arrow icon
-            stroke(this.isFocused ? 0 : 255);
-            strokeWeight(3);
-            noFill();
-            // Arrow shaft
-            line(-12, 0, 12, 0);
-            // Arrow head (Pointed left)
-            line(-12, 0, -4, -8);
-            line(-12, 0, -4, 8);
+            // Back arrow — back.png, 2× render size, no tint
+            if (assets.backImg) {
+                image(assets.backImg, 0, 0, this.w * 2, this.h * 2);
+            }
         } else {
-            // Standard Text Rendering
-            textSize(24);
-            text(this.label, 0, 0);
+            // Standard button — button.png 2× render size, no tint
+            if (assets.btnImg) {
+                image(assets.btnImg, 0, 0, this.w * 2, this.h * 2);
+            }
+
+            // Text label on top — 1.8× original (24 * 1.8 ≈ 43)
+            // ← adjust the number below to change main menu button text size
+            // ← adjust the -6 below to move text up/down inside the button
+            textSize(43);
+            textAlign(CENTER, CENTER);
+            stroke(0, 0, 0, 180);
+            strokeWeight(5);
+            fill(255, 215, 0);
+            text(this.label, 0, -10);
+            noStroke();
+            fill(255, 215, 0);
+            text(this.label, 0, -10);
         }
         pop();
     }
@@ -77,8 +69,10 @@ class UIButton {
      * Essential for mouse-to-index synchronization in MainMenu.
      */
     checkMouse(mx, my) {
-        return (mx > this.x - this.w / 2 && mx < this.x + this.w / 2 &&
-            my > this.y - this.h / 2 && my < this.y + this.h / 2);
+        // Slightly larger hit area for easier clicking (1.3× logical size)
+        let hw = this.w * 0.65, hh = this.h * 0.65;
+        return (mx > this.x - hw && mx < this.x + hw &&
+                my > this.y - hh && my < this.y + hh);
     }
 
     handleClick() {
@@ -141,7 +135,10 @@ class TimeWheel {
             delay: 8,
             rotation: random(-15, 15)
         };
+
+        // Cloud hover scale (smooth lerp)
         this._cloudScale = 1.0;
+
     }
 
     /**
@@ -216,6 +213,59 @@ class TimeWheel {
         }
         pop();
 
+        // Right-side up/down arrows
+        this.drawSelectionArrows();
+
+        pop();
+    }
+
+    /**
+     * RENDERER: RIGHT-SIDE NAVIGATION ARROWS
+     * Up/Down arrows for day selection with hover zoom effect.
+     */
+    drawSelectionArrows() {
+        if (!assets.backImg || this.isEntering) return;
+
+        let arrowX   = width - 90;
+        let centerY  = height / 2;
+        let arrowSz  = 60;
+        let arrowGap = 90;
+
+        // Up arrow (previous day)
+        let canGoUp  = this.selectedDay > 1;
+        let upHover  = canGoUp && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35;
+        push();
+        translate(arrowX, centerY - arrowGap);
+        rotate(HALF_PI);
+        if (!canGoUp) tint(255, 60);
+        if (upHover)  scale(1.25);
+        imageMode(CENTER);
+        image(assets.backImg, 0, 0, arrowSz, arrowSz);
+        noTint();
+        pop();
+
+        // Day indicator between arrows
+        push();
+        textFont(fonts.title);
+        textSize(20);
+        textAlign(CENTER, CENTER);
+        stroke(0, 0, 0, 150); strokeWeight(3); fill(255, 215, 0);
+        text("DAY " + this.selectedDay, arrowX, centerY);
+        noStroke(); fill(255, 215, 0);
+        text("DAY " + this.selectedDay, arrowX, centerY);
+        pop();
+
+        // Down arrow (next day)
+        let canGoDown  = this.selectedDay < this.totalDays;
+        let downHover  = canGoDown && dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35;
+        push();
+        translate(arrowX, centerY + arrowGap);
+        rotate(-HALF_PI);
+        if (!canGoDown) tint(255, 60);
+        if (downHover)  scale(1.25);
+        imageMode(CENTER);
+        image(assets.backImg, 0, 0, arrowSz, arrowSz);
+        noTint();
         pop();
     }
 
@@ -269,8 +319,10 @@ class TimeWheel {
     }
 
     /**
-     * RENDERER: DUAL-STATE BACKGROUND
-     * Blends lock/unlock backgrounds based on selection.
+     * RENDERER: BACKGROUND BLEND
+     * Lerps bgAlpha (0=lock image, 255=unlock image) based on whether the selected day
+     * is locked. Day 1 is treated as locked until the player clicks once, so flipping
+     * day1VisuallyUnlocked automatically starts the fade-in to the colorful background.
      */
     drawDynamicBackground() {
         let isLocked = (this.selectedDay > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
@@ -286,11 +338,7 @@ class TimeWheel {
         this.bgAlpha = lerp(this.bgAlpha, targetAlpha, 0.04);
 
         imageMode(CORNER);
-
-        if (assets.selectBg.lock) {
-            image(assets.selectBg.lock, 0, 0, width, height);
-        }
-
+        if (assets.selectBg.lock)   image(assets.selectBg.lock,   0, 0, width, height);
         if (assets.selectBg.unlock) {
             push();
             tint(255, this.bgAlpha);
@@ -298,6 +346,8 @@ class TimeWheel {
             pop();
         }
 
+        // Darken overlay
+        noStroke();
         fill(0, 0, 0, 100);
         rect(0, 0, width, height);
     }
@@ -351,21 +401,38 @@ class TimeWheel {
 
         imageMode(CENTER);
 
-        // Grayscale filter for locked days
-        if (isLocked) {
+        // Grayscale filter for locked / not-yet-clicked days
+        if (visuallyLocked) {
             drawingContext.filter = 'grayscale(100%) brightness(0.6)';
         }
 
-        // Pink dreamcore glow for unlocked
-        if (!isLocked) {
+        // Pink dreamcore glow only for visually-unlocked days
+        if (!visuallyLocked) {
             drawingContext.shadowBlur = 40;
             drawingContext.shadowColor = 'rgba(255, 105, 180, 0.6)';
         }
 
-        image(cloudImg, 0, 0, 700, 450);
+        image(cloudImg, 0, 0, cloudW, cloudH);
 
         drawingContext.shadowBlur = 0;
         drawingContext.filter = 'none';
+
+        // ── Tutorial hint: breathing warning icon on cloud top-right ──
+        // Day 1: show while still visually locked (first-click prompt)
+        // Days 2-5: show on the newest-unlocked day before first entry
+        let showDay1Hint = typeof tutorialHints !== 'undefined' &&
+                           dayID === 1 &&
+                           !tutorialHints.day1VisuallyUnlocked;
+        let showNewDayHint = typeof tutorialHints !== 'undefined' &&
+                             typeof currentUnlockedDay !== 'undefined' &&
+                             !isLocked && dayID > 1 &&
+                             dayID === currentUnlockedDay &&
+                             tutorialHints.levelSelectShownForDay < currentUnlockedDay;
+        if ((showDay1Hint || showNewDayHint) && typeof assets !== 'undefined' && assets.warningImg) {
+            let warnX = cloudW / 2 - 80;
+            let warnY = -cloudH / 2 + 55;
+            drawWarningIcon(warnX, warnY, 100);
+        }
 
         // Mission title positioned at cloud's left-center-lower area
         this.drawMissionTitle(dayID);
@@ -534,27 +601,52 @@ class UISlider {
     display() {
         push();
         rectMode(CENTER);
-        textAlign(LEFT, CENTER);
 
+        // Label — centered above the slider, matches DIFFICULTY size
         textFont(fonts.body);
-        fill(255);
-        textSize(24);
-        text(this.label, this.x - this.w / 2, this.y - 40);
-
-        stroke(255, 100);
-        strokeWeight(6);
-        line(this.x - this.w / 2, this.y, this.x + this.w / 2, this.y);
-
-        let sliderX = map(this.value, this.minVal, this.maxVal, this.x - this.w / 2, this.x + this.w / 2);
-
+        textSize(32);
+        textAlign(CENTER, CENTER);
+        stroke(0, 0, 0, 200);
+        strokeWeight(5);
+        fill(255, 215, 0);
+        text(this.label, this.x, this.y - 44);
         noStroke();
-        fill(this.isDragging ? color(255, 150, 200) : 255);
-        rect(sliderX, this.y, this.knobSize, this.knobSize + 10, 5);
+        fill(255, 215, 0);
+        text(this.label, this.x, this.y - 44);
 
+        let leftX   = this.x - this.w / 2;
+        let rightX  = this.x + this.w / 2;
+        let sliderX = map(this.value, this.minVal, this.maxVal, leftX, rightX);
+
+        // Track background (dim grey) — thicker
+        stroke(255, 255, 255, 60);
+        strokeWeight(10);
+        line(leftX, this.y, rightX, this.y);
+
+        // Filled purple bar from left to knob — thicker
+        stroke(160, 90, 255, 220);
+        strokeWeight(10);
+        line(leftX, this.y, sliderX, this.y);
+
+        // Knob — scale-up when dragging, no tint
+        push();
+        translate(sliderX, this.y);
+        if (this.isDragging) scale(1.3);
+        noStroke();
+        fill(255, 215, 0);
+        rect(0, 0, this.knobSize, this.knobSize + 10, 5);
+        pop();
+
+        // Percentage text
         textFont(fonts.time);
         textAlign(CENTER, CENTER);
-        fill(255, 200);
+        stroke(0, 0, 0, 160);
+        strokeWeight(3);
+        fill(255, 215, 0);
         textSize(20);
+        text(floor(this.value * 100) + "%", sliderX, this.y + 35);
+        noStroke();
+        fill(255, 215, 0);
         text(floor(this.value * 100) + "%", sliderX, this.y + 35);
         pop();
 

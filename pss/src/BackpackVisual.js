@@ -173,6 +173,7 @@ class BackpackVisual {
             this.messageTimer--;
         }
         this.drawInstructions();
+        // Back arrow button (top-left)
         this.backButton.isFocused = this.backButton.checkMouse(mouseX, mouseY);
         this.backButton.update();
         this.backButton.display();
@@ -951,11 +952,11 @@ class BackpackVisual {
      * In dev mode, checks for dev handles first before normal game interaction.
      */
     handleMousePressed(mx, my) {
+        // Back arrow click
         if (this.backButton.checkMouse(mx, my)) {
             this.backButton.handleClick();
             return;
         }
-
         // ── Dev mode: check for dev handles first ─────────────────────────────
         if (developerMode && !this.showReplaceDialog) {
             let hit = this.getDevHit(mx, my);

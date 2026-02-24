@@ -146,7 +146,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 30;
+const totalAssetsToLoad = 38;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -173,11 +173,12 @@ function preload() {
     assets.inventoryBg = loadImage('assets/inventory/table.png', itemLoaded);
     assets.backpackImg = loadImage('assets/inventory/backpack.png', itemLoaded);
     assets.studentCardImg = loadImage('assets/inventory/student_card.png', itemLoaded);
-    assets.computerImg = loadImage('assets/inventory/computer.png', itemLoaded);
-    assets.vitaminImg = loadImage('assets/inventory/vitamin.png', itemLoaded);
-    assets.tangleImg = loadImage('assets/inventory/tangle.png', itemLoaded);
-    assets.headphoneImg = loadImage('assets/inventory/headphone.png', itemLoaded);
-    assets.rainbootImg = loadImage('assets/inventory/rainboot.png', itemLoaded);
+    assets.computerImg    = loadImage('assets/inventory/computer.png', itemLoaded);
+    assets.portraitPlayerNormal = loadImage('assets/characters/portrait/main.png', itemLoaded);
+    assets.vitaminImg     = loadImage('assets/inventory/vitamin.png', itemLoaded);
+    assets.tangleImg      = loadImage('assets/inventory/tangle.png', itemLoaded);
+    assets.headphoneImg   = loadImage('assets/inventory/headphone.png', itemLoaded);
+    assets.rainbootImg    = loadImage('assets/inventory/rainboot.png', itemLoaded);
 
     assets.selectBg.unlock = loadImage('assets/select_background/day_unlock.jpg', itemLoaded);
     assets.selectBg.lock = loadImage('assets/select_background/day_lock.jpg', itemLoaded);
@@ -577,6 +578,12 @@ function handlePauseSelection() {
         pauseFromState = null;
     } else if (PAUSE_OPTIONS[pauseIndex] === "HELP") {
         pauseFromState = gameState.previousState;
+        if (typeof playSFX === 'function') playSFX(sfxClick);
+        mainMenu.diffToastTimer = 0;   // clear any stale difficulty toast
+        gameState.currentState = STATE_SETTINGS;
+        mainMenu.menuState     = STATE_SETTINGS;
+    } else if (selected === "HELP") {
+        pauseFromState         = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         gameState.currentState = STATE_HELP;
         mainMenu.menuState = STATE_HELP;

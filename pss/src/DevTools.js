@@ -10,14 +10,14 @@
  * true  → skips loading/splash, shows collision boxes and dev HUD.
  * false → normal game flow.
  */
-let developerMode = true;
+let developerMode = false;
 
 /**
  * Bypass day-lock checks in the level-select screen.
  * true  → all days are always selectable regardless of progress.
  * false → only unlocked days are selectable.
  */
-const DEBUG_UNLOCK_ALL = true;
+const DEBUG_UNLOCK_ALL = developerMode;  // auto-unlocks all days when dev mode is on
 
 /**
  * Which scene to jump to immediately on startup (only active when developerMode = true).
@@ -140,25 +140,18 @@ function setupRoomTestMode() {
 
 /**
  * Drops the game directly into the Day Run scene for obstacle/gameplay testing.
- * @param {number} dayOverride Optional day ID override.
- * Call from the browser console: setupRunTestMode() or setupRunTestMode(4)
+ * Call from the browser console: setupRunTestMode()
  */
-function setupRunTestMode(dayOverride) {
-    const dayID = Number.isFinite(Number(dayOverride)) ? Number(dayOverride) : DEBUG_DAY_ID;
-    console.log(`[DEV] Entering DAY_RUN directly (Day ${dayID})`);
-    currentDayID = dayID;
-    if (player) player.applyLevelStats(dayID);
+function setupRunTestMode() {
+    console.log(`[DEV] Entering DAY_RUN directly (Day ${DEBUG_DAY_ID})`);
+    currentDayID = DEBUG_DAY_ID;
+    if (player) player.applyLevelStats(DEBUG_DAY_ID);
     if (player) {
-        player.x = GLOBAL_CONFIG.lanes.lane1;
-        player.y = PLAYER_RUN_FOOT_Y;
+        player.x = 500;
+        player.y = height / 2;
     }
-    if (obstacleManager) obstacleManager = new ObstacleManager();
-
-    // Initialize the level controller to load backgrounds and apply difficulty
-    if (levelController) {
-        levelController.initializeLevel(dayID);
-    }
-
+    obstacleManager = new ObstacleManager();
+    if (levelController) levelController.initializeLevel(DEBUG_DAY_ID);
     gameState.currentState = STATE_DAY_RUN;
 }
 
@@ -212,6 +205,13 @@ function devRefillHealth() {
 function devApplyStartupSkip() {
     console.log(`[DEV] Startup skip → ${DEBUG_START_STATE}`);
     gameState.currentState = DEBUG_START_STATE;
+
+    if (DEBUG_STORY_RECAP) {
+        setTimeout(() => {
+            devGoToStoryRecap();
+        }, 100);
+        return;
+    }
 
     if (DEBUG_START_STATE === STATE_ROOM) {
         setupRoomTestMode();
