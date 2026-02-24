@@ -486,15 +486,17 @@ function renderGlobalFade() {
  * Dispatches keyboard events to the appropriate scene or system handler.
  */
 function keyPressed() {
+    // Testing panel hotkey is always available, even during transitions/end screens.
+    if ((keyCode === 113 || keyCode === 192 || key === 'F2' || key === '`' || key === '~') && testingPanel) {
+        testingPanel.toggle();
+        return false;
+    }
+
     if (globalFade.isFading) return;
     let state = gameState.currentState;
 
     // Toggle developer mode
     if (key === '0') devToggle();
-    if ((keyCode === 113 || key === 'F2' || key === '`') && testingPanel) {
-        testingPanel.toggle();
-        return false;
-    }
     if (testingPanel && testingPanel.isVisible()) {
         if (testingPanel.handleKeyPressed(key, keyCode)) return false;
     }
@@ -692,6 +694,20 @@ function setupRun(dayID) {
     levelController.initializeLevel(dayID);
     if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DESK';
     gameState.setState(STATE_ROOM);
+}
+
+/**
+ * Starts a run directly on the street, skipping the room scene.
+ */
+function setupRunDirectly(dayID) {
+    currentDayID = dayID;
+    player.applyLevelStats(dayID);
+    player.x = GLOBAL_CONFIG.lanes.lane1;
+    player.y = PLAYER_RUN_FOOT_Y;
+    obstacleManager = new ObstacleManager();
+    levelController.initializeLevel(dayID);
+    if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DONE';
+    gameState.setState(STATE_DAY_RUN);
 }
 
 
@@ -942,14 +958,8 @@ function drawPauseButton() {
  */
 function renderPauseOverlay() {
     push();
-    if (assets.otherBg) {
-        imageMode(CORNER);
-        image(assets.otherBg, 0, 0, width, height);
-        rect(0, 0, width, height);
-    } else {
-        fill(0, 0, 0, 200);
-        rect(0, 0, width, height);
-    }
+    // Keep pause background consistent with settings/help/room overlay style.
+    drawOtherBgWithOverlay();
 
     textAlign(CENTER, CENTER);
     textFont(fonts.title);

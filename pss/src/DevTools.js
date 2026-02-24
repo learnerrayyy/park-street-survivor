@@ -146,6 +146,7 @@ function setupRoomTestMode() {
 function setupRunTestMode(dayOverride) {
     const dayID = Number.isFinite(Number(dayOverride)) ? Number(dayOverride) : DEBUG_DAY_ID;
     console.log(`[DEV] Entering DAY_RUN directly (Day ${dayID})`);
+    currentDayID = dayID;
     if (player) player.applyLevelStats(dayID);
     if (player) {
         player.x = GLOBAL_CONFIG.lanes.lane1;

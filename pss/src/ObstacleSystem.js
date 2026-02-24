@@ -279,9 +279,12 @@ class ObstacleManager {
             if (this.checkCollision(player, obs)) {
                 console.log(`[ObstacleManager] Collision with ${obs.type}!`);
 
+                // Keep control/interactive effects while invincible so promoter/homeless/scooter
+                // still feel responsive; only bypass pure damage-style hits.
                 if (player && typeof player.isInvincibleActive === "function" &&
                     player.isInvincibleActive() &&
-                    obs.config && obs.config.type !== "BUFF") {
+                    obs.config && obs.config.type !== "BUFF" &&
+                    !["leaflet", "forcedLaneSwitch", "stun"].includes(obs.config.effect)) {
                     this.obstacles.splice(i, 1);
                     continue;
                 }
