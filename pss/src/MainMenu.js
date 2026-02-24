@@ -139,11 +139,19 @@ class MainMenu {
     drawSelectScreen() {
         this.timeWheel.display();
         push();
+        let pulse = (sin(frameCount * 0.07) + 1) * 0.5;
+        let alpha = 180 + pulse * 75;
+        // Text
         textFont(fonts.body);
         textAlign(CENTER, CENTER);
-        fill(255, 150);
-        textSize(20);
-        text("PRESS ENTER TO START  /  ESC TO BACK", width / 2, height - 80);
+        textSize(26);
+        stroke(0, 0, 0, 160);
+        strokeWeight(5);
+        fill(255, 215, 0, alpha);
+        text("CLICK OR PRESS [ENTER] TO START  ·  [ESC] TO BACK", width / 2, height - 58);
+        noStroke();
+        fill(255, 215, 0, alpha);
+        text("CLICK OR PRESS [ENTER] TO START  ·  [ESC] TO BACK", width / 2, height - 58);
         pop();
     }
 
@@ -541,15 +549,6 @@ class MainMenu {
 
             if (keyCode === ENTER || keyCode === 13) {
                 let selectedDay = this.timeWheel.selectedDay;
-                // First press on any available day: unlock visually, don't enter yet (skipped in dev mode)
-                if (!developerMode && !DEBUG_UNLOCK_ALL &&
-                    typeof tutorialHints !== 'undefined' &&
-                    selectedDay <= currentUnlockedDay &&
-                    !tutorialHints.dayVisuallyUnlocked[selectedDay]) {
-                    tutorialHints.dayVisuallyUnlocked[selectedDay] = true;
-                    playSFX(sfxClick);
-                    return;
-                }
                 if (DEBUG_UNLOCK_ALL || selectedDay <= currentUnlockedDay) {
                     if (typeof tutorialHints !== 'undefined') {
                         tutorialHints.levelSelectShownForDay = selectedDay;
@@ -610,6 +609,10 @@ class MainMenu {
                 if (!this.timeWheel.isEntering) {
                     if (this.timeWheel.selectedDay > 1 &&
                         dist(mx, my, arrowX, centerY - arrowGap) < 35) {
+                        let newDay = this.timeWheel.selectedDay - 1;
+                        if (typeof tutorialHints !== 'undefined' && !tutorialHints.dayVisuallyUnlocked[newDay]) {
+                            this.timeWheel.bgAlpha = 0;
+                        }
                         this.timeWheel.selectedDay--;
                         this.timeWheel.targetIndex--;
                         playSFX(sfxSelect);
@@ -617,28 +620,22 @@ class MainMenu {
                     }
                     if (this.timeWheel.selectedDay < 5 &&
                         dist(mx, my, arrowX, centerY + arrowGap) < 35) {
+                        let newDay = this.timeWheel.selectedDay + 1;
+                        if (typeof tutorialHints !== 'undefined' && !tutorialHints.dayVisuallyUnlocked[newDay]) {
+                            this.timeWheel.bgAlpha = 0;
+                        }
                         this.timeWheel.selectedDay++;
                         this.timeWheel.targetIndex++;
                         playSFX(sfxSelect);
                         return;
                     }
                 }
-                // Cloud click to start (or to visually unlock Day 1 on first click)
+                // Cloud click to start
                 let cloudX = width * 0.65, cloudY = height * 0.5;
                 let cloudW = 700, cloudH = 450;
                 if (mx > cloudX - cloudW / 2 && mx < cloudX + cloudW / 2 &&
                     my > cloudY - cloudH / 2 && my < cloudY + cloudH / 2) {
                     let selectedDay = this.timeWheel.selectedDay;
-                    // First click on any available day: unlock visually, don't enter yet (skipped in dev mode)
-                    if (!developerMode && !DEBUG_UNLOCK_ALL &&
-                        typeof tutorialHints !== 'undefined' &&
-                        selectedDay <= currentUnlockedDay &&
-                        !tutorialHints.dayVisuallyUnlocked[selectedDay]) {
-                        tutorialHints.dayVisuallyUnlocked[selectedDay] = true;
-                        playSFX(sfxClick);
-                        return;
-                    }
-                    // Normal entry: day already visually unlocked or dev mode
                     if (DEBUG_UNLOCK_ALL || selectedDay <= currentUnlockedDay) {
                         if (typeof tutorialHints !== 'undefined') {
                             tutorialHints.levelSelectShownForDay = selectedDay;

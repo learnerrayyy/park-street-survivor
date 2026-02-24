@@ -464,6 +464,15 @@ function draw() {
             case STATE_HELP:
                 if (mainMenu) {
                     mainMenu.menuState = gameState.currentState;
+                    // Auto-colorize once the entrance animation finishes — keeps visible gray period
+                    if (gameState.currentState === STATE_LEVEL_SELECT &&
+                        typeof tutorialHints !== 'undefined' && mainMenu.timeWheel &&
+                        !mainMenu.timeWheel.isEntering) {
+                        let sel = mainMenu.timeWheel.selectedDay;
+                        if (sel <= currentUnlockedDay) {
+                            tutorialHints.dayVisuallyUnlocked[sel] = true;
+                        }
+                    }
                     mainMenu.display();
                 }
                 break;
@@ -1540,14 +1549,6 @@ function renderStoryRecap() {
         } else {
             fill(180, 60, 60, alpha); textSize(14);
             text("LOCKED", -10, 8);
-        }
-
-        // Warning icon on any day that is unlocked but not yet visually unlocked (first click pending)
-        let showRecapHint = day <= currentUnlockedDay &&
-                            !tutorialHints.dayVisuallyUnlocked[day] &&
-                            assets.warningImg;
-        if (showRecapHint) {
-            drawWarningIcon(100, -38, 50);
         }
 
         pop();

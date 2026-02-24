@@ -414,13 +414,10 @@ class TimeWheel {
         drawingContext.shadowBlur = 0;
         drawingContext.filter = 'none';
 
-        // ── Tutorial hint: breathing warning icon on cloud top-right ──
-        // Show on any available day that hasn't been visually unlocked yet (first-click prompt)
-        let showHint = !developerMode && !DEBUG_UNLOCK_ALL &&
-                       typeof tutorialHints !== 'undefined' &&
-                       !isLocked &&
-                       !tutorialHints.dayVisuallyUnlocked[dayID];
-        if (showHint && typeof assets !== 'undefined' && assets.warningImg) {
+        // ── Entry hint: breathing warning icon on selected unlocked cloud ──
+        // Only shows after colorization is complete, guiding the player to click / press Enter.
+        if (!visuallyLocked && dayID === this.selectedDay &&
+            typeof assets !== 'undefined' && assets.warningImg) {
             let warnX = cloudW / 2 - 80;
             let warnY = -cloudH / 2 + 55;
             drawWarningIcon(warnX, warnY, 100);
@@ -460,13 +457,6 @@ class TimeWheel {
         let isSelected = (i === this.selectedDay - 1);
         let dayID = i + 1;
         let isLocked = (dayID > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
-
-        // Any available day shows as locked/grey until the player clicks once
-        if (!developerMode && !DEBUG_UNLOCK_ALL &&
-            typeof tutorialHints !== 'undefined' &&
-            !tutorialHints.dayVisuallyUnlocked[dayID]) {
-            isLocked = true;
-        }
 
         let alpha = map(distFromCenter, 0, 2, 255, 50);
         let s = map(distFromCenter, 0, 1, 1.2, 0.8);
@@ -564,10 +554,18 @@ class TimeWheel {
         if (this.isEntering) return;
 
         if ((keyCode === UP_ARROW || keyCode === 87) && this.selectedDay > 1) {
+            let newDay = this.selectedDay - 1;
+            if (typeof tutorialHints !== 'undefined' && !tutorialHints.dayVisuallyUnlocked[newDay]) {
+                this.bgAlpha = 0;
+            }
             this.selectedDay--;
             this.targetIndex--;
             if (typeof playSFX === 'function') playSFX(sfxSelect);
         } else if ((keyCode === DOWN_ARROW || keyCode === 83) && this.selectedDay < this.totalDays) {
+            let newDay = this.selectedDay + 1;
+            if (typeof tutorialHints !== 'undefined' && !tutorialHints.dayVisuallyUnlocked[newDay]) {
+                this.bgAlpha = 0;
+            }
             this.selectedDay++;
             this.targetIndex++;
             if (typeof playSFX === 'function') playSFX(sfxSelect);
