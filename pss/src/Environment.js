@@ -26,6 +26,10 @@ class Environment {
             roadEnd: 1220   // Calculated as 700 + (260 * 2)
         };
 
+        // ── PERFORMANCE: Pre-compute constants used every frame ──
+        this.bgHeight = 1080; // matches background image height
+        this.centerX = 960;  // exact horizontal centre of the 1920px canvas
+
         // Flat Visual Palette (No Glow for consistent pixel aesthetic)
         this.colors = {
             scenery: color(40, 70, 40),    // Deep Grass Green

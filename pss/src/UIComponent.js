@@ -7,11 +7,11 @@ class UIButton {
         this.w = w; this.h = h;
         this.label = label;
         this.onClick = onClick;
-        
+
         // Animation State: Current and Target scale for smooth feedback
         this.currentScale = 1.0;
         this.targetScale = 1.0;
-        this.isFocused = false; 
+        this.isFocused = false;
     }
 
     /**
@@ -97,16 +97,16 @@ class TimeWheel {
         this.config = config;
         this.selectedDay = 1;
         this.totalDays = 5;
-        
+
         // Motion system for sidebar scrolling
         this.targetIndex = 0;
         this.currentIndex = 0;
-        
+
         // Layout parameters
         this.anchorX = width * 0.15;
         this.verticalSpacing = 160;
         this.dayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
-        
+
         // Background blend state
         this.bgAlpha = 0;
 
@@ -119,20 +119,20 @@ class TimeWheel {
         let delays = [0, 4, 10, 6, 2];
         for (let i = 0; i < this.totalDays; i++) {
             this._drops.push({
-                y:       -400 - random(100),
-                vy:      0,
-                landed:  false,
-                delay:   delays[i],
+                y: -400 - random(100),
+                vy: 0,
+                landed: false,
+                delay: delays[i],
                 rotation: random(-25, 25)
             });
         }
 
         // Cloud drop physics (single cloud, synced with selected day)
         this._cloudDrop = {
-            y:       -800,
-            vy:      0,
-            landed:  false,
-            delay:   8,
+            y: -800,
+            vy: 0,
+            landed: false,
+            delay: 8,
             rotation: random(-15, 15)
         };
 
@@ -153,21 +153,22 @@ class TimeWheel {
         let delays = [0, 4, 10, 6, 2];
         for (let i = 0; i < this.totalDays; i++) {
             this._drops[i] = {
-                y:       -400 - random(100),
-                vy:      0,
-                landed:  false,
-                delay:   delays[i],
+                y: -400 - random(100),
+                vy: 0,
+                landed: false,
+                delay: delays[i],
                 rotation: random(-25, 25)
             };
         }
 
         this._cloudDrop = {
-            y:       -800,
-            vy:      0,
-            landed:  false,
-            delay:   8,
+            y: -800,
+            vy: 0,
+            landed: false,
+            delay: 8,
             rotation: random(-15, 15)
         };
+        this._cloudScale = 1.0;
     }
 
     /**
@@ -274,7 +275,7 @@ class TimeWheel {
      * Applies to both sidebar cards and cloud preview.
      */
     _updateDropPhysics() {
-        const cardGravity  = 6.0; // sidebar day-cards (sped up)
+        const cardGravity = 6.0; // sidebar day-cards (sped up)
         const cloudGravity = 4.5; // cloud preview — original first-version value
 
         // Sidebar cards
@@ -288,13 +289,13 @@ class TimeWheel {
             let targetY = diff * this.verticalSpacing;
 
             drop.vy += cardGravity;
-            drop.y  += drop.vy;
+            drop.y += drop.vy;
             drop.rotation *= 0.88;
 
             if (drop.y >= targetY) {
-                drop.y        = targetY;
-                drop.vy       = 0;
-                drop.landed   = true;
+                drop.y = targetY;
+                drop.vy = 0;
+                drop.landed = true;
                 drop.rotation = 0;
             }
         }
@@ -304,13 +305,13 @@ class TimeWheel {
         if (!cloud.landed) {
             if (this.entryTimer >= cloud.delay) {
                 cloud.vy += cloudGravity;
-                cloud.y  += cloud.vy;
+                cloud.y += cloud.vy;
                 cloud.rotation *= 0.88;
 
                 if (cloud.y >= 0) {
-                    cloud.y        = 0;
-                    cloud.vy       = 0;
-                    cloud.landed   = true;
+                    cloud.y = 0;
+                    cloud.vy = 0;
+                    cloud.landed = true;
                     cloud.rotation = 0;
                 }
             }
@@ -329,6 +330,7 @@ class TimeWheel {
         if (!developerMode && !DEBUG_UNLOCK_ALL &&
             typeof tutorialHints !== 'undefined' &&
             !tutorialHints.dayVisuallyUnlocked[this.selectedDay]) {
+
             isLocked = true;
         }
 
@@ -384,13 +386,14 @@ class TimeWheel {
         // Mouse hover scale-up (smooth lerp, doesn't conflict with float)
         let cloudW = 700, cloudH = 450;
         let isCloudHover = (mouseX > x - cloudW / 2 && mouseX < x + cloudW / 2 &&
-                            mouseY > y - cloudH / 2 && mouseY < y + cloudH / 2);
+            mouseY > y - cloudH / 2 && mouseY < y + cloudH / 2);
 
         // Any available day stays visually locked (grayscale) until the player clicks once
         let visuallyLocked = isLocked ||
             (!developerMode && !DEBUG_UNLOCK_ALL &&
              typeof tutorialHints !== 'undefined' &&
              !tutorialHints.dayVisuallyUnlocked[dayID]);
+
 
         let targetScale = (isCloudHover && !visuallyLocked && !this.isEntering) ? 1.08 : 1.0;
         this._cloudScale = lerp(this._cloudScale, targetScale, 0.1);
@@ -436,7 +439,7 @@ class TimeWheel {
     drawNavNode(i) {
         let diff = i - this.currentIndex;
         let distFromCenter = abs(diff);
-        
+
         let x = distFromCenter * 40;
         let y = diff * this.verticalSpacing;
 
@@ -469,7 +472,7 @@ class TimeWheel {
         } else {
             fill(isSelected ? [255, 20, 147, alpha] : [70, 20, 90, alpha * 0.6]);
         }
-        
+
         // P5 skewed trapezoid
         beginShape();
         vertex(-140, -40); vertex(160, -55);
@@ -488,7 +491,7 @@ class TimeWheel {
         textSize(22);  // Fixed size for all
         fill(isSelected ? color(255, 215, 0, alpha) : color(255, 215, 0, alpha * 0.8));  // Slightly dimmed when not selected
         text(this.dayNames[i], -20, 10);
-        
+
         if (isLocked) {
             fill(180, 60, 60, alpha);
             textSize(14);
@@ -521,28 +524,28 @@ class TimeWheel {
         rotate(radians(-5));
         textFont(fonts.title);
         textAlign(LEFT, CENTER);
-        
+
         // White stroke outline for readability
         strokeWeight(8);
         stroke(0, 0, 0, 180);
         fill(255);
         textSize(70);
         text("DAY", 0, 0);
-        
+
         noStroke();
         fill(255);
         text("DAY", 0, 0);
-        
+
         // Pink number with extra spacing
         strokeWeight(8);
         stroke(0, 0, 0, 180);
         fill(255, 105, 180);
         text(dayID.toString().padStart(2, '0'), 200, 0);  // Increased spacing from 170 to 200
-        
+
         noStroke();
         fill(255, 105, 180);
         text(dayID.toString().padStart(2, '0'), 200, 0);
-        
+
         pop();
     }
 
@@ -587,7 +590,7 @@ class UISlider {
         this.maxVal = maxVal;
         this.value = currentVal;
         this.label = label;
-        
+
         this.knobSize = 24;
         this.isDragging = false;
     }
@@ -651,7 +654,7 @@ class UISlider {
         if (this.isDragging) {
             let mousePos = constrain(mouseX, this.x - this.w / 2, this.x + this.w / 2);
             this.value = map(mousePos, this.x - this.w / 2, this.x + this.w / 2, this.minVal, this.maxVal);
-            
+
             if (typeof bgm !== 'undefined' && bgm) {
                 bgm.setVolume(this.value);
             }

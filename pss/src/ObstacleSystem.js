@@ -64,10 +64,12 @@ class ObstacleManager {
 
     selectRandomObstacle(forceBuff = false) {
         if (!this.currentLevelConfig || !this.currentLevelConfig.availableObstacles) {
+            console.log("[DEBUG] selectRandomObstacle: no config or no availableObstacles");
             return null;
         }
 
         const available = this.currentLevelConfig.availableObstacles;
+        console.log(`[DEBUG] selectRandomObstacle: available=${JSON.stringify(available)}`);
 
         const buffObstacles = ["COFFEE", "EMPTY_SCOOTER"];
         const buffInAvailable = available.filter(o => buffObstacles.includes(o));
@@ -80,8 +82,10 @@ class ObstacleManager {
         const isBuff = !hasActiveBuffOnScreen &&
             this.buffCooldownFrames <= 0 &&
             (Math.random() < this.currentLevelConfig.spawnConfig.buffSpawnRatio);
+        console.log(`[DEBUG] isBuff=${isBuff}, buffSpawnRatio=${this.currentLevelConfig.spawnConfig.buffSpawnRatio}`);
 
         if (isBuff) {
+
             if (buffInAvailable.length > 0) {
                 return this.pickWeightedObstacle(buffInAvailable);
             }
@@ -91,12 +95,17 @@ class ObstacleManager {
         if (this.promoterCooldownFramesRemaining > 0) {
             hazardsInAvailable = hazardsInAvailable.filter(o => o !== "LARGE_CAR");
         }
+        console.log(`[DEBUG] hazardsInAvailable=${JSON.stringify(hazardsInAvailable)}`);
 
         if (hazardsInAvailable.length > 0) {
-            return this.pickWeightedObstacle(hazardsInAvailable);
+            const selected = this.pickWeightedObstacle(hazardsInAvailable);
+            console.log(`[DEBUG] selected hazard: ${selected}`);
+            return selected;
         }
 
-        return this.pickWeightedObstacle(available);
+        const fallback = this.pickWeightedObstacle(available);
+        console.log(`[DEBUG] fallback selection: ${fallback}`);
+        return fallback;
     }
 
     pickWeightedObstacle(candidates) {
@@ -137,10 +146,17 @@ class ObstacleManager {
 
 
     spawnObstacle(forceBuff = false) {
-        if (!this.currentLevelConfig) return;
+        if (!this.currentLevelConfig) {
+            console.log("[DEBUG] spawnObstacle: no currentLevelConfig");
+            return;
+        }
 
         const obstacleType = this.selectRandomObstacle(forceBuff);
-        if (!obstacleType) return;
+        console.log(`[DEBUG] selectRandomObstacle returned: ${obstacleType}`);
+        if (!obstacleType) {
+            console.log("[DEBUG] spawnObstacle: obstacleType is null");
+            return;
+        }
 
         const config = OBSTACLE_CONFIG[obstacleType];
         if (!config) {
@@ -202,7 +218,6 @@ class ObstacleManager {
 
      */
     update(scrollSpeed, player, levelPhase) {
-
         if (levelPhase !== "RUNNING" || !this.currentLevelConfig) {
             return;
         }
@@ -225,19 +240,14 @@ class ObstacleManager {
             }
         }
 
-        if (randVal < spawnRate) {
-
-            if (canSpawn) {
-                this.spawnObstacle();
-            }
+        if (randVal < spawnRate && canSpawn) {
+            this.spawnObstacle();
         }
-
 
         for (let i = this.obstacles.length - 1; i >= 0; i--) {
             const obs = this.obstacles[i];
 
             this.updateDynamicLaneBehavior(obs);
-
 
             const baseSpeed = PLAYER_DEFAULTS.baseSpeed;
             let obsMoveSpeed = obs.speed * baseSpeed * (scrollSpeed / max(1, GLOBAL_CONFIG.scrollSpeed));
@@ -245,19 +255,18 @@ class ObstacleManager {
             if (obsMoveSpeed <= 0.01) obsMoveSpeed = scrollSpeed;
             obs.y += obsMoveSpeed;
 
-
             if (obs.y > GLOBAL_CONFIG.resolutionH + 100) {
                 this.obstacles.splice(i, 1);
                 continue;
             }
 
-
             if (this.checkCollision(player, obs)) {
-                console.log(`[ObstacleManager] Collision with ${obs.type}!`);
-
+                // Keep control/interactive effects while invincible so promoter/homeless/scooter
+                // still feel responsive; only bypass pure damage-style hits.
                 if (player && typeof player.isInvincibleActive === "function" &&
                     player.isInvincibleActive() &&
-                    obs.config && obs.config.type !== "BUFF") {
+                    obs.config && obs.config.type !== "BUFF" &&
+                    !["leaflet", "forcedLaneSwitch", "stun"].includes(obs.config.effect)) {
                     this.obstacles.splice(i, 1);
                     continue;
                 }

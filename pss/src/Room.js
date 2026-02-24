@@ -27,32 +27,48 @@ class RoomScene {
         };
 
         // Desk interaction zone
-        this.deskX         = 1085;
-        this.deskY         = 430;
+        this.deskX = 1085;
+        this.deskY = 430;
         this.deskThreshold = 80;
-        this.deskBoxW      = 115;
-        this.deskBoxH      = 50;
+        this.deskBoxW = 115;
+        this.deskBoxH = 50;
 
         // Door interaction zone
-        this.doorX         = 955;
-        this.doorY         = 760;
+        this.doorX = 955;
+        this.doorY = 760;
         this.doorThreshold = 80;
-        this.doorBoxW      = 60;
-        this.doorBoxH      = 45;
+        this.doorBoxW = 60;
+        this.doorBoxH = 45;
 
         // Proximity flags used by the renderer and input handler
         this.isPlayerNearDesk = false;
         this.isPlayerNearDoor = false;
 
         // Timer for the "missing items" warning prompt (frames)
-        this.doorBlockTimer   = 0;
+        this.doorBlockTimer = 0;
         this.doorBlockMessage = "";
+        // Dialog / Typewriter state
+        this.dialogActive = false;
+        this.dialogTimerMax = 120;   // 总时长（帧）2s
+        this.dialogTimer = 0;
+
+        this.dialogFullText = "";
+        this.dialogWords = [];
+        this.dialogWordIndex = 0;
+        this.dialogDisplayed = "";
+
+        // typing pacing (frames per word)
+        this.wordInterval = 4;
+        this.wordTick = 0;
+
+        // sound hook placeholder
+        this.typingSfx = null; // 找到音源后赋值，比如 sfxType
 
         // ── PERFORMANCE: Lazy-cached scale values for background images ──
         // Computed once on first render so we avoid per-frame division.
         this._otherBgScale = null;
-        this._roomBgScale  = null;
-        this._roomTopY     = null; // derived from roomBg scale, also cached
+        this._roomBgScale = null;
+        this._roomTopY = null; // derived from roomBg scale, also cached
 
         // Back arrow button — returns to level select
         this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => {
@@ -78,8 +94,15 @@ class RoomScene {
         }
         this.isPlayerNearDesk = false;
         this.isPlayerNearDoor = false;
-        this.doorBlockTimer   = 0;
+        this.doorBlockTimer = 0;
         this.doorBlockMessage = "";
+        this.dialogActive = false;
+        this.dialogTimer = 0;
+        this.dialogFullText = "";
+        this.dialogWords = [];
+        this.dialogWordIndex = 0;
+        this.dialogDisplayed = "";
+        this.wordTick = 0;
     }
 
     // ─── COLLISION ───────────────────────────────────────────────────────────
@@ -105,9 +128,9 @@ class RoomScene {
      */
     getValidPosition(newX, newY, oldX, oldY) {
         let playerRadius = 20;
-        if (this.isWalkable(newX, newY, playerRadius))  return { x: newX, y: newY  };
-        if (this.isWalkable(newX, oldY, playerRadius))  return { x: newX, y: oldY  };
-        if (this.isWalkable(oldX, newY, playerRadius))  return { x: oldX, y: newY  };
+        if (this.isWalkable(newX, newY, playerRadius)) return { x: newX, y: newY };
+        if (this.isWalkable(newX, oldY, playerRadius)) return { x: newX, y: oldY };
+        if (this.isWalkable(oldX, newY, playerRadius)) return { x: oldX, y: newY };
         return { x: oldX, y: oldY };
     }
 
@@ -157,16 +180,14 @@ class RoomScene {
             // Check required items before leaving
             if (typeof backpackUI !== 'undefined' && backpackUI && !backpackUI.hasRequiredItems()) {
                 let missing = backpackUI.getMissingRequiredItems();
-                this.doorBlockMessage = "Pack your " + missing.join(" & ") + " before heading out!";
-                this.doorBlockTimer = 180; // show for 3 seconds
+                this.triggerDialog("I haven't packed my bag yet.");
                 console.log("[RoomScene] Exit blocked — missing: " + missing.join(", "));
                 return;
             }
             console.log("[RoomScene] Leaving room");
-            if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DONE';
             if (typeof player !== 'undefined') {
-                player.x = width / 2;
-                player.y = height - 200;
+                player.x = GLOBAL_CONFIG.lanes.lane1;
+                player.y = PLAYER_RUN_FOOT_Y;  // Player foot anchor for day run
             }
             gameState.currentState = STATE_DAY_RUN;
             if (typeof playSFX !== 'undefined' && typeof sfxClick !== 'undefined') {
@@ -174,6 +195,21 @@ class RoomScene {
             }
         }
     }
+
+    /**
+     * Trigger dialog box 
+     */
+    triggerDialog(text) {
+        this.dialogActive = true;
+        this.dialogTimer = this.dialogTimerMax;
+
+        this.dialogFullText = text;
+        this.dialogWords = text.trim().split(/\s+/); // 按空格分词
+        this.dialogWordIndex = 0;
+        this.dialogDisplayed = "";
+        this.wordTick = 0;
+    }
+
 
     // ─── RENDERING ───────────────────────────────────────────────────────────
 
@@ -217,27 +253,38 @@ class RoomScene {
         this.checkInteraction();
         this.drawInteractionIndicators();
 
-        // 4. Tutorial hint icons (warning.png breathing icons)
+        // 4. Door-blocked warning prompt
+        this.drawDoorBlockedPrompt();
         this.drawTutorialHints();
 
-        // 5. Door-blocked warning prompt
-        this.drawDoorBlockedPrompt();
-
-        // 6. Back arrow button (top-left)
+        // 5. Back button
         this.backButton.isFocused = this.backButton.checkMouse(mouseX, mouseY);
         this.backButton.update();
         this.backButton.display();
 
-        // 7. Developer overlay
+        // 6. Developer overlay
         this.drawRoomDevTools();
 
         pop();
     }
 
     /**
+     * Handles room-specific mouse clicks.
+     * @returns {boolean} True if the click was consumed.
+     */
+    handleMousePressed(mx, my) {
+        if (this.backButton.checkMouse(mx, my)) {
+            this.backButton.handleClick();
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Draws interaction indicators.
      * Yellow outline box: always visible when the tutorial phase matches (synced with ! icon).
      * Prompt text + key icon: only when the player is close enough to interact.
+
      */
     drawInteractionIndicators() {
         let phase = (typeof tutorialHints !== 'undefined') ? tutorialHints.roomPhase : 'DONE';
@@ -250,6 +297,7 @@ class RoomScene {
 
         let target = showDeskBox
             ? { label: "CHECK DESK", key: 'e',     x: this.deskX, y: this.deskY, w: this.deskBoxW, h: this.deskBoxH }
+
             : { label: "LEAVE ROOM", key: 'enter', x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
 
         let roomTopY = (this._roomTopY !== null) ? this._roomTopY : 100;
@@ -281,6 +329,7 @@ class RoomScene {
                 image(sheet, width / 2, roomTopY - 60, 50, 40, frame * sw, 0, sw, sheet.height);
                 noTint();
             }
+
         }
 
         pop();
@@ -340,7 +389,7 @@ class RoomScene {
         strokeWeight(2);
         rectMode(CORNERS);
         rect(this.walkableArea.minX, this.walkableArea.minY, this.walkableArea.maxX, this.walkableArea.maxY);
-        rect(this.carpetArea.minX,   this.carpetArea.minY,   this.carpetArea.maxX,   this.carpetArea.maxY);
+        rect(this.carpetArea.minX, this.carpetArea.minY, this.carpetArea.maxX, this.carpetArea.maxY);
         pop();
     }
 
@@ -348,30 +397,83 @@ class RoomScene {
      * Shows a timed warning when the player tries to leave without required items.
      */
     drawDoorBlockedPrompt() {
-        if (this.doorBlockTimer <= 0) return;
-        this.doorBlockTimer--;
+        if (!this.dialogActive || this.dialogTimer <= 0) return;
 
-        push();
-        let alpha = min(this.doorBlockTimer * 4, 220);
+        // countdown
+        this.dialogTimer--;
 
-        // Pill-shaped red banner centred at the bottom third of the screen
-        let bx = width / 2;
-        let by = height - 160;
-        let bw = 820;
-        let bh = 64;
+        // ---- Typewriter update (word-by-word) ----
+        // 只要还没显示完，就按节奏追加单词
+        if (this.dialogWordIndex < this.dialogWords.length) {
+            this.wordTick++;
+            if (this.wordTick >= this.wordInterval) {
+                this.wordTick = 0;
 
-        rectMode(CENTER);
+                // append next word
+                let w = this.dialogWords[this.dialogWordIndex];
+                this.dialogDisplayed += (this.dialogDisplayed ? " " : "") + w;
+                this.dialogWordIndex++;
+
+                // typing sfx hook (placeholder)
+                // 音源确定后：this.typingSfx = sfxType; 并确保 playSFX 存在
+                if (typeof playSFX === "function" && this.typingSfx) {
+                    playSFX(this.typingSfx);
+                }
+            }
+        }
+
+        // ---- Simple pop-in animation ----
+        let alpha = 230; // 90% black ≈ 230
+
+        // ---- Scale mapping from 1920x1080 design space ----
+        const DESIGN_W = 1920;
+        const DESIGN_H = 1080;
+        // 用统一缩放，避免图片/布局被拉伸
+        const s = min(width / DESIGN_W, height / DESIGN_H);
+
+        // ---- Dialog box: fixed 1920x220 in design space -> scaled to canvas ----
+        const boxH = 220 * s;
+        rectMode(CORNER);
         noStroke();
-        fill(180, 30, 30, alpha);
-        rect(bx, by, bw, bh, 12);
+        fill(56, 39, 96, alpha);
+        rect(0, height - boxH, width, boxH); 
 
-        // Warning text
-        textAlign(CENTER, CENTER);
+        // ---- Portrait: design (30,700) size 380x380 -> scaled ----
+        const px = 30 * s;
+        const py = 700 * s;
+        const pSize = 380 * s;
+
+        imageMode(CORNER);
+        if (assets && assets.portraitPlayerNormal) {
+            image(assets.portraitPlayerNormal, px, py, pSize, pSize);
+        } else {
+            fill(255, 255, 255, 40);
+            rect(px, py, pSize, pSize, 18 * s);
+        }
+
+        // ---- Text: fixed top-left at (496,932) in design space -> scaled ----
+        const tx = 496 * s;
+        const ty = 932 * s;
+
+        // 文本框宽高也按设计值缩放（右边留 40px，上下留白自己调）
+        const tw = (1920 - 496 - 40) * s;
+        const th = (220 - 30) * s;
+
         textFont(fonts.body);
-        textSize(22);
-        fill(255, 240, 100, alpha);
-        text(this.doorBlockMessage, bx, by);
+        textSize(48);
+        fill(255);
+        noStroke();
+        textAlign(LEFT, TOP);
+
+        // p5 自动换行：传入 w/h
+        text(this.dialogDisplayed, tx, ty, tw, th);
+
         pop();
+
+        // timer finished -> close
+        if (this.dialogTimer <= 0) {
+            this.dialogActive = false;
+        }
     }
 
     /**
