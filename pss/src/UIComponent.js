@@ -139,6 +139,9 @@ class TimeWheel {
         // Cloud hover scale (smooth lerp)
         this._cloudScale = 1.0;
 
+        // Breathing phase: cloud breathes in gray after landing, before colorization
+        this._isBreathing = false;
+        this._breatheTimer = 0;
     }
 
     /**
@@ -169,6 +172,8 @@ class TimeWheel {
             rotation: random(-15, 15)
         };
         this._cloudScale = 1.0;
+        this._isBreathing = false;
+        this._breatheTimer = 0;
     }
 
     /**
@@ -195,8 +200,18 @@ class TimeWheel {
                 }
             }
 
-            if (this._drops.every(d => d.landed) && this.entryTimer > 20) {
-                this.isEntering = false;
+            if (this._drops.every(d => d.landed) && this._cloudDrop.landed && this.entryTimer > 20) {
+                if (!this._isBreathing) {
+                    // Start the breathe phase — short static pause then scale-up before colorizing
+                    this._isBreathing = true;
+                    this._breatheTimer = 65;
+                } else {
+                    this._breatheTimer--;
+                    if (this._breatheTimer <= 0) {
+                        this.isEntering = false;
+                        this._isBreathing = false;
+                    }
+                }
             }
         }
 
@@ -335,7 +350,7 @@ class TimeWheel {
         }
 
         let targetAlpha = isLocked ? 0 : 255;
-        this.bgAlpha = lerp(this.bgAlpha, targetAlpha, 0.04);
+        this.bgAlpha = lerp(this.bgAlpha, targetAlpha, 0.07);
 
         imageMode(CORNER);
         if (assets.selectBg.lock)   image(assets.selectBg.lock,   0, 0, width, height);
@@ -395,7 +410,15 @@ class TimeWheel {
              !tutorialHints.dayVisuallyUnlocked[dayID]);
 
 
-        let targetScale = (isCloudHover && !visuallyLocked && !this.isEntering) ? 1.08 : 1.0;
+        let targetScale;
+        if (this._isBreathing) {
+            // Two-phase unlock animation:
+            //   breatheTimer 65→25  — cloud is static in gray (no movement)
+            //   breatheTimer 25→ 0  — single scale-up pop to signal unlock
+            targetScale = (this._breatheTimer > 25) ? 1.0 : 1.15;
+        } else {
+            targetScale = (isCloudHover && !visuallyLocked && !this.isEntering) ? 1.08 : 1.0;
+        }
         this._cloudScale = lerp(this._cloudScale, targetScale, 0.1);
         scale(this._cloudScale);
 

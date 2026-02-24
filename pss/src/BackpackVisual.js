@@ -517,12 +517,6 @@ class BackpackVisual {
                 let breathe = 1.0 + sin(frameCount * 0.06) * 0.10;
                 scale(breathe);
             }
-            let isHovered = (this.hoveredItem === i);
-            if (isHovered) {
-                fill(200, 150, 255, 90);
-                noStroke();
-                ellipse(0, 0, 115, 115);
-            }
             let itemImg = this._getItemImage(scattered.item.name);
             if (itemImg) {
                 let baseSize = (scattered.item.name === "Laptop Computer") ? 300 : 180;

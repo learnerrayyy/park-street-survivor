@@ -348,10 +348,12 @@ class Player {
      * Renders the energy bar with a green fill that depletes as stamina drops.
      */
     drawHealthBar(x, y) {
+        textAlign(CENTER, CENTER);
         fill(255);
         textSize(32);
         textStyle(BOLD);
-        text("ENERGY", x, y - 22);
+        // Centred above the bar, clear of the backpack icon on the left
+        text("ENERGY", x + 200, y - 22);
 
         fill(50);
         stroke(0);
