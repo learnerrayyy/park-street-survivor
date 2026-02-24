@@ -100,6 +100,10 @@ class BackpackVisual {
         // Shimmer animation counter for slot decoration
         this.shimmer = 0;
 
+        // Tutorial drag animation (Day 1 only)
+        this.showDragTutorial = false;
+        this.tutorialAnimT    = 0;
+
         // ── DEV DRAG STATE ────────────────────────────────────────────────────
         // Tracks interactive manipulation of debug zones and backpack in dev mode.
         this.devDrag = {
@@ -118,6 +122,26 @@ class BackpackVisual {
             }
             gameState.currentState = STATE_ROOM;
         });
+    }
+
+    /**
+     * Resets the backpack to a clean state for a new day:
+     * clears all packed slots and puts every day-appropriate item back on the desk.
+     * Call this from setupRun() / setupRunDirectly() when starting any new level.
+     */
+    resetForNewDay() {
+        this.topSlots = [null, null, null];
+        this.draggedItem       = null;
+        this.dragSource        = null;
+        this.dragIndex         = -1;
+        this.showReplaceDialog = false;
+        this.replaceNewItem    = null;
+        this.replaceSlotIndex  = -1;
+        this.messageText       = "";
+        this.messageTimer      = 0;
+        this.showDragTutorial  = (currentDayID === 1);
+        this.tutorialAnimT     = 0;
+        this.initScatteredItems();
     }
 
     /**
@@ -154,7 +178,60 @@ class BackpackVisual {
         return items;
     }
 
+    /**
+     * Returns the name of the item first introduced on the given day, or null for Day 1.
+     */
+    _getNewItemName(day) {
+        if (day === 2) return "Soft Gummy Vitamins";
+        if (day === 3) return "Tangle";
+        if (day === 4) return "Headphones";
+        if (day === 5) return "Rain Boots";
+        return null;
+    }
+
     // ─── RENDERING ───────────────────────────────────────────────────────────
+
+    /**
+     * Ghost-drag tutorial: animates the Student ID sliding toward the backpack.
+     * Loops until the player starts dragging any desk item.
+     * Only active on Day 1.
+     */
+    drawDragTutorial() {
+        if (!this.showDragTutorial || !assets.studentCardImg) return;
+
+        const CYCLE   = 130; // total frames per loop
+        const MOVE    = 90;  // frames spent moving (rest = pause before restart)
+        this.tutorialAnimT = (this.tutorialAnimT + 1) % CYCLE;
+
+        let t = constrain(this.tutorialAnimT / MOVE, 0, 1);
+
+        // Smooth ease-in-out
+        let eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+        let startX = this.itemFixedPositions["UoB Student ID"].x;
+        let startY = this.itemFixedPositions["UoB Student ID"].y;
+        let endX   = this.backpackX;
+        let endY   = this.backpackY;
+
+        let gx = lerp(startX, endX, eased);
+        let gy = lerp(startY, endY, eased);
+
+        // Alpha: fade in → full → fade out
+        let alpha;
+        if      (t < 0.12) alpha = map(t, 0,    0.12, 0,   210);
+        else if (t < 0.75) alpha = 210;
+        else               alpha = map(t, 0.75, 1.0,  210, 0);
+
+        let posData  = this.itemFixedPositions["UoB Student ID"];
+        let maxSize  = 180 * (posData ? (posData.size || 1.0) : 1.0) * 0.65;
+
+        push();
+        imageMode(CENTER);
+        tint(255, alpha);
+        image(assets.studentCardImg, gx, gy, maxSize, maxSize);
+        noTint();
+        pop();
+    }
 
     /**
      * Main display entry point — renders all layers in draw order.
@@ -165,6 +242,7 @@ class BackpackVisual {
         this.drawRoomBackground();
         this.drawBackpack();
         this.drawScatteredItems();
+        this.drawDragTutorial();
         this.drawTopBar();
         if (this.draggedItem) this.drawDraggedItem();
         if (this.showReplaceDialog) this.drawReplaceDialog();
@@ -173,10 +251,27 @@ class BackpackVisual {
             this.messageTimer--;
         }
         this.drawInstructions();
-        // Back arrow button (top-left)
+        // Desk item tooltip — drawn last so it always appears above all items
+        if (this.hoveredItem >= 0 && !this.draggedItem) {
+            let s = this.scatteredItems[this.hoveredItem];
+            if (s && !(this.dragSource === 'desk' && this.dragIndex === this.hoveredItem)) {
+                this.drawTooltip(s.item, s.x, s.y);
+            }
+        }
+        // Back arrow button (top-left): breathes when required items are packed
         this.backButton.isFocused = this.backButton.checkMouse(mouseX, mouseY);
         this.backButton.update();
-        this.backButton.display();
+        if (this.hasRequiredItems()) {
+            let breathe = 1.0 + sin(frameCount * 0.06) * 0.12; // 0.88 → 1.12 pulse
+            push();
+            translate(this.backButton.x, this.backButton.y);
+            scale(breathe);
+            translate(-this.backButton.x, -this.backButton.y);
+            this.backButton.display();
+            pop();
+        } else {
+            this.backButton.display();
+        }
         // Dev overlays are drawn last so they are always on top
         if (developerMode) this.drawDevOverlays();
         pop();
@@ -417,11 +512,10 @@ class BackpackVisual {
             push();
             translate(scattered.x, scattered.y);
             rotate(radians(scattered.rotation));
-            let isHovered = (this.hoveredItem === i);
-            if (isHovered) {
-                fill(200, 150, 255, 90);
-                noStroke();
-                ellipse(0, 0, 115, 115);
+            // Breathe if this item is newly unlocked on the current day
+            if (scattered.item.name === this._getNewItemName(currentDayID)) {
+                let breathe = 1.0 + sin(frameCount * 0.06) * 0.10;
+                scale(breathe);
             }
             let itemImg = this._getItemImage(scattered.item.name);
             if (itemImg) {
@@ -440,10 +534,7 @@ class BackpackVisual {
                 text(scattered.item.name.split(" ")[0].substring(0, 6).toUpperCase(), 0, 0);
             }
             pop();
-
-            if (isHovered && !this.draggedItem) {
-                this.drawTooltip(scattered.item, scattered.x, scattered.y);
-            }
+            // Tooltip is drawn later in display() to ensure it renders above all items
         });
     }
 
@@ -485,35 +576,33 @@ class BackpackVisual {
         let title = item.name;
         let desc = item.description || "";
 
+        textFont(fonts.body);
+        textSize(26);
+        let w  = max(textWidth(title), 260) + 56;
         textSize(20);
-        let w = max(textWidth(title), textSize(16) || 0, 220) + 40;
-        textSize(16);
-        if (desc) w = max(w, textWidth(desc) + 40);
-        let h = desc ? 110 : 75;
-        let tx = constrain(itemX + 80, 10, width - w - 10);
+        if (desc) w = max(w, textWidth(desc) + 56);
+        let h  = desc ? 118 : 72;
+        let tx = constrain(itemX + 90, 10, width - w - 10);
+
         let ty = constrain(itemY - h / 2, 10, height - h - 10);
 
         rectMode(CORNER);
-        fill(22, 10, 48, 240);
+        fill(22, 10, 48, 245);
         stroke(255, 215, 0);
-        strokeWeight(2);
-        rect(tx, ty, w, h, 8);
+        strokeWeight(2.5);
+        rect(tx, ty, w, h, 10);
 
         noStroke();
         fill(255, 215, 0);
         textAlign(LEFT, TOP);
-        textSize(20);
-        text(title, tx + 16, ty + 14);
+        textSize(26);
+        text(title, tx + 18, ty + 14);
 
         if (desc) {
             fill(200, 160, 255);
-            textSize(16);
-            text(desc, tx + 16, ty + 46);
+            textSize(20);
+            text(desc, tx + 18, ty + 56);
         }
-
-        fill(140, 100, 200);
-        textSize(13);
-        text("Drag to backpack", tx + 16, ty + h - 24);
         pop();
     }
 
@@ -525,35 +614,33 @@ class BackpackVisual {
         let title = item.name;
         let desc = item.description || "";
 
+        textFont(fonts.body);
+        textSize(26);
+        let w  = max(textWidth(title), 260) + 56;
         textSize(20);
-        let w = max(textWidth(title), 220) + 40;
-        textSize(16);
-        if (desc) w = max(w, textWidth(desc) + 40);
-        let h = desc ? 110 : 75;
+        if (desc) w = max(w, textWidth(desc) + 56);
+        let h  = desc ? 118 : 72;
+
         let tx = constrain(slotX - w / 2, 10, width - w - 10);
         let ty = slotY + this.slotSize / 2 + 12;
 
         rectMode(CORNER);
-        fill(22, 10, 48, 240);
+        fill(22, 10, 48, 245);
         stroke(255, 215, 0);
-        strokeWeight(2);
-        rect(tx, ty, w, h, 8);
+        strokeWeight(2.5);
+        rect(tx, ty, w, h, 10);
 
         noStroke();
         fill(255, 215, 0);
         textAlign(LEFT, TOP);
-        textSize(20);
-        text(title, tx + 16, ty + 14);
+        textSize(26);
+        text(title, tx + 18, ty + 14);
 
         if (desc) {
             fill(200, 160, 255);
-            textSize(16);
-            text(desc, tx + 16, ty + 46);
+            textSize(20);
+            text(desc, tx + 18, ty + 56);
         }
-
-        fill(140, 100, 200);
-        textSize(13);
-        text("Drag back to desk", tx + 16, ty + h - 24);
         pop();
     }
 
@@ -638,12 +725,14 @@ class BackpackVisual {
      */
     drawInstructions() {
         push();
-        fill(180, 130, 255, 160);
+        textFont(fonts.body);
+        textSize(22);
         textAlign(CENTER, BOTTOM);
-        textSize(15);
         noStroke();
+        fill(255, 215, 0);
         text("Drag items between backpack and desk  |  Hover for info  |  [ESC] to close",
-            width / 2, height - 8);
+             width / 2, height - 12);
+
         pop();
     }
 
@@ -1025,6 +1114,7 @@ class BackpackVisual {
         for (let i = this.scatteredItems.length - 1; i >= 0; i--) {
             let s = this.scatteredItems[i];
             if (dist(mx, my, s.x, s.y) < 100) {
+                this.showDragTutorial = false; // player started interacting — hide tutorial
                 this.draggedItem = s.item;
                 this.dragSource = 'desk';
                 this.dragIndex = i;
@@ -1117,7 +1207,7 @@ class BackpackVisual {
             if (emptySlot !== -1) {
                 this.topSlots[emptySlot] = item.name;
                 this.removeFromDesk(item.name);
-                this.showMessage("✓ " + item.name + " packed!");
+                this.showMessage(item.name + " packed!");
             }
         } else if (npcCount >= 1) {
             let existingIndex = this.topSlots.findIndex(id => id && id !== "UoB Student ID" && id !== "Laptop Computer");
@@ -1129,7 +1219,7 @@ class BackpackVisual {
             if (emptySlot !== -1) {
                 this.topSlots[emptySlot] = item.name;
                 this.removeFromDesk(item.name);
-                this.showMessage("✓ " + item.name + " packed!");
+                this.showMessage(item.name + " packed!");
             }
         }
     }
@@ -1167,7 +1257,7 @@ class BackpackVisual {
         this.topSlots[this.replaceSlotIndex] = this.replaceNewItem.name;
         this.removeFromDesk(this.replaceNewItem.name);
         this.addToDesk(this.findItemByName(oldItemName));
-        this.showMessage("✓ Item replaced!");
+        this.showMessage("Item replaced!");
         this.showReplaceDialog = false;
         this.replaceNewItem = null;
     }

@@ -422,8 +422,15 @@ class SuccessScreen extends EndScreenBase {
         text(msg, cx, box.y + box.h * 0.38);
         pop();
 
-        // Moved towards the center (from 0.42 to 0.55)
-        this.drawProgressBar(cx, box.y + box.h * 0.55, box.w * 0.6);
+        // Character illustration in place of the progress bar
+        if (assets.irisSuccess) {
+            let imgH = box.h * 0.36;
+            let imgW = imgH * (assets.irisSuccess.width / assets.irisSuccess.height);
+            push();
+            imageMode(CENTER);
+            image(assets.irisSuccess, cx, box.y + box.h * 0.60, imgW, imgH);
+            pop();
+        }
         }
         this.drawButtons(cx, this._getButtonStartY());
 
@@ -451,7 +458,17 @@ class SuccessScreen extends EndScreenBase {
                     gameState.resetFlags();
                     if (currentDayID < 5) currentUnlockedDay = Math.max(currentUnlockedDay, currentDayID + 1);
                     gameState.setState(STATE_LEVEL_SELECT);
-                    if (mainMenu && mainMenu.timeWheel) mainMenu.timeWheel.triggerEntrance();
+                    if (mainMenu && mainMenu.timeWheel) {
+                        // Auto-select the next day so the level select opens on it
+                        if (currentDayID < 5) {
+                            let nextDay = currentDayID + 1;
+                            mainMenu.timeWheel.selectedDay = nextDay;
+                            // Keep sidebar index in sync so day cards are centred correctly
+                            mainMenu.timeWheel.targetIndex  = nextDay - 1;
+                            mainMenu.timeWheel.currentIndex = nextDay - 1;
+                        }
+                        mainMenu.timeWheel.triggerEntrance();
+                    }
                 });
             } else if (option === "RESTART") {
                 // Switch to sub-menu layer

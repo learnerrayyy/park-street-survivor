@@ -373,6 +373,12 @@ class TestingPanel {
             if (typeof devGoToFail === "function") devGoToFail("LATE");
             return;
         }
+
+        if (actionId === "story_recap") {
+            if (typeof devGoToStoryRecap === "function") devGoToStoryRecap();
+            this.visible = false;
+            return;
+        }
     }
 
     draw() {
@@ -655,7 +661,8 @@ class TestingPanel {
             { id: "toggle_dev", label: developerMode ? "Dev ON" : "Dev OFF" },
             { id: "win", label: "Force Win" },
             { id: "fail_hit_bus", label: "Fail HIT_BUS" },
-            { id: "fail_late", label: "Fail LATE" }
+            { id: "fail_late", label: "Fail LATE" },
+            { id: "story_recap", label: "Story Recap" }
         ];
 
         const btnGap = 8;

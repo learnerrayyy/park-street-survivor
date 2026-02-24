@@ -281,68 +281,86 @@ class RoomScene {
     }
 
     /**
-     * Draws a pulsing highlight box and prompt label for the nearest interactable object.
+     * Draws interaction indicators.
+     * Yellow outline box: always visible when the tutorial phase matches (synced with ! icon).
+     * Prompt text + key icon: only when the player is close enough to interact.
+
      */
     drawInteractionIndicators() {
-        if (!this.isPlayerNearDesk && !this.isPlayerNearDoor) return;
+        let phase = (typeof tutorialHints !== 'undefined') ? tutorialHints.roomPhase : 'DONE';
+
+        let showDeskBox = this.isPlayerNearDesk || (phase === 'DESK');
+        let showDoorBox = this.isPlayerNearDoor || (phase === 'DOOR');
+        if (!showDeskBox && !showDoorBox) return;
 
         push();
 
-        let target = this.isPlayerNearDesk
-            ? { label: "CHECK DESK", key: 'e', x: this.deskX, y: this.deskY, w: this.deskBoxW, h: this.deskBoxH }
+        let target = showDeskBox
+            ? { label: "CHECK DESK", key: 'e',     x: this.deskX, y: this.deskY, w: this.deskBoxW, h: this.deskBoxH }
+
             : { label: "LEAVE ROOM", key: 'enter', x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
 
-        // Use cached roomTopY (computed once on first render)
         let roomTopY = (this._roomTopY !== null) ? this._roomTopY : 100;
-
         let pulse = (sin(frameCount * 0.1) + 1) * 0.5;
 
-        // Pulsing outline box around the interactable object
+        // Pulsing outline box — always visible when tutorial phase or proximity active
         noFill();
         stroke(255, 216, 0, 150 + pulse * 105);
         strokeWeight(2);
         rectMode(CENTER);
         rect(target.x, target.y, target.w, target.h, 8);
 
-        // Prompt text centred above the room
-        textAlign(CENTER, CENTER);
-        textFont(fonts.title);
-        textSize(22);
-        fill(255, 216, 0, 180 + pulse * 75);
-        noStroke();
-        text(`PRESS [${target.key.toUpperCase()}] TO ${target.label}`, width / 2, roomTopY);
+        // Prompt text + key icon — only when close enough to actually interact
+        let playerNear = (showDeskBox && this.isPlayerNearDesk) || (showDoorBox && this.isPlayerNearDoor);
+        if (playerNear) {
+            textAlign(CENTER, CENTER);
+            textFont(fonts.title);
+            textSize(22);
+            fill(255, 216, 0, 180 + pulse * 75);
+            noStroke();
+            text(`PRESS [${target.key.toUpperCase()}] TO ${target.label}`, width / 2, roomTopY);
 
-        // Animated key icon above the prompt text
-        if (assets.keys && assets.keys[target.key]) {
-            let sheet = assets.keys[target.key];
-            let frame = floor(frameCount / 15) % 3;
-            let sw = sheet.width / 3;
-            imageMode(CENTER);
-            tint(255, 200 + pulse * 55);
-            image(sheet, width / 2, roomTopY - 60, 50, 40, frame * sw, 0, sw, sheet.height);
-            noTint();
+            if (assets.keys && assets.keys[target.key]) {
+                let sheet = assets.keys[target.key];
+                let frame = floor(frameCount / 15) % 3;
+                let sw    = sheet.width / 3;
+                imageMode(CENTER);
+                tint(255, 200 + pulse * 55);
+                image(sheet, width / 2, roomTopY - 60, 50, 40, frame * sw, 0, sw, sheet.height);
+                noTint();
+            }
+
         }
 
         pop();
     }
 
     /**
-     * Draws breathing warning icons to guide the player through the tutorial sequence.
-     * Phase 'DESK'  — icon near the desk, prompting to open the backpack.
-     * Phase 'DOOR'  — icon near the door (Day 1 only), prompting to leave the room.
+     * Draws the warning icon alongside the interactable object.
+     * Always visible when the tutorial phase matches — not proximity-gated.
+     * Pulses at the same frequency as the yellow outline box so they flash in sync.
      */
     drawTutorialHints() {
         if (typeof tutorialHints === 'undefined' || !assets.warningImg) return;
         let phase = tutorialHints.roomPhase;
         if (phase !== 'DESK' && phase !== 'DOOR') return;
 
-        // Use the global drawWarningIcon() which preserves the image's natural
-        // aspect ratio and applies the breathing animation — no manual stretching.
+        // Same pulse as the yellow box in drawInteractionIndicators()
+        let pulse   = (sin(frameCount * 0.1) + 1) * 0.5;
+        let breathe = 0.85 + pulse * 0.15;
+        let size    = 52;
+        let img     = assets.warningImg;
+        let renderW = size * (img.width / img.height) * breathe;
+        let renderH = size * breathe;
+
+        push();
+        imageMode(CENTER);
         if (phase === 'DESK') {
-            drawWarningIcon(this.deskX + 55, this.deskY - 45, 52);
-        } else if (phase === 'DOOR') {
-            drawWarningIcon(this.doorX + 35, this.doorY - 55, 52);
+            image(img, this.deskX + 55, this.deskY - 45, renderW, renderH);
+        } else {
+            image(img, this.doorX + 35, this.doorY - 55, renderW, renderH);
         }
+        pop();
     }
 
     /**

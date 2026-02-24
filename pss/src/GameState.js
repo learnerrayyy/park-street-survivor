@@ -27,6 +27,14 @@ class GameState {
             this.previousState = this.currentState;
         }
 
+        // Reset end screen when leaving WIN/FAIL so it re-activates correctly next visit
+        if ((this.currentState === STATE_WIN || this.currentState === STATE_FAIL) &&
+            newState !== STATE_WIN && newState !== STATE_FAIL) {
+            if (typeof endScreenManager !== "undefined" && endScreenManager) {
+                endScreenManager._activeScreen = null;
+            }
+        }
+
         // Debugging: Log transition for developer console tracking
         console.log(`[GameState] Switch: ${this.currentState} -> ${newState}`);
 

@@ -12,6 +12,7 @@ class Player {
         this.resetStatsToDefault();
         this.distanceRun = 0;
         this.playTimeFrames = 0;
+        this.carHitCount = 0;
 
         // Sprite dimensions (flat pixel aesthetic)
         this.width = 160;
@@ -60,10 +61,8 @@ class Player {
         this.wasSpeedBoostActive = false;
 
         // ── PERFORMANCE: Clock display cache ──
-        // Rebuild the formatted time string only once per second (every 60 frames),
-        // not on every single draw call.
-        this._clockStr    = "08:30:00";
-        this._clockRed    = false;
+        this._clockStr     = "08:30:00";
+        this._clockRed     = false;
         this._lastClockSec = -1;
     }
 
@@ -84,6 +83,7 @@ class Player {
         this.resetStatsToDefault();
         this.distanceRun = 0;
         this.playTimeFrames = 0;
+        this.carHitCount = 0;
         this.currentLaneIndex = 0;
         this.targetLaneIndex = 0;
         this.laneVelocityX = 0;
@@ -170,9 +170,9 @@ class Player {
      * 4-directional movement for the bedroom scene, with collision detection via RoomScene.
      */
     handleRoomMovement() {
-        let s     = 12; // was 8 — increased for snappier room navigation
-        let oldX  = this.x;
-        let oldY  = this.y;
+        let s = 12; // was 8 — increased for snappier room navigation
+        let oldX = this.x;
+        let oldY = this.y;
         let moveX = 0;
         let moveY = 0;
 
@@ -314,14 +314,46 @@ class Player {
         pop();
     }
 
-     /**
+    /**
+     * Translates elapsed frames into a digital clock display starting at 08:30:00.
+     */
+    drawClock(x, y) {
+        // Rebuild the formatted string only when the displayed second changes
+        let currentSec = Math.floor(this.playTimeFrames / 60);
+        if (currentSec !== this._lastClockSec) {
+            this._lastClockSec = currentSec;
+            const START = 8.5 * 3600; // 08:30:00 in seconds
+            let total = START + currentSec;
+            let hh = Math.floor(total / 3600);
+            let mm = Math.floor((total % 3600) / 60);
+            let ss = Math.floor(total % 60);
+            this._clockStr = (hh < 10 ? '0' : '') + hh + ':' +
+                             (mm < 10 ? '0' : '') + mm + ':' +
+                             (ss < 10 ? '0' : '') + ss;
+            this._clockRed = (hh >= 9);
+        }
+
+        textAlign(CENTER, CENTER);
+        textSize(44);
+        textStyle(BOLD);
+        fill(this._clockRed ? color(255, 50, 50) : color(255, 215, 0));
+        text(this._clockStr, x, y);
+        textSize(12);
+        fill(150);
+        textStyle(NORMAL);
+        text("BRISTOL TIME", x, y + 32);
+    }
+
+    /**
      * Renders the energy bar with a green fill that depletes as stamina drops.
      */
     drawHealthBar(x, y) {
+        textAlign(CENTER, CENTER);
         fill(255);
         textSize(32);
         textStyle(BOLD);
-        text("ENERGY", x, y - 22);
+        // Centred above the bar, clear of the backpack icon on the left
+        text("ENERGY", x + 200, y - 22);
 
         fill(50);
         stroke(0);
@@ -440,6 +472,34 @@ class Player {
         }
     }
 
+    drawSpeedBoostBanner() {
+        if (this.speedBoostFramesRemaining <= 0) return;
+
+        push();
+        textAlign(CENTER, CENTER);
+        textSize(48);
+        textStyle(BOLD);
+        fill(255, 230, 80, 235);
+        stroke(30, 30, 30, 160);
+        strokeWeight(4);
+        text("SPEED UP", width / 2, height * 0.38);
+        pop();
+    }
+
+    applyRunScrollSpeed() {
+        if (this.baseRunScrollSpeed === null) {
+            this.baseRunScrollSpeed = GLOBAL_CONFIG.scrollSpeed;
+        }
+
+        if (this.speedBoostFramesRemaining > 0) {
+            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed * this.activeSpeedMultiplier;
+            this.wasSpeedBoostActive = true;
+        } else if (this.wasSpeedBoostActive) {
+            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed;
+            this.wasSpeedBoostActive = false;
+        }
+    }
+
     // ─── GAME STATE ──────────────────────────────────────────────────────────
 
     /**
@@ -448,6 +508,7 @@ class Player {
     takeDamage(damage, type) {
         if (this.isInvincibleActive()) return;
         this.health -= damage;
+        if (damage > 0) this.carHitCount++;
         if (type === "BUS") {
             this.triggerGameOver("HIT_BUS");
         }

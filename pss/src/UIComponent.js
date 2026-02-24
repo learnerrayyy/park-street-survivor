@@ -139,6 +139,9 @@ class TimeWheel {
         // Cloud hover scale (smooth lerp)
         this._cloudScale = 1.0;
 
+        // Breathing phase: cloud breathes in gray after landing, before colorization
+        this._isBreathing = false;
+        this._breatheTimer = 0;
     }
 
     /**
@@ -169,6 +172,8 @@ class TimeWheel {
             rotation: random(-15, 15)
         };
         this._cloudScale = 1.0;
+        this._isBreathing = false;
+        this._breatheTimer = 0;
     }
 
     /**
@@ -195,8 +200,18 @@ class TimeWheel {
                 }
             }
 
-            if (this._drops.every(d => d.landed) && this.entryTimer > 20) {
-                this.isEntering = false;
+            if (this._drops.every(d => d.landed) && this._cloudDrop.landed && this.entryTimer > 20) {
+                if (!this._isBreathing) {
+                    // Start the breathe phase — short static pause then scale-up before colorizing
+                    this._isBreathing = true;
+                    this._breatheTimer = 65;
+                } else {
+                    this._breatheTimer--;
+                    if (this._breatheTimer <= 0) {
+                        this.isEntering = false;
+                        this._isBreathing = false;
+                    }
+                }
             }
         }
 
@@ -322,20 +337,20 @@ class TimeWheel {
      * RENDERER: BACKGROUND BLEND
      * Lerps bgAlpha (0=lock image, 255=unlock image) based on whether the selected day
      * is locked. Day 1 is treated as locked until the player clicks once, so flipping
-     * day1VisuallyUnlocked automatically starts the fade-in to the colorful background.
+     * dayVisuallyUnlocked[day] flipping to true automatically starts the fade-in to the colorful background.
      */
     drawDynamicBackground() {
         let isLocked = (this.selectedDay > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
-        // Day 1 stays visually locked until the player clicks once (skipped in dev mode)
-        if (this.selectedDay === 1 &&
+        // Every newly-unlocked day stays visually locked until the player clicks once
+        if (!developerMode && !DEBUG_UNLOCK_ALL &&
             typeof tutorialHints !== 'undefined' &&
-            !tutorialHints.day1VisuallyUnlocked &&
-            !developerMode) {
+            !tutorialHints.dayVisuallyUnlocked[this.selectedDay]) {
+
             isLocked = true;
         }
 
         let targetAlpha = isLocked ? 0 : 255;
-        this.bgAlpha = lerp(this.bgAlpha, targetAlpha, 0.04);
+        this.bgAlpha = lerp(this.bgAlpha, targetAlpha, 0.07);
 
         imageMode(CORNER);
         if (assets.selectBg.lock)   image(assets.selectBg.lock,   0, 0, width, height);
@@ -388,14 +403,22 @@ class TimeWheel {
         let isCloudHover = (mouseX > x - cloudW / 2 && mouseX < x + cloudW / 2 &&
             mouseY > y - cloudH / 2 && mouseY < y + cloudH / 2);
 
-        // Day 1 is "visually locked" (grayscale, same as Days 2-5) until the player clicks once (skipped in dev mode)
+        // Any available day stays visually locked (grayscale) until the player clicks once
         let visuallyLocked = isLocked ||
-            (dayID === 1 &&
-                typeof tutorialHints !== 'undefined' &&
-                !tutorialHints.day1VisuallyUnlocked &&
-                !developerMode);
+            (!developerMode && !DEBUG_UNLOCK_ALL &&
+             typeof tutorialHints !== 'undefined' &&
+             !tutorialHints.dayVisuallyUnlocked[dayID]);
 
-        let targetScale = (isCloudHover && !visuallyLocked && !this.isEntering) ? 1.08 : 1.0;
+
+        let targetScale;
+        if (this._isBreathing) {
+            // Two-phase unlock animation:
+            //   breatheTimer 65→25  — cloud is static in gray (no movement)
+            //   breatheTimer 25→ 0  — single scale-up pop to signal unlock
+            targetScale = (this._breatheTimer > 25) ? 1.0 : 1.15;
+        } else {
+            targetScale = (isCloudHover && !visuallyLocked && !this.isEntering) ? 1.08 : 1.0;
+        }
         this._cloudScale = lerp(this._cloudScale, targetScale, 0.1);
         scale(this._cloudScale);
 
@@ -417,18 +440,10 @@ class TimeWheel {
         drawingContext.shadowBlur = 0;
         drawingContext.filter = 'none';
 
-        // ── Tutorial hint: breathing warning icon on cloud top-right ──
-        // Day 1: show while still visually locked (first-click prompt)
-        // Days 2-5: show on the newest-unlocked day before first entry
-        let showDay1Hint = typeof tutorialHints !== 'undefined' &&
-                           dayID === 1 &&
-                           !tutorialHints.day1VisuallyUnlocked;
-        let showNewDayHint = typeof tutorialHints !== 'undefined' &&
-                             typeof currentUnlockedDay !== 'undefined' &&
-                             !isLocked && dayID > 1 &&
-                             dayID === currentUnlockedDay &&
-                             tutorialHints.levelSelectShownForDay < currentUnlockedDay;
-        if ((showDay1Hint || showNewDayHint) && typeof assets !== 'undefined' && assets.warningImg) {
+        // ── Entry hint: breathing warning icon on selected unlocked cloud ──
+        // Only shows after colorization is complete, guiding the player to click / press Enter.
+        if (!visuallyLocked && dayID === this.selectedDay &&
+            typeof assets !== 'undefined' && assets.warningImg) {
             let warnX = cloudW / 2 - 80;
             let warnY = -cloudH / 2 + 55;
             drawWarningIcon(warnX, warnY, 100);
@@ -466,11 +481,8 @@ class TimeWheel {
         }
 
         let isSelected = (i === this.selectedDay - 1);
-        let isLocked = (i + 1 > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
-
-        if (i === 0 && typeof tutorialHints !== 'undefined' && !tutorialHints.day1VisuallyUnlocked && !developerMode) {
-            isLocked = true;
-        }
+        let dayID = i + 1;
+        let isLocked = (dayID > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
 
         let alpha = map(distFromCenter, 0, 2, 255, 50);
         let s = map(distFromCenter, 0, 1, 1.2, 0.8);
@@ -568,10 +580,18 @@ class TimeWheel {
         if (this.isEntering) return;
 
         if ((keyCode === UP_ARROW || keyCode === 87) && this.selectedDay > 1) {
+            let newDay = this.selectedDay - 1;
+            if (typeof tutorialHints !== 'undefined' && !tutorialHints.dayVisuallyUnlocked[newDay]) {
+                this.bgAlpha = 0;
+            }
             this.selectedDay--;
             this.targetIndex--;
             if (typeof playSFX === 'function') playSFX(sfxSelect);
         } else if ((keyCode === DOWN_ARROW || keyCode === 83) && this.selectedDay < this.totalDays) {
+            let newDay = this.selectedDay + 1;
+            if (typeof tutorialHints !== 'undefined' && !tutorialHints.dayVisuallyUnlocked[newDay]) {
+                this.bgAlpha = 0;
+            }
             this.selectedDay++;
             this.targetIndex++;
             if (typeof playSFX === 'function') playSFX(sfxSelect);

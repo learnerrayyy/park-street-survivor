@@ -71,7 +71,6 @@ class ObstacleManager {
         const available = this.currentLevelConfig.availableObstacles;
         console.log(`[DEBUG] selectRandomObstacle: available=${JSON.stringify(available)}`);
 
-
         const buffObstacles = ["COFFEE", "EMPTY_SCOOTER"];
         const buffInAvailable = available.filter(o => buffObstacles.includes(o));
         const hasActiveBuffOnScreen = this.obstacles.some(o => o.config && o.config.type === "BUFF");
@@ -91,7 +90,6 @@ class ObstacleManager {
                 return this.pickWeightedObstacle(buffInAvailable);
             }
         }
-
 
         let hazardsInAvailable = available.filter(o => !buffObstacles.includes(o));
         if (this.promoterCooldownFramesRemaining > 0) {
@@ -686,7 +684,7 @@ class ObstacleManager {
      */
     stopSpawning() {
         console.log("[ObstacleManager] Spawning stopped - Victory phase active");
-        this.obstacles.length = 0;
+        this.obstacles = [];
     }
 
     renderPromoterEffects() {

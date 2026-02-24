@@ -10,7 +10,7 @@ html, body {
   
   /* LAYER: BROWSER BACKGROUND (The "Underlay") */
   /* Contributor: Aesthetic Designer (Lucca) */
-  background-image: url('assets/bbg.png');
+  background-image: url('assets/background/bbg.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

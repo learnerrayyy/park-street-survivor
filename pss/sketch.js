@@ -16,6 +16,11 @@ let assets = {
     menuBg: null,
     otherBg: null,
     warningImg: null,
+    bbg: null,
+    libraryBg: null,
+    irisSuccess: null,
+    storyShape: null,
+    storyCloud: null,
     keys: {},
     selectClouds: [],
     selectBg: {
@@ -108,13 +113,155 @@ let globalFade = {
 };
 
 // ─── PAUSE MENU STATE ─────────────────────────────────────────────────────────
-let pauseIndex = 0;
-const PAUSE_OPTIONS = ["RESUME", "HELP", "QUIT TO MENU"];
+let pauseIndex = -1;  // -1 = no selection (nothing highlighted by default)
 let pauseFromState = null;
 
-// ─── TUTORIAL HINT STATE ──────────────────────────────────────────────────────
+// Pause options vary by context (room vs day-run)
+function getPauseOptions() {
+    if (gameState && gameState.previousState === STATE_DAY_RUN) {
+        return ["RESTART","SETTINGS", "STORY", "HELP", "EXIT"];
+    }
+    return ["SETTINGS", "STORY", "HELP", "EXIT"];
+}
+
+// Restart sub-menu state
+let showRestartChoice = false;
+let restartChoiceIndex = 0;
+const RESTART_OPTIONS = ["BACK TO ROOM", "RESTART RUN"];
+
+// Pause button breathing scale (smooth lerp)
+let pauseBtnScale = 1.0;
+
+// Story recap state
+let showStoryRecap = false;
+let storyRecapDay = 1;
+let storyScrollOffset = 0;  // scroll offset within current day's text
+
+// ─── STORY RECAP CONTENT ──────────────────────────────────────────────────────
+/**
+ * Story summary text for each day's recap panel.
+ * Each entry has a title (shown above the cloud) and lines[] (scrollable body text).
+ */
+const STORY_RECAPS = {
+    1: {
+        title: "Day 1 — Monday",
+        lines: [
+            "First day of term.",
+            "The alarm went off at 8:15.",
+            "",
+            "You threw on your hoodie, grabbed your",
+            "laptop, and sprinted out the door.",
+            "",
+            "Park Street looked deceptively calm.",
+            "Then the buses came.",
+            "",
+            "You wove between parked scooters,",
+            "ducked past a leaflet-handing promoter,",
+            "and somehow made it to the Arts Complex",
+            "with two minutes to spare.",
+            "",
+            "You rewarded yourself with a coffee.",
+            "It helped. A little."
+        ]
+    },
+    2: {
+        title: "Day 2 — Tuesday",
+        lines: [
+            "Seminar at 9:00.",
+            "You left at 8:48.",
+            "",
+            "The hill felt steeper than yesterday.",
+            "A scooter nearly clipped your shoulder.",
+            "",
+            "You spotted an empty scooter by the kerb",
+            "and hopped on for a short burst —",
+            "probably not legal, definitely worth it.",
+            "",
+            "You arrived breathless but present.",
+            "The lecturer hadn't even started yet.",
+            "",
+            "Small victories."
+        ]
+    },
+    3: {
+        title: "Day 3 — Wednesday",
+        lines: [
+            "Midweek. The city felt busier.",
+            "",
+            "A street vendor was handing out flyers",
+            "right in the middle of the pavement.",
+            "You pressed SPACE ten times and",
+            "launched a paper ball to clear the path.",
+            "",
+            "A homeless man stepped out unexpectedly",
+            "and bumped you into the wrong lane.",
+            "You recovered. Barely.",
+            "",
+            "The coffee from Tuesday was wearing off.",
+            "You found another one on the kerb.",
+            "",
+            "Somehow, you kept moving."
+        ]
+    },
+    4: {
+        title: "Day 4 — Thursday",
+        lines: [
+            "It was raining.",
+            "",
+            "Your rain boots kept your feet dry",
+            "through three separate puddles.",
+            "Your headphones blocked out the noise",
+            "of two separate promoters.",
+            "",
+            "The large car came out of nowhere.",
+            "You felt it before you saw it.",
+            "",
+            "You stumbled. Lost momentum.",
+            "But you kept running.",
+            "",
+            "The library was in sight.",
+            "It always felt further in the rain."
+        ]
+    },
+    5: {
+        title: "Day 5 — Friday",
+        lines: [
+            "Final submission day.",
+            "",
+            "Your laptop was heavy in the bag.",
+            "Your Student ID was clipped to your jacket.",
+            "Everything you needed was with you.",
+            "",
+            "The street threw everything at you.",
+            "Buses. Scooters. Promoters. Rain.",
+            "",
+            "You used every skill you'd picked up",
+            "across the week.",
+            "",
+            "And then — the Arts Complex doors.",
+            "Open. Waiting.",
+            "",
+            "You made it.",
+            "You actually made it."
+        ]
+    }
+};
+
+// ─── TUTORIAL HINT SYSTEM ─────────────────────────────────────────────────────
+/**
+ * Tracks which tutorial hints are active.
+ *   dayVisuallyUnlocked    — object {dayID: bool}; each day starts gray until player clicks once.
+ *                            on that click the background turns color and the warning disappears,
+ *                            but the game does NOT start yet (a second click is required).
+ *   levelSelectShownForDay — last day whose cloud was clicked to ENTER the game;
+ *                            hint icon shows on days above this value.
+ *   dayVisuallyUnlocked    — object {dayID: bool}; each day starts gray until player clicks once.
+ *   levelSelectShownForDay — last day whose cloud was clicked to ENTER the game.
+ *   roomPhase              — 'DESK' | 'CLOSE_BP' | 'DOOR' | 'DONE'
+ */
+
 let tutorialHints = {
-    day1VisuallyUnlocked: false,
+    dayVisuallyUnlocked: {},   // { 1: true/false, 2: true/false, … } per-day first-click unlock
     levelSelectShownForDay: 0,
     roomPhase: 'DESK'
 };
@@ -146,7 +293,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 41;
+const totalAssetsToLoad = 46;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -167,9 +314,9 @@ function itemLoaded() {
  */
 function preload() {
     // Visual assets
-    assets.menuBg = loadImage('assets/cbg.png', itemLoaded);
-    assets.otherBg = loadImage('assets/other_bg.png', itemLoaded);
-    assets.roomBg = loadImage('assets/room.png', itemLoaded);
+    assets.menuBg = loadImage('assets/background/cbg.png', itemLoaded);
+    assets.otherBg = loadImage('assets/background/other_bg.png', itemLoaded);
+    assets.roomBg = loadImage('assets/background/room.png', itemLoaded);
     assets.inventoryBg = loadImage('assets/inventory/table.png', itemLoaded);
     assets.backpackImg = loadImage('assets/inventory/backpack.png', itemLoaded);
     assets.studentCardImg = loadImage('assets/inventory/student_card.png', itemLoaded);
@@ -179,6 +326,12 @@ function preload() {
     assets.tangleImg      = loadImage('assets/inventory/tangle.png', itemLoaded);
     assets.headphoneImg   = loadImage('assets/inventory/headphone.png', itemLoaded);
     assets.rainbootImg    = loadImage('assets/inventory/rainboot.png', itemLoaded);
+
+    assets.bbg         = loadImage('assets/background/bbg.png', itemLoaded);
+    assets.libraryBg   = loadImage('assets/background/library.jpg', itemLoaded);
+    assets.irisSuccess = loadImage('assets/end_screen/iris_success.png', itemLoaded);
+    assets.storyShape  = loadImage('assets/story/frame_shape.png', itemLoaded);
+    assets.storyCloud  = loadImage('assets/story/frame_cloud.png', itemLoaded);
 
     assets.selectBg.unlock = loadImage('assets/select_background/day_unlock.jpg', itemLoaded);
     assets.selectBg.lock = loadImage('assets/select_background/day_lock.jpg', itemLoaded);
@@ -304,10 +457,10 @@ function setup() {
     env = new Environment();
     player = new Player();
     obstacleManager = new ObstacleManager();
-    testingPanel = new TestingPanel();
     backpackUI = new BackpackVisual(inventory, roomScene);
     levelController = new LevelController();
     endScreenManager = new EndScreenManager();
+    testingPanel = new TestingPanel();
 
     textFont(fonts.body);
     gameState.currentState = STATE_LOADING;
@@ -337,6 +490,15 @@ function draw() {
             case STATE_HELP:
                 if (mainMenu) {
                     mainMenu.menuState = gameState.currentState;
+                    // Auto-colorize once the entrance animation finishes — keeps visible gray period
+                    if (gameState.currentState === STATE_LEVEL_SELECT &&
+                        typeof tutorialHints !== 'undefined' && mainMenu.timeWheel &&
+                        !mainMenu.timeWheel.isEntering) {
+                        let sel = mainMenu.timeWheel.selectedDay;
+                        if (sel <= currentUnlockedDay) {
+                            tutorialHints.dayVisuallyUnlocked[sel] = true;
+                        }
+                    }
                     mainMenu.display();
                 }
                 break;
@@ -352,18 +514,6 @@ function draw() {
 
             case STATE_INVENTORY:
                 if (backpackUI) backpackUI.display();
-                // Tutorial: once required items are packed, guide player to close backpack.
-                if (tutorialHints.roomPhase === 'CLOSE_BP' && backpackUI && backpackUI.hasRequiredItems()) {
-                    drawWarningIcon(width / 2, height - 75, 48);
-                    push();
-                    textFont(fonts.body);
-                    textSize(20);
-                    textAlign(CENTER, CENTER);
-                    fill(255, 215, 0, 200 + sin(frameCount * 0.1) * 55);
-                    noStroke();
-                    text("PACK COMPLETE! PRESS ESC TO CLOSE BACKPACK", width / 2, height - 45);
-                    pop();
-                }
                 break;
 
             case STATE_DAY_RUN:
@@ -387,18 +537,40 @@ function draw() {
                 break;
 
             case STATE_FAIL:
+                // Draw frozen gameplay behind the overlay
+                if (env) env.display();
+                if (obstacleManager) obstacleManager.display();
+                if (player) player.display();
+                if (endScreenManager) {
+                    if (!endScreenManager._activeScreen) {
+                        endScreenManager.activateFail(gameState.failReason || "EXHAUSTED");
+                    }
+                    endScreenManager.display();
+                }
+                break;
+
             case STATE_WIN:
-                if (endScreenManager) endScreenManager.display();
-                else drawEndScreen();
+                if (endScreenManager) {
+                    if (!endScreenManager._activeScreen) {
+                        // Unlock next day immediately so its warning icon appears on level select
+                        if (currentDayID < 5) {
+                            currentUnlockedDay = Math.max(currentUnlockedDay, currentDayID + 1);
+                        }
+                        endScreenManager.activateSuccess();
+                    }
+                    endScreenManager.display();
+                }
+
                 break;
         }
     } catch (e) {
         console.error("[Core Systems] Runtime Exception:", e);
     }
 
-    if (testingPanel && testingPanel.isVisible()) testingPanel.draw();
-
     renderGlobalFade();
+
+    // TestingPanel always draws on top of everything (dev overlay)
+    if (testingPanel) testingPanel.draw();
 }
 
 /**
@@ -413,6 +585,7 @@ function runGameLoop() {
     if (obstacleManager && typeof obstacleManager.renderPromoterEffects === 'function') {
         obstacleManager.renderPromoterEffects();
     }
+
     if (levelController) { levelController.display(); }
 
     // Win condition: settlement point reached
@@ -501,8 +674,22 @@ function keyPressed() {
 
     // Toggle developer mode
     if (key === '0') devToggle();
+
+    // Toggle TestingPanel with backtick (`) or F2
+    if (key === '`' || keyCode === 113) {
+        if (testingPanel) testingPanel.toggle();
+        return;
+    }
+
+    // If TestingPanel is open, route all keys to it and block everything else
     if (testingPanel && testingPanel.isVisible()) {
         if (testingPanel.handleKeyPressed(key, keyCode)) return false;
+    }
+
+    // Dev shortcuts: 8 = instant WIN, 9 = instant FAIL
+    if (developerMode) {
+        if (key === '8') { devGoToWin();  return; }
+        if (key === '9') { devGoToFail("EXHAUSTED"); return; }
     }
 
     // Pause / unpause — available in most gameplay states
@@ -511,28 +698,76 @@ function keyPressed() {
             state !== STATE_SETTINGS && state !== STATE_HELP &&
             state !== STATE_SPLASH && state !== STATE_INVENTORY) {
             playSFX(sfxClick);
+            playSFX(sfxClick);
             togglePause();
-            // If we just resumed (left STATE_PAUSED), clear the pause-origin tracker
-            if (gameState.currentState !== STATE_PAUSED) {
-                pauseFromState = null;
-            }
-            pauseIndex = 0;
+            pauseIndex = -1;
+            showRestartChoice = false;
+            showStoryRecap = false;
             return;
         }
     }
 
     // Pause menu navigation
     if (state === STATE_PAUSED) {
-        if (keyCode === UP_ARROW || keyCode === 87 || keyCode === DOWN_ARROW || keyCode === 83) {
-            playSFX(sfxSelect);
+        if (showStoryRecap) {
+            // story recap arrow keys / ESC handled in story recap section
             if (keyCode === UP_ARROW || keyCode === 87) {
-                pauseIndex = (pauseIndex - 1 + PAUSE_OPTIONS.length) % PAUSE_OPTIONS.length;
-            } else {
-                pauseIndex = (pauseIndex + 1) % PAUSE_OPTIONS.length;
+                if (storyScrollOffset <= 0 && storyRecapDay > 1) {
+                    storyRecapDay--;
+                    let prevRecap = STORY_RECAPS[storyRecapDay];
+                    storyScrollOffset = max(0, prevRecap.lines.length - 10);
+                } else {
+                    storyScrollOffset = max(0, storyScrollOffset - 1);
+                }
+                if (typeof playSFX === 'function') playSFX(sfxSelect);
+            } else if (keyCode === DOWN_ARROW || keyCode === 83) {
+                let recap = STORY_RECAPS[storyRecapDay];
+                if (recap) {
+                    let maxScroll = max(0, recap.lines.length - 10);
+                    if (storyScrollOffset >= maxScroll && storyRecapDay + 1 <= 5) {
+                        storyRecapDay++;
+                        storyScrollOffset = 0;
+                    } else {
+                        storyScrollOffset = min(maxScroll, storyScrollOffset + 1);
+                    }
+                }
+                if (typeof playSFX === 'function') playSFX(sfxSelect);
+            } else if (keyCode === ESCAPE) {
+                showStoryRecap = false;
+                pauseIndex = -1;
             }
-        } else if (keyCode === ENTER || keyCode === 13) {
-            playSFX(sfxClick);
-            handlePauseSelection();
+            return;
+        } else if (showRestartChoice) {
+            if (keyCode === UP_ARROW || keyCode === 87 || keyCode === DOWN_ARROW || keyCode === 83) {
+                if (typeof playSFX === 'function') playSFX(sfxSelect);
+                restartChoiceIndex = (restartChoiceIndex < 0) ? 0 : (restartChoiceIndex + 1) % RESTART_OPTIONS.length;
+            } else if ((keyCode === ENTER || keyCode === 13) && restartChoiceIndex >= 0) {
+                if (typeof playSFX === 'function') playSFX(sfxClick);
+                handleRestartChoice();
+            } else if (keyCode === ESCAPE) {
+                showRestartChoice = false;
+                pauseIndex = -1;
+            }
+            return;
+        } else {
+            let options = getPauseOptions();
+            if (keyCode === UP_ARROW || keyCode === 87 || keyCode === DOWN_ARROW || keyCode === 83) {
+                if (typeof playSFX === 'function') playSFX(sfxSelect);
+                if (pauseIndex < 0) {
+                    pauseIndex = (keyCode === UP_ARROW || keyCode === 87) ? options.length - 1 : 0;
+                } else if (keyCode === UP_ARROW || keyCode === 87) {
+                    pauseIndex = (pauseIndex - 1 + options.length) % options.length;
+                } else {
+                    pauseIndex = (pauseIndex + 1) % options.length;
+                }
+            } else if ((keyCode === ENTER || keyCode === 13) && pauseIndex >= 0) {
+                playSFX(sfxClick);
+                handlePauseSelection();
+            } else if (keyCode === ESCAPE) {
+                togglePause();
+                pauseFromState = null;
+                showStoryRecap = false;
+            }
         }
         return;
     }
@@ -576,19 +811,61 @@ function keyPressed() {
  * Executes the selected option in the pause menu.
  */
 function handlePauseSelection() {
-    if (PAUSE_OPTIONS[pauseIndex] === "RESUME") {
+    let options = getPauseOptions();
+    let selected = options[pauseIndex];
+
+    if (selected === "RESUME") {
         togglePause();
         pauseFromState = null;
-    } else if (PAUSE_OPTIONS[pauseIndex] === "HELP") {
+    } else if (selected === "STORY") {
+        showStoryRecap = true;
+        storyRecapDay = 1;
+        storyScrollOffset = 0;
+    } else if (selected === "SETTINGS") {
+        pauseFromState = gameState.previousState;
+        if (typeof playSFX === 'function') playSFX(sfxClick);
+        mainMenu.diffToastTimer = 0;
+        gameState.currentState = STATE_SETTINGS;
+        mainMenu.menuState     = STATE_SETTINGS;
+    } else if (selected === "HELP") {
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         gameState.currentState = STATE_HELP;
-        mainMenu.menuState = STATE_HELP;
-        mainMenu.helpPage = 0;
-    } else if (PAUSE_OPTIONS[pauseIndex] === "QUIT TO MENU") {
+        mainMenu.menuState     = STATE_HELP;
+        mainMenu.helpPage      = 0;
+    } else if (selected === "RESTART") {
+        showRestartChoice  = true;
+        restartChoiceIndex = -1;
+    } else if (selected === "EXIT") {
         triggerTransition(() => {
             gameState.setState(STATE_MENU);
             mainMenu.menuState = STATE_MENU;
+            pauseFromState     = null;
+            showRestartChoice  = false;
+            showStoryRecap     = false;
+        });
+    }
+}
+
+function handleRestartChoice() {
+    if (RESTART_OPTIONS[restartChoiceIndex] === "BACK TO ROOM") {
+        triggerTransition(() => {
+            showRestartChoice = false;
+            gameState.setState(STATE_ROOM);
+            if (roomScene) roomScene.reset();
+            pauseFromState = null;
+        });
+    } else if (RESTART_OPTIONS[restartChoiceIndex] === "RESTART RUN") {
+        triggerTransition(() => {
+            showRestartChoice = false;
+            player.applyLevelStats(currentDayID);
+            player.x = 500;
+            player.y = height / 2;
+            obstacleManager = new ObstacleManager();
+            levelController.initializeLevel(currentDayID);
+            if (endScreenManager) endScreenManager._activeScreen = null;
+            gameState.setState(STATE_DAY_RUN);
+
             pauseFromState = null;
         });
     }
@@ -599,9 +876,13 @@ function handlePauseSelection() {
  */
 function mousePressed() {
     if (globalFade.isFading || !gameState) return;
+
+    // TestingPanel intercepts all clicks when visible
     if (testingPanel && testingPanel.isVisible()) {
         if (testingPanel.handleMousePressed(mouseX, mouseY)) return false;
     }
+
+
     let state = gameState.currentState;
 
     // Splash screen: unlock audio and transition to main menu
@@ -616,6 +897,46 @@ function mousePressed() {
         return;
     }
 
+    if (state === STATE_PAUSED) {
+        // Back arrow (top-left) — resume
+        if (assets.backImg && dist(mouseX, mouseY, 70, 65) < 40) {
+            if (typeof playSFX === 'function') playSFX(sfxClick);
+            if (showStoryRecap) {
+                showStoryRecap = false;
+                pauseIndex = -1;
+            } else if (showRestartChoice) {
+                showRestartChoice = false;
+                pauseIndex = -1;
+            } else {
+                togglePause();
+            }
+            return;
+        }
+        if (showRestartChoice && restartChoiceIndex >= 0) {
+            if (typeof playSFX === 'function') playSFX(sfxClick);
+            handleRestartChoice();
+        } else if (showStoryRecap) {
+            // story recap sidebar clicks
+            let sidebarX = width * 0.16;
+            let sidebarBaseY = height * 0.45;
+            for (let i = 0; i < 5; i++) {
+                let diff = i - (storyRecapDay - 1);
+                let cardY = sidebarBaseY + diff * 130;
+                if (mouseX > sidebarX - 120 && mouseX < sidebarX + 120 &&
+                    mouseY > cardY - 40 && mouseY < cardY + 40) {
+                    storyRecapDay = i + 1;
+                    storyScrollOffset = 0;
+                    if (typeof playSFX === 'function') playSFX(sfxSelect);
+                    return;
+                }
+            }
+        } else if (pauseIndex >= 0) {
+            if (typeof playSFX === 'function') playSFX(sfxClick);
+            handlePauseSelection();
+        }
+        return;
+    }
+
     if (state === STATE_MENU || state === STATE_LEVEL_SELECT ||
         state === STATE_SETTINGS || state === STATE_HELP) {
         if (mainMenu) mainMenu.handleClick(mouseX, mouseY);
@@ -626,10 +947,12 @@ function mousePressed() {
             return false;
         }
         // Pause button hit-test
-        if (dist(mouseX, mouseY, width - 60, 50) < 25) {
+        if (dist(mouseX, mouseY, width - 95, 85) < 80) {
             playSFX(sfxClick);
             togglePause();
-            pauseIndex = 0;
+            pauseIndex = -1;
+            showRestartChoice = false;
+            showStoryRecap = false;
         }
     }
 
@@ -697,6 +1020,9 @@ function setupRun(dayID) {
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
     if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DESK';
+    if (backpackUI) backpackUI.resetForNewDay();
+    if (endScreenManager) endScreenManager._activeScreen = null;
+
     gameState.setState(STATE_ROOM);
 }
 
@@ -706,11 +1032,17 @@ function setupRun(dayID) {
 function setupRunDirectly(dayID) {
     currentDayID = dayID;
     player.applyLevelStats(dayID);
+
+    // Set position at lane 1 matching standard run spawn
     player.x = GLOBAL_CONFIG.lanes.lane1;
     player.y = PLAYER_RUN_FOOT_Y;
+
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
     if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DONE';
+    if (backpackUI) backpackUI.resetForNewDay();
+    if (endScreenManager) endScreenManager._activeScreen = null;
+
     gameState.setState(STATE_DAY_RUN);
 }
 
@@ -943,22 +1275,31 @@ function drawInteractionPrompts() {
  */
 function drawPauseButton() {
     push();
-    let bx = width - 60;
-    let by = 50;
+    let bx = width - 95;
+    let by = 85;
+    let isHover = dist(mouseX, mouseY, bx, by) < 80;
 
     if (assets.pauseImg) {
+        push();
+        translate(bx, by);
+        if (isHover) scale(1.15);
         imageMode(CENTER);
-        image(assets.pauseImg, bx, by, 52, 52);
+        image(assets.pauseImg, 0, 0, 160, 160);
+        pop();
     } else {
+        push();
+        translate(bx, by);
+        if (isHover) scale(1.15);
         noFill();
         stroke(255, 150);
-        strokeWeight(2);
-        ellipse(bx, by, 40, 40);
+        strokeWeight(3);
+        ellipse(0, 0, 80, 80);
         fill(255, 150);
         noStroke();
         rectMode(CENTER);
-        rect(bx - 5, by, 4, 15);
-        rect(bx + 5, by, 4, 15);
+        rect(-10, 0, 8, 28);
+        rect(10, 0, 8, 28);
+        pop();
     }
     pop();
 }
@@ -968,21 +1309,97 @@ function drawPauseButton() {
  */
 function renderPauseOverlay() {
     push();
-    // Keep pause background consistent with settings/help/room overlay style.
     drawOtherBgWithOverlay();
 
-    textAlign(CENTER, CENTER);
-    textFont(fonts.title);
-    fill(255);
-    textSize(60);
-    text("PAUSED", width / 2, height / 2 - 100);
+    // Back arrow (top-left) — click to resume
+    if (assets.backImg) {
+        let bx = 70, by = 65;
+        let isBackHover = dist(mouseX, mouseY, bx, by) < 40;
+        push();
+        translate(bx, by);
+        if (isBackHover) scale(1.15);
+        imageMode(CENTER);
+        image(assets.backImg, 0, 0, 120, 120);
+        pop();
+    }
 
-    textFont(fonts.body);
-    for (let i = 0; i < PAUSE_OPTIONS.length; i++) {
-        let isSelected = (i === pauseIndex);
-        fill(isSelected ? 255 : 150);
-        textSize(isSelected ? 32 : 28);
-        text(isSelected ? `> ${PAUSE_OPTIONS[i]} <` : PAUSE_OPTIONS[i], width / 2, height / 2 + 20 + i * 60);
+    if (showStoryRecap) {
+        renderStoryRecap();
+    } else if (showRestartChoice) {
+        let titleY = height / 2 - 280;
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title);
+        textSize(48);
+        stroke(0, 0, 0, 180); strokeWeight(6); fill(255, 215, 0);
+        text("RESTART?", width / 2, titleY);
+        noStroke(); fill(255, 215, 0);
+        text("RESTART?", width / 2, titleY);
+
+        let optW = 280, optH = 80;
+        let spacing = 95;
+        let totalH = (RESTART_OPTIONS.length - 1) * spacing;
+        let startY = (height / 2) - (totalH / 2) + 20;
+
+        let anyRestartHover = false;
+        for (let i = 0; i < RESTART_OPTIONS.length; i++) {
+            let ox = width / 2;
+            let oy = startY + i * spacing;
+            let isHover = (mouseX > ox - optW / 2 && mouseX < ox + optW / 2 &&
+                           mouseY > oy - optH / 2 && mouseY < oy + optH / 2);
+            if (isHover) { restartChoiceIndex = i; anyRestartHover = true; }
+            let isSelected = (i === restartChoiceIndex) && restartChoiceIndex >= 0;
+
+            push();
+            translate(ox, oy);
+            if (isSelected) scale(1.15);
+            imageMode(CENTER);
+            if (assets.btnImg) image(assets.btnImg, 0, 0, optW * 2, optH * 2);
+            textFont(fonts.body); textSize(24); textAlign(CENTER, CENTER);
+            stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
+            text(RESTART_OPTIONS[i], 0, -6);
+            noStroke(); fill(255, 215, 0);
+            text(RESTART_OPTIONS[i], 0, -6);
+            pop();
+        }
+        if (!anyRestartHover && !keyIsPressed) restartChoiceIndex = -1;
+    } else {
+        let options = getPauseOptions();
+        let titleY = height / 2 - 320;
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title);
+        textSize(60);
+        stroke(0, 0, 0, 180); strokeWeight(6); fill(255, 215, 0);
+        text("PAUSED", width / 2, titleY);
+        noStroke(); fill(255, 215, 0);
+        text("PAUSED", width / 2, titleY);
+
+        let optW = 280, optH = 80;
+        let spacing = 95;
+        let totalH = (options.length - 1) * spacing;
+        let startY = (height / 2) - (totalH / 2) + 30;
+
+        let anyPauseHover = false;
+        for (let i = 0; i < options.length; i++) {
+            let ox = width / 2;
+            let oy = startY + i * spacing;
+            let isHover = (mouseX > ox - optW / 2 && mouseX < ox + optW / 2 &&
+                           mouseY > oy - optH / 2 && mouseY < oy + optH / 2);
+            if (isHover) { pauseIndex = i; anyPauseHover = true; }
+            let isSelected = (i === pauseIndex) && pauseIndex >= 0;
+
+            push();
+            translate(ox, oy);
+            if (isSelected) scale(1.15);
+            imageMode(CENTER);
+            if (assets.btnImg) image(assets.btnImg, 0, 0, optW * 2, optH * 2);
+            textFont(fonts.body); textSize(24); textAlign(CENTER, CENTER);
+            stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
+            text(options[i], 0, -6);
+            noStroke(); fill(255, 215, 0);
+            text(options[i], 0, -6);
+            pop();
+        }
+        if (!anyPauseHover && !keyIsPressed) pauseIndex = -1;
     }
     pop();
 }
@@ -1005,14 +1422,288 @@ function drawEndScreen() {
         textSize(80);
         text("FAILED", width / 2, height / 2 - 50);
     }
+    pop();
+}
 
-    textFont(fonts.body);
-    fill(255);
-    textSize(24);
-    let msg = (gameState.failReason === "HIT_BUS") ? "You were hit by a speeding bus." :
-        (gameState.failReason === "EXHAUSTED") ? "You ran out of energy." :
-            (gameState.failReason === "LATE") ? "You are fired!" : "Game Over.";
-    text(msg, width / 2, height / 2 + 20);
-    textSize(18);
-    text("Press ENTER to return to Room", width / 2, height / 2 + 100);
+/**
+ * Renders the story recap sub-page inside the pause overlay.
+ *
+ * Layer order (bottom → top):
+ *   L1  other_bg + overlay      — drawn by renderPauseOverlay() before this call
+ *   L2a Left sidebar (day cards)
+ *   L2b frame_shape.png         — full-canvas decorative background panel
+ *   L3  Story CONTENT text      — clipped to textArea, sandwiched before cloud
+ *   L4  frame_cloud.png         — full-canvas decorative overlay (covers content edges)
+ *   L5  Title text              — always on top of everything
+ *   L5  Up/Down arrows          — always on top, fully clickable
+ */
+function renderStoryRecap() {
+    let dayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
+    let isUnlocked = (storyRecapDay < currentUnlockedDay) ||
+                     (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
+    let recap = STORY_RECAPS[storyRecapDay];
+
+    // ── L2a: Left sidebar — skewed day cards (moved right slightly) ──
+    let sidebarX     = width * 0.16;   // was 0.12 — shifted right
+    let sidebarBaseY = height * 0.45;
+    let cardSpacing  = 130;
+
+    push();
+    translate(sidebarX, sidebarBaseY);
+    for (let i = 0; i < 5; i++) {
+        let day  = i + 1;
+        let diff = i - (storyRecapDay - 1);
+        let distFromCenter = abs(diff);
+        let cardY = diff * cardSpacing;
+        let cardX = distFromCenter * 30;
+
+        let dayUnlocked = (day <= currentUnlockedDay) ||
+                          (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
+        let isSelected = (day === storyRecapDay);
+        let alpha = map(distFromCenter, 0, 2, 255, 50);
+        let s     = map(distFromCenter, 0, 1, 1.15, 0.8);
+
+        push();
+        translate(cardX, cardY);
+        rotate(radians(-12));
+        scale(constrain(s, 0.5, 1.4));
+
+        noStroke();
+        fill(dayUnlocked
+            ? (isSelected ? [255, 20, 147, alpha] : [70, 20, 90, alpha * 0.6])
+            : [30, 30, 45, alpha * 0.7]);
+
+        beginShape();
+        vertex(-110, -32); vertex(130, -44);
+        vertex(110,   32); vertex(-130,  44);
+        endShape(CLOSE);
+
+        textAlign(LEFT, CENTER);
+        textFont(fonts.title); textSize(40);
+        fill(isSelected ? color(255, 215, 0, alpha) : color(255, alpha));
+        text(day.toString().padStart(2, '0'), -90, 4);
+
+        textFont(fonts.body); textSize(18);
+        if (dayUnlocked) {
+            fill(isSelected ? color(255, 215, 0, alpha) : color(255, 215, 0, alpha * 0.8));
+            text(dayNames[i], -10, 8);
+        } else {
+            fill(180, 60, 60, alpha); textSize(14);
+            text("LOCKED", -10, 8);
+        }
+
+        pop();
+    }
+    pop();
+
+    // ── L2b: frame_shape.png ──
+    if (assets.storyShape) {
+        push();
+        imageMode(CENTER);
+        image(assets.storyShape,
+              storyDebugData.shape.x, storyDebugData.shape.y,
+              storyDebugData.shape.w, storyDebugData.shape.h);
+        drawingContext.filter = 'none';
+        pop();
+    }
+
+    // ── L3: Story CONTENT lines — clipped to textArea, sandwiched before cloud ──
+    let textX = storyDebugData.textArea.x;
+    let textY = storyDebugData.textArea.y;
+    let textW = storyDebugData.textArea.w;
+    let textH = storyDebugData.textArea.h;
+
+    if (recap && isUnlocked) {
+        push();
+        drawingContext.save();
+        drawingContext.beginPath();
+        drawingContext.rect(textX - textW / 2, textY - textH / 2, textW, textH);
+        drawingContext.clip();
+
+        // Content lines only (title is drawn separately above the cloud)
+        textFont(fonts.body); textSize(25); textAlign(CENTER, CENTER);
+        let lineH      = 32;
+        let contentTop = textY - textH / 2 + 24;   // start near top of clip box
+        let maxScroll  = max(0, recap.lines.length - 10);
+        storyScrollOffset = constrain(storyScrollOffset, 0, maxScroll);
+
+        for (let j = 0; j < recap.lines.length; j++) {
+            let ly = contentTop + (j - storyScrollOffset) * lineH;
+            if (ly < textY - textH / 2 || ly > textY + textH / 2) continue;
+            let lineText = recap.lines[j];
+            if (lineText === "") continue;
+
+            let edgeFade = 255;
+            let topEdge  = textY - textH / 2 + 30;
+            let botEdge  = textY + textH / 2 - 28;
+            if (ly < topEdge) edgeFade = map(ly, textY - textH / 2, topEdge, 0, 255);
+            if (ly > botEdge) edgeFade = map(ly, botEdge, textY + textH / 2, 255, 0);
+            edgeFade = constrain(edgeFade, 0, 255);
+
+            stroke(0, 0, 0, edgeFade * 0.6); strokeWeight(3); fill(255, 240, 220, edgeFade);
+            text(lineText, textX, ly);
+            noStroke(); fill(255, 240, 220, edgeFade);
+            text(lineText, textX, ly);
+        }
+
+        drawingContext.restore();
+        pop();
+
+        // Scroll bar below text area
+        if (maxScroll > 0) {
+            let barW = 200, barH = 6;
+            noStroke();
+            fill(255, 255, 255, 40);
+            rect(textX - barW / 2, textY + textH / 2 + 18, barW, barH, 3);
+            fill(255, 215, 0, 150);
+            rect(textX - barW / 2, textY + textH / 2 + 18,
+                 map(storyScrollOffset, 0, maxScroll, 20, barW), barH, 3);
+        }
+    } else {
+        push();
+
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title);
+
+        textSize(45);
+        stroke(0, 0, 0, 180);
+        strokeWeight(6);
+        fill(255, 215, 0);
+        text("LOCKED", textX, textY);
+
+        noStroke();
+        fill(255, 215, 0);
+        text("LOCKED", textX, textY);
+
+        textFont(fonts.body);
+        textSize(20);
+        fill(200);
+        text("COMPLETE TODAY TO REVEAL", textX, textY + 40);
+        pop();
+    }
+
+    // ── L4: frame_cloud.png — sits on top of content, under title ──
+    if (assets.storyCloud) {
+        push();
+        imageMode(CENTER);
+        tint(255, storyDebugData.cloud.alpha);
+        image(assets.storyCloud,
+              storyDebugData.cloud.x, storyDebugData.cloud.y,
+              storyDebugData.cloud.w, storyDebugData.cloud.h);
+        noTint();
+        pop();
+    }
+
+    // ── L5: Title — drawn ABOVE the cloud ──
+    if (recap && isUnlocked) {
+        push();
+        textFont(fonts.title); textSize(35); textAlign(CENTER, CENTER);
+        stroke(0, 0, 0, 200); strokeWeight(6); fill(255, 105, 180);
+        text(recap.title, storyDebugData.titleArea.x, storyDebugData.titleArea.y);
+        noStroke(); fill(255, 105, 180);
+        text(recap.title, storyDebugData.titleArea.x, storyDebugData.titleArea.y);
+        pop();
+    }
+
+    // ── L5: Up/Down arrows + day indicator — identical to level-select arrows ──
+    let arrowX   = width - 90;
+    let centerY  = height / 2;
+    let arrowSz  = 60;
+    let arrowGap = 90;
+
+    if (assets.backImg) {
+        // Up arrow (previous day)
+        let canGoUp  = storyRecapDay > 1;
+        let upHover  = canGoUp && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35;
+        push();
+        translate(arrowX, centerY - arrowGap);
+        rotate(HALF_PI);
+        if (!canGoUp) tint(255, 60);
+        if (upHover)  scale(1.25);
+        imageMode(CENTER);
+        image(assets.backImg, 0, 0, arrowSz, arrowSz);
+        noTint();
+        pop();
+
+        // Day indicator between arrows
+        push();
+        textFont(fonts.title); textSize(20); textAlign(CENTER, CENTER);
+        stroke(0, 0, 0, 150); strokeWeight(3); fill(255, 215, 0);
+        text("DAY " + storyRecapDay, arrowX, centerY);
+        noStroke(); fill(255, 215, 0);
+        text("DAY " + storyRecapDay, arrowX, centerY);
+        pop();
+
+        // Down arrow (next day)
+        let nextDay   = storyRecapDay + 1;
+        let canGoDown = nextDay <= 5;
+        let downHover = canGoDown && dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35;
+
+        push();
+        translate(arrowX, centerY + arrowGap);
+        rotate(-HALF_PI);
+        if (!canGoDown) tint(255, 60);
+        if (downHover)  scale(1.25);
+        imageMode(CENTER);
+        image(assets.backImg, 0, 0, arrowSz, arrowSz);
+        noTint();
+        pop();
+    }
+
+    // ── DEV MODE: bounding boxes + controls hint ──
+    if (showStoryDebugControls) {
+        drawStoryDebugOverlay();
+    }
+}
+
+/**
+ * Draws bounding-box overlays for each story layer during dev adjust mode.
+ * Layers: [1] Shape  [2] Cloud  [3] TextArea  [4] TitleArea
+ */
+function drawStoryDebugOverlay() {
+    push();
+    let layers = [
+        { key: 'shape',     label: 'SHAPE',      color: [255, 80,  80 ] },
+        { key: 'cloud',     label: 'CLOUD',      color: [80,  200, 255] },
+        { key: 'textArea',  label: 'CONTENT',    color: [80,  255, 80 ] },
+        { key: 'titleArea', label: 'TITLE',      color: [255, 200, 0  ] }
+    ];
+
+    for (let l = 0; l < layers.length; l++) {
+        let layerIdx = l + 1;
+        let d   = storyDebugData[layers[l].key];
+        let col = layers[l].color;
+        let active = (layerIdx === storyDebugActiveLayer);
+
+        stroke(col[0], col[1], col[2], active ? 255 : 100);
+        strokeWeight(active ? 3 : 1);
+        noFill();
+        rectMode(CENTER);
+        rect(d.x, d.y, d.w, d.h);
+
+        noStroke();
+        fill(col[0], col[1], col[2], active ? 230 : 130);
+        textFont(fonts.body); textSize(15); textAlign(LEFT, BOTTOM);
+        text(`[${layerIdx}] ${layers[l].label}: (${d.x}, ${d.y})  ${d.w}×${d.h}`,
+             d.x - d.w / 2 + 4, d.y - d.h / 2 - 4);
+    }
+
+    // Controls hint bar
+    fill(0, 0, 0, 170);
+    noStroke(); rectMode(CORNER);
+    rect(0, height - 50, width, 50);
+    fill(255, 255, 0, 220);
+    textFont(fonts.body); textSize(17); textAlign(CENTER, CENTER);
+    text("DEV  [1] Shape  [2] Cloud  [3] Content  [4] Title  |  Arrows: Move  |  Shift+Arrows: Resize  |  P: print",
+         width / 2, height - 25);
+    pop();
+}
+
+/**
+ * Prints current storyDebugData to the browser console.
+ */
+function printStoryDebugData() {
+    console.log("[DEV] Current storyDebugData:");
+    console.log(JSON.stringify(storyDebugData, null, 2));
+
 }
