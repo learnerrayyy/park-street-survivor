@@ -140,18 +140,20 @@ function setupRoomTestMode() {
 
 /**
  * Drops the game directly into the Day Run scene for obstacle/gameplay testing.
- * Call from the browser console: setupRunTestMode()
+ * @param {number} dayOverride Optional day ID override.
+ * Call from the browser console: setupRunTestMode() or setupRunTestMode(4)
  */
-function setupRunTestMode() {
-    console.log(`[DEV] Entering DAY_RUN directly (Day ${DEBUG_DAY_ID})`);
-    currentDayID = DEBUG_DAY_ID;
-    if (player) player.applyLevelStats(DEBUG_DAY_ID);
+function setupRunTestMode(dayOverride) {
+    const dayID = Number.isFinite(Number(dayOverride)) ? Number(dayOverride) : DEBUG_DAY_ID;
+    console.log(`[DEV] Entering DAY_RUN directly (Day ${dayID})`);
+    currentDayID = dayID;
+    if (player) player.applyLevelStats(dayID);
     if (player) {
-        player.x = 500;
-        player.y = height / 2;
+        player.x = GLOBAL_CONFIG.lanes.lane1;
+        player.y = PLAYER_RUN_FOOT_Y;
     }
-    obstacleManager = new ObstacleManager();
-    if (levelController) levelController.initializeLevel(DEBUG_DAY_ID);
+    if (obstacleManager) obstacleManager = new ObstacleManager();
+    if (levelController) levelController.initializeLevel(dayID);
     gameState.currentState = STATE_DAY_RUN;
 }
 

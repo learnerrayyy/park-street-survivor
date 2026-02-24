@@ -5,7 +5,7 @@
 const DIFFICULTY_PROGRESSION = {
   //level 1 is tutorial, so no procedural generation config needed
   1: {
-    description: "Day 1 - Learn the Basics",
+    description: "Day 1 - The Morning Commute",
     availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
       spawnRatePerFrame: 0.01,

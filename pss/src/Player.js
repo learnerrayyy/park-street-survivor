@@ -46,6 +46,18 @@ class Player {
         this.animFrame  = 0;
         this.isWalking  = false;
         this.animSpeed  = 0.18;
+        this.runAnimSpeed = 0.28;
+
+        // Status effects
+        this.stunFramesRemaining = 0;
+        this.laneDelayFramesRemaining = 0;
+        this.speedBoostFramesRemaining = 0;
+        this.invincibleFramesRemaining = 0;
+        this.hpLockFramesRemaining = 0;
+        this.hpLockValue = 0;
+        this.activeSpeedMultiplier = 1;
+        this.baseRunScrollSpeed = null;
+        this.wasSpeedBoostActive = false;
 
         // ── PERFORMANCE: Clock display cache ──
         // Rebuild the formatted time string only once per second (every 60 frames),

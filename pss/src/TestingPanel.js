@@ -385,19 +385,22 @@ class TestingPanel {
 
         push();
         noStroke();
-        fill(0, 180);
+        fill(255, 170);
         rect(0, 0, width, height);
 
-        fill(24, 28, 40, 242);
+        stroke(0);
+        strokeWeight(2);
+        fill(255, 252);
         rect(panelX, panelY, panelW, panelH, 14);
+        noStroke();
 
-        fill(255);
+        fill(0);
         textAlign(LEFT, CENTER);
         textStyle(BOLD);
         textSize(34);
         text("OBSTACLE TUNER", panelX + 24, panelY + 34);
         textStyle(BOLD);
-        textSize(18);
+        textSize(20);
         text("` / F2: Close  |  Click cells to edit  |  Enter: commit", panelX + 24, panelY + 62);
 
         this.drawDaySelector(panelX + 24, panelY + 80);
@@ -419,12 +422,15 @@ class TestingPanel {
             const bx = x + i * (buttonW + gap);
             const selected = day === this.selectedDay;
 
-            fill(selected ? color(67, 135, 255) : color(85, 92, 108));
+            stroke(0);
+            strokeWeight(1.5);
+            fill(selected ? 0 : 245);
             rect(bx, y, buttonW, buttonH, 7);
-            fill(255);
+            noStroke();
+            fill(selected ? 255 : 0);
             textAlign(CENTER, CENTER);
             textStyle(BOLD);
-            textSize(22);
+            textSize(24);
             text(`DAY ${day}`, bx + buttonW / 2, y + buttonH / 2 + 1);
 
             this.dayButtons.push({ day, x: bx, y, w: buttonW, h: buttonH });
@@ -437,11 +443,14 @@ class TestingPanel {
 
         this.dayParamHitboxes = [];
 
-        fill(255, 255, 255, 22);
+        stroke(0, 150);
+        strokeWeight(1);
+        fill(245);
         rect(x, y, w, h, 8);
-        fill(220);
+        noStroke();
+        fill(0);
         textStyle(BOLD);
-        textSize(21);
+        textSize(23);
         textAlign(LEFT, CENTER);
         text("Day Config (DAYS_CONFIG)", x + 12, y + 16);
 
@@ -458,22 +467,25 @@ class TestingPanel {
             const cellX = innerX + col * (colW + colGap);
             const cellY = innerY + row * rowH;
 
-            fill(180);
+            fill(0);
             textStyle(BOLD);
-            textSize(18);
+            textSize(20);
             textAlign(LEFT, CENTER);
             text(def.label, cellX, cellY + rowH / 2);
 
             const valueBoxW = 186;
             const valueX = cellX + colW - valueBoxW;
             const isEditing = this.isEditingDayParam(def.key);
-            fill(isEditing ? color(78, 124, 214, 230) : color(44, 52, 72, 230));
+            stroke(0, 160);
+            strokeWeight(1);
+            fill(isEditing ? 255 : 238);
             rect(valueX, cellY + 4, valueBoxW, rowH - 8, 5);
 
-            fill(255);
+            noStroke();
+            fill(0);
             textAlign(CENTER, CENTER);
             textStyle(BOLD);
-            textSize(18);
+            textSize(20);
             const rawVal = cfg[def.key];
             const valueText = isEditing ? `${this.inputBuffer}_` : String(rawVal);
             text(valueText, valueX + valueBoxW / 2, cellY + rowH / 2 + 1);
@@ -488,11 +500,14 @@ class TestingPanel {
 
         this.homelessParamHitboxes = [];
 
-        fill(255, 255, 255, 22);
+        stroke(0, 150);
+        strokeWeight(1);
+        fill(245);
         rect(x, y, w, h, 8);
-        fill(220);
+        noStroke();
+        fill(0);
         textStyle(BOLD);
-        textSize(19);
+        textSize(21);
         textAlign(LEFT, CENTER);
         text("Homeless Bubble", x + 12, y + 16);
 
@@ -506,22 +521,25 @@ class TestingPanel {
             const def = this.homelessParamDefs[i];
             const cellX = startX + i * (cellW + gap);
 
-            fill(180);
+            fill(0);
             textStyle(BOLD);
-            textSize(16);
+            textSize(18);
             textAlign(LEFT, CENTER);
             text(def.label, cellX, labelY);
 
             const valueW = 180;
             const valueX = cellX + cellW - valueW;
             const isEditing = this.isEditingHomelessParam(def.key);
-            fill(isEditing ? color(78, 124, 214, 230) : color(44, 52, 72, 230));
+            stroke(0, 160);
+            strokeWeight(1);
+            fill(isEditing ? 255 : 238);
             rect(valueX, startY, valueW, 28, 5);
 
-            fill(255);
+            noStroke();
+            fill(0);
             textAlign(CENTER, CENTER);
             textStyle(BOLD);
-            textSize(16);
+            textSize(18);
             const valueText = isEditing ? `${this.inputBuffer}_` : String(cfg[def.key]);
             text(valueText, valueX + valueW / 2, startY + 14);
 
@@ -545,11 +563,14 @@ class TestingPanel {
         const colWeightX = x + w - 170;
         const weightW = 140;
 
-        fill(255, 255, 255, 26);
+        stroke(0, 150);
+        strokeWeight(1);
+        fill(242);
         rect(x, y, w, headerH, 8);
-        fill(220);
+        noStroke();
+        fill(0);
         textStyle(BOLD);
-        textSize(19);
+        textSize(21);
         textAlign(LEFT, CENTER);
         text("Obstacle", colTypeX, y + headerH / 2 + 1);
         text("Category", colCatX, y + headerH / 2 + 1);
@@ -568,12 +589,15 @@ class TestingPanel {
             const enabled = this.isObstacleEnabled(obstacleType);
             const baseDays = (this.baseDayMap[obstacleType] || []).join(", ");
 
-            fill(enabled ? color(45, 62, 98, 220) : color(78, 78, 86, 190));
+            stroke(0, enabled ? 130 : 70);
+            strokeWeight(1);
+            fill(enabled ? 255 : 235);
             rect(x, rowY, w, rowH - 2, 6);
 
-            fill(enabled ? 255 : 170);
+            noStroke();
+            fill(enabled ? 0 : 110);
             textStyle(BOLD);
-            textSize(18);
+            textSize(20);
             textAlign(LEFT, CENTER);
             text(obstacleType, colTypeX, rowY + rowH / 2);
             text(obCfg.type || "-", colCatX, rowY + rowH / 2);
@@ -581,16 +605,20 @@ class TestingPanel {
             text(obCfg.effect || "-", colEffectX, rowY + rowH / 2);
             text(baseDays || "-", colDayX, rowY + rowH / 2);
 
-            fill(enabled ? color(25, 36, 64, 230) : color(66, 66, 74, 220));
+            stroke(0, enabled ? 160 : 80);
+            strokeWeight(1);
+            fill(enabled ? 255 : 240);
             rect(colWeightX, rowY + 5, weightW, rowH - 12, 5);
-            fill(enabled ? 255 : 160);
+            noStroke();
+            fill(enabled ? 0 : 120);
             textAlign(CENTER, CENTER);
             textStyle(BOLD);
-            textSize(18);
+            textSize(20);
             const isEditing = this.isEditingWeight(obstacleType);
             const weightText = enabled
                 ? (isEditing ? `${this.inputBuffer || ""}_` : String((cfg.obstacleWeights || {})[obstacleType] ?? 1))
                 : "--";
+            if (enabled && isEditing) fill(0);
             text(weightText, colWeightX + weightW / 2, rowY + rowH / 2);
 
             this.rowHitboxes.push({
@@ -608,12 +636,15 @@ class TestingPanel {
     drawDevActions(x, y, w, h) {
         this.devButtons = [];
 
-        fill(255, 255, 255, 22);
+        stroke(0, 150);
+        strokeWeight(1);
+        fill(245);
         rect(x, y, w, h, 8);
-        fill(220);
+        noStroke();
+        fill(0);
         textAlign(LEFT, CENTER);
         textStyle(BOLD);
-        textSize(20);
+        textSize(22);
         text("Dev Actions", x + 12, y + 14);
 
         const buttons = [
@@ -637,12 +668,15 @@ class TestingPanel {
             const b = buttons[i];
             const bx = startX + i * (btnW + btnGap);
 
-            fill(54, 72, 108, 235);
-            rect(bx, btnY, btnW, btnH, 6);
+            stroke(0);
+            strokeWeight(1.2);
             fill(255);
+            rect(bx, btnY, btnW, btnH, 6);
+            noStroke();
+            fill(0);
             textAlign(CENTER, CENTER);
             textStyle(BOLD);
-            textSize(17);
+            textSize(19);
             text(b.label, bx + btnW / 2, btnY + btnH / 2 + 1);
 
             this.devButtons.push({ id: b.id, x: bx, y: btnY, w: btnW, h: btnH });

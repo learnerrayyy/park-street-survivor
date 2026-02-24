@@ -579,12 +579,6 @@ function handlePauseSelection() {
     } else if (PAUSE_OPTIONS[pauseIndex] === "HELP") {
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
-        mainMenu.diffToastTimer = 0;   // clear any stale difficulty toast
-        gameState.currentState = STATE_SETTINGS;
-        mainMenu.menuState     = STATE_SETTINGS;
-    } else if (selected === "HELP") {
-        pauseFromState         = gameState.previousState;
-        if (typeof playSFX === 'function') playSFX(sfxClick);
         gameState.currentState = STATE_HELP;
         mainMenu.menuState = STATE_HELP;
         mainMenu.helpPage = 0;
