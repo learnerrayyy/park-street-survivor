@@ -256,6 +256,11 @@ class LevelController {
       console.log(`  - Victory Start ScrollPos: ${this.victoryStartScrollPos}`);
       console.log(`  - Victory Pre-Roll Distance: ${this.victoryPreRollDistance}`);
 
+      // Freeze avatar into forward-running pose when reaching destination.
+      if (player && typeof player.forceForwardRunPose === "function") {
+         player.forceForwardRunPose();
+      }
+
       // Notify ObstacleManager to stop spawning
       if (obstacleManager) {
          obstacleManager.stopSpawning();

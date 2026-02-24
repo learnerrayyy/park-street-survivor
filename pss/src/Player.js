@@ -131,6 +131,9 @@ class Player {
                 }
             }
             // In VICTORY_TRANSITION and VICTORY_ZONE: player stops moving
+            else {
+                this.forceForwardRunPose();
+            }
 
             this.playTimeFrames++;
 
@@ -249,6 +252,16 @@ class Player {
 
         // Keep this true so run scene continuously plays movement frames.
         this.isWalking = true;
+    }
+
+    /**
+     * Forces the run avatar to face forward (back-facing / north) and clears
+     * lateral input memory so it never sticks on east/west at destination.
+     */
+    forceForwardRunPose() {
+        this.dir = 'north';
+        this.leftHeld = false;
+        this.rightHeld = false;
     }
 
     // ─── RENDERING ───────────────────────────────────────────────────────────
