@@ -35,6 +35,66 @@ let bgm, sfxSelect, sfxClick;
 let masterVolumeBGM = 0.25;
 let masterVolumeSFX = 0.7;
 
+// ─── DIFFICULTY SETTING ──────────────────────────────────────────────────────
+// 0 = EASY (locked), 1 = NORMAL (default), 2 = HARD (locked)
+let gameDifficulty = 1;
+const DIFFICULTY_LABELS = ["EASY", "NORMAL", "HARD"];
+
+// ─── GLOBAL BACKGROUND WITH OVERLAY ──────────────────────────────────────────
+/**
+ * Shared dark-overlay alpha for every screen that renders otherBg.
+ * Change this ONE value to adjust the darkness uniformly across
+ * settings, help, pause, story, and the room wallpaper.
+ */
+const SHARED_BG_OVERLAY_ALPHA = 100;
+
+/**
+ * Draws the standard otherBg background with a unified dark overlay.
+ * Uses cover-scale (imageMode CENTER, max-scale) so the image fills the
+ * canvas without stretching — identical to the room scene wallpaper.
+ * Used in settings, help, pause, and story screens for consistent look.
+ */
+function drawOtherBgWithOverlay() {
+    push();
+    if (assets && assets.otherBg) {
+        let s = max(width / assets.otherBg.width, height / assets.otherBg.height);
+        imageMode(CENTER);
+        image(assets.otherBg, width / 2, height / 2, assets.otherBg.width * s, assets.otherBg.height * s);
+    } else {
+        background(20);
+    }
+    noStroke();
+    fill(0, 0, 0, SHARED_BG_OVERLAY_ALPHA);
+    rectMode(CORNER);
+    rect(0, 0, width, height);
+    imageMode(CORNER);
+    pop();
+}
+
+// ─── TUTORIAL WARNING ICON ────────────────────────────────────────────────────
+/**
+ * Draws a pulsing warning icon at (x, y) with a breathing scale animation.
+ * @param {number} x      Center X
+ * @param {number} y      Center Y
+ * @param {number} size   Base diameter in pixels
+ */
+function drawWarningIcon(x, y, size) {
+    if (!assets.warningImg) return;
+
+    let originalW = assets.warningImg.width;
+    let originalH = assets.warningImg.height;
+    let aspectRatio = originalW / originalH;
+
+    let breathe = 0.85 + sin(frameCount * 0.08) * 0.15;
+    let renderH = size * breathe;
+    let renderW = (size * aspectRatio) * breathe;
+
+    push();
+    imageMode(CENTER);
+    image(assets.warningImg, x, y, renderW, renderH);
+    pop();
+}
+
 // ─── GLOBAL FADE TRANSITION CONTROLLER ───────────────────────────────────────
 // Drives a 0.3s fade-in / fade-out overlay across all scene transitions.
 let globalFade = {
@@ -106,6 +166,10 @@ function preload() {
     assets.studentCardImg = loadImage('assets/inventory/student_card.png', itemLoaded);
     assets.computerImg    = loadImage('assets/inventory/computer.png', itemLoaded);
     assets.portraitPlayerNormal = loadImage('assets/characters/portrait/main.png', itemLoaded);
+    assets.vitaminImg     = loadImage('assets/inventory/vitamin.png', itemLoaded);
+    assets.tangleImg      = loadImage('assets/inventory/tangle.png', itemLoaded);
+    assets.headphoneImg   = loadImage('assets/inventory/headphone.png', itemLoaded);
+    assets.rainbootImg    = loadImage('assets/inventory/rainboot.png', itemLoaded);
 
     assets.selectBg.unlock = loadImage('assets/select_background/day_unlock.jpg', itemLoaded);
     assets.selectBg.lock = loadImage('assets/select_background/day_lock.jpg', itemLoaded);
@@ -484,7 +548,13 @@ function handlePauseSelection() {
         pauseFromState = null;
     } else if (PAUSE_OPTIONS[pauseIndex] === "HELP") {
         pauseFromState = gameState.previousState;
-        playSFX(sfxClick);
+        if (typeof playSFX === 'function') playSFX(sfxClick);
+        mainMenu.diffToastTimer = 0;   // clear any stale difficulty toast
+        gameState.currentState = STATE_SETTINGS;
+        mainMenu.menuState     = STATE_SETTINGS;
+    } else if (selected === "HELP") {
+        pauseFromState         = gameState.previousState;
+        if (typeof playSFX === 'function') playSFX(sfxClick);
         gameState.currentState = STATE_HELP;
         mainMenu.menuState = STATE_HELP;
         mainMenu.helpPage = 0;
@@ -712,10 +782,10 @@ function drawLogoPlaceholder(x, y) {
     let t = frameCount * 0.02;
     let targetY = isSplash ? (y + 160) : (y + 10);
 
-    // Drop-in physics
+    // Drop-in physics (gravity 1.2 → 3.0 for a snappier drop)
     if (!titleDrop.landed) {
-        titleDrop.vy += 1.2;
-        titleDrop.y += titleDrop.vy;
+        titleDrop.vy += 2.0;
+        titleDrop.y  += titleDrop.vy;
         if (titleDrop.y >= y + 160) {
             titleDrop.y = y + 160;
             titleDrop.landed = true;
@@ -745,9 +815,10 @@ function drawLogoPlaceholder(x, y) {
         pop();
     }
 
-    // "PARK STREET" title
+    // "PARK STREET" title — only apply random shake while it's perceptible (>= 0.5px)
     push();
-    translate(x + random(-titleDrop.shake, titleDrop.shake), titleDrop.y);
+    let shakeX = (titleDrop.shake >= 0.5) ? random(-titleDrop.shake, titleDrop.shake) : 0;
+    translate(x + shakeX, titleDrop.y);
     drawSplitTitle("PARK STREET", 300, -130, 25);
     pop();
 
@@ -760,9 +831,9 @@ function drawLogoPlaceholder(x, y) {
         pop();
     }
 
-    // "SURVIVOR" subtitle
+    // "SURVIVOR" subtitle — reuse the same shake offset computed above
     push();
-    translate(x + random(-titleDrop.shake, titleDrop.shake), titleDrop.y);
+    translate(x + shakeX, titleDrop.y);
     drawSplitTitle("SURVIVOR", 200, 80, 20);
     pop();
 

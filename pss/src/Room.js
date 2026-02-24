@@ -64,6 +64,12 @@ class RoomScene {
         // sound hook placeholder
         this.typingSfx = null; // 找到音源后赋值，比如 sfxType
 
+        // ── PERFORMANCE: Lazy-cached scale values for background images ──
+        // Computed once on first render so we avoid per-frame division.
+        this._otherBgScale = null;
+        this._roomBgScale  = null;
+        this._roomTopY     = null; // derived from roomBg scale, also cached
+
         // Back arrow button — returns to level select
         this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => {
             triggerTransition(() => {
@@ -135,11 +141,16 @@ class RoomScene {
      */
     checkInteraction() {
         if (typeof player !== 'undefined') {
-            let distToDesk = dist(player.x, player.y, this.deskX, this.deskY);
-            this.isPlayerNearDesk = (distToDesk < this.deskThreshold);
+            // Use squared distance to avoid sqrt() — compare threshold² instead
+            let deskThreshSq = this.deskThreshold * this.deskThreshold;
+            let doorThreshSq = this.doorThreshold * this.doorThreshold;
+            let dx, dy;
 
-            let distToDoor = dist(player.x, player.y, this.doorX, this.doorY);
-            this.isPlayerNearDoor = (distToDoor < this.doorThreshold);
+            dx = player.x - this.deskX; dy = player.y - this.deskY;
+            this.isPlayerNearDesk = (dx * dx + dy * dy < deskThreshSq);
+
+            dx = player.x - this.doorX; dy = player.y - this.doorY;
+            this.isPlayerNearDoor = (dx * dx + dy * dy < doorThreshSq);
         }
     }
 
@@ -151,6 +162,14 @@ class RoomScene {
     handleKeyPress(keyCode) {
         if (this.isPlayerNearDesk && keyCode === 69) {
             console.log("[RoomScene] Opening backpack");
+            // Refresh desk items for the current day before opening
+            if (typeof backpackUI !== 'undefined' && backpackUI) {
+                backpackUI.initScatteredItems();
+            }
+            // Advance tutorial hint: desk visited → now prompt to close backpack once items are packed
+            if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'DESK') {
+                tutorialHints.roomPhase = 'CLOSE_BP';
+            }
             gameState.currentState = STATE_INVENTORY;
             if (typeof playSFX !== 'undefined' && typeof sfxClick !== 'undefined') {
                 playSFX(sfxClick);
@@ -200,20 +219,34 @@ class RoomScene {
     display() {
         push();
 
-        // 1. Background wallpaper
+        // 1. Background wallpaper — use cached scale (compute once on first frame)
         if (assets && assets.otherBg) {
+            if (this._otherBgScale === null) {
+                this._otherBgScale = max(width / assets.otherBg.width, height / assets.otherBg.height);
+            }
+            let s = this._otherBgScale;
             imageMode(CENTER);
-            let scale = max(width / assets.otherBg.width, height / assets.otherBg.height);
-            image(assets.otherBg, width / 2, height / 2, assets.otherBg.width * scale, assets.otherBg.height * scale);
+            image(assets.otherBg, width / 2, height / 2, assets.otherBg.width * s, assets.otherBg.height * s);
         } else {
             background(80, 60, 100);
         }
 
-        // 2. Room sprite
+        // Dark overlay — alpha matches all other otherBg screens (see SHARED_BG_OVERLAY_ALPHA)
+        noStroke();
+        fill(0, 0, 0, SHARED_BG_OVERLAY_ALPHA);
+        rectMode(CORNER);
+        rect(0, 0, width, height);
+        imageMode(CORNER);
+
+        // 2. Room sprite — use cached scale
         if (assets && assets.roomBg) {
+            if (this._roomBgScale === null) {
+                this._roomBgScale = min(width / assets.roomBg.width, height / assets.roomBg.height) * 0.8;
+                this._roomTopY = height / 2 - (assets.roomBg.height * this._roomBgScale) / 2 + 100;
+            }
+            let s = this._roomBgScale;
             imageMode(CENTER);
-            let scale = min(width / assets.roomBg.width, height / assets.roomBg.height) * 0.8;
-            image(assets.roomBg, width / 2, height / 2, assets.roomBg.width * scale, assets.roomBg.height * scale);
+            image(assets.roomBg, width / 2, height / 2, assets.roomBg.width * s, assets.roomBg.height * s);
         }
 
         // 3. Update and draw interaction indicators
@@ -241,14 +274,8 @@ class RoomScene {
             ? { label: "CHECK DESK", key: 'e', x: this.deskX, y: this.deskY, w: this.deskBoxW, h: this.deskBoxH }
             : { label: "LEAVE ROOM", key: 'enter', x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
 
-        // Compute the top of the room image for the prompt anchor
-        let roomTopY;
-        if (assets.roomBg) {
-            let scale = min(width / assets.roomBg.width, height / assets.roomBg.height) * 0.8;
-            roomTopY = height / 2 - (assets.roomBg.height * scale) / 2 + 100;
-        } else {
-            roomTopY = 100;
-        }
+        // Use cached roomTopY (computed once on first render)
+        let roomTopY = (this._roomTopY !== null) ? this._roomTopY : 100;
 
         let pulse = (sin(frameCount * 0.1) + 1) * 0.5;
 
@@ -279,6 +306,25 @@ class RoomScene {
         }
 
         pop();
+    }
+
+    /**
+     * Draws breathing warning icons to guide the player through the tutorial sequence.
+     * Phase 'DESK'  — icon near the desk, prompting to open the backpack.
+     * Phase 'DOOR'  — icon near the door (Day 1 only), prompting to leave the room.
+     */
+    drawTutorialHints() {
+        if (typeof tutorialHints === 'undefined' || !assets.warningImg) return;
+        let phase = tutorialHints.roomPhase;
+        if (phase !== 'DESK' && phase !== 'DOOR') return;
+
+        // Use the global drawWarningIcon() which preserves the image's natural
+        // aspect ratio and applies the breathing animation — no manual stretching.
+        if (phase === 'DESK') {
+            drawWarningIcon(this.deskX + 55, this.deskY - 45, 52);
+        } else if (phase === 'DOOR') {
+            drawWarningIcon(this.doorX + 35, this.doorY - 55, 52);
+        }
     }
 
     /**

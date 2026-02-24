@@ -11,12 +11,12 @@ class InventorySystem {
      */
     constructor() {
         this.items = [
-            { name: "UoB Student ID",      description: "必需品"           },
-            { name: "Laptop Computer",     description: "必需品"           },
-            { name: "Soft Gummy Vitamins", description: "补充体力"          },
-            { name: "Tangle Coffee",       description: "识别幻想咖啡"       },
-            { name: "Headphones",          description: "忽略2个promoter"  },
-            { name: "Rain Boots",          description: "抵消三次水坑"       }
+            { name: "UoB Student ID",      description: "Required item"          },
+            { name: "Laptop Computer",     description: "Required item"          },
+            { name: "Soft Gummy Vitamins", description: "Restores stamina"       },
+            { name: "Tangle",              description: "Fidget toy - helps focus"},
+            { name: "Headphones",          description: "Ignore 2 promoters"     },
+            { name: "Rain Boots",          description: "Avoid 3 puddles"        }
         ];
         this.maxSlots  = 5;
         this.isVisible = false;

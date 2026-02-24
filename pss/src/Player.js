@@ -42,22 +42,17 @@ class Player {
         this.y = PLAYER_RUN_FOOT_Y;
 
         // Walking animation state
-        this.dir = 'south';
-        this.animFrame = 0;
-        this.isWalking = false;
-        this.animSpeed = 0.18;
-        this.runAnimSpeed = 0.28;
+        this.dir        = 'south';
+        this.animFrame  = 0;
+        this.isWalking  = false;
+        this.animSpeed  = 0.18;
 
-        // Status effects
-        this.stunFramesRemaining = 0;
-        this.laneDelayFramesRemaining = 0;
-        this.speedBoostFramesRemaining = 0;
-        this.invincibleFramesRemaining = 0;
-        this.hpLockFramesRemaining = 0;
-        this.hpLockValue = 0;
-        this.activeSpeedMultiplier = 1;
-        this.baseRunScrollSpeed = null;
-        this.wasSpeedBoostActive = false;
+        // ── PERFORMANCE: Clock display cache ──
+        // Rebuild the formatted time string only once per second (every 60 frames),
+        // not on every single draw call.
+        this._clockStr    = "08:30:00";
+        this._clockRed    = false;
+        this._lastClockSec = -1;
     }
 
     /**
@@ -163,9 +158,9 @@ class Player {
      * 4-directional movement for the bedroom scene, with collision detection via RoomScene.
      */
     handleRoomMovement() {
-        let s = 8;
-        let oldX = this.x;
-        let oldY = this.y;
+        let s     = 12; // was 8 — increased for snappier room navigation
+        let oldX  = this.x;
+        let oldY  = this.y;
         let moveX = 0;
         let moveY = 0;
 

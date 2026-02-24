@@ -219,79 +219,10 @@ class ObstacleManager {
     /**
 
      */
-    update(scrollSpeed, player, levelPhase) {
-
-        if (levelPhase !== "RUNNING" || !this.currentLevelConfig) {
-            console.log(`[ObstacleManager] Skipping spawn: phase=${levelPhase}, hasConfig=${!!this.currentLevelConfig}`);
-            return;
-        }
-
-        const randVal = Math.random();
-        const spawnRate = this.currentLevelConfig.spawnConfig.spawnRatePerFrame;
-        console.log(`[ObstacleManager] Spawn check: rand=${randVal.toFixed(3)} vs rate=${spawnRate}`);
-        if (this.buffCooldownFrames > 0) this.buffCooldownFrames--;
-        if (this.promoterCooldownFramesRemaining > 0) this.promoterCooldownFramesRemaining--;
-
-        const lastObs = this.obstacles[this.obstacles.length - 1];
-        const canSpawn = this.obstacles.length === 0 ||
-            lastObs.y > this.currentLevelConfig.spawnConfig.minObstacleInterval;
-
-        // Buff guarantee spawn: if timeout reached, force one buff spawn.
-        if (this.buffGuaranteeFrames > 0) {
-            this.buffGuaranteeTimer--;
-            if (this.buffGuaranteeTimer <= 0 && canSpawn) {
-                this.spawnObstacle(true);
-                this.buffGuaranteeTimer = this.buffGuaranteeFrames;
-            }
-        }
-
-        if (randVal < spawnRate) {
-
-            if (canSpawn) {
-                console.log(`[ObstacleManager] GENERATING OBSTACLE!`);
-                this.spawnObstacle();
-            } else if (this.obstacles.length > 0) {
-                const dist = lastObs.y - (-lastObs.config.size.height);
-                console.log(`[ObstacleManager] Interval check failed: lastObs.y=${lastObs.y}, need > ${this.currentLevelConfig.spawnConfig.minObstacleInterval}, dist from spawn=${dist}`);
-            }
-        }
-
-
-        for (let i = this.obstacles.length - 1; i >= 0; i--) {
-            const obs = this.obstacles[i];
-
-            this.updateDynamicLaneBehavior(obs);
-
-
-            const baseSpeed = PLAYER_DEFAULTS.baseSpeed;
-            let obsMoveSpeed = obs.speed * baseSpeed * (scrollSpeed / max(1, GLOBAL_CONFIG.scrollSpeed));
-            // Stationary entities (speed=0) still need world scrolling to enter the screen.
-            if (obsMoveSpeed <= 0.01) obsMoveSpeed = scrollSpeed;
-            obs.y += obsMoveSpeed;
-
-
-            if (obs.y > GLOBAL_CONFIG.resolutionH + 100) {
-                this.obstacles.splice(i, 1);
-                continue;
-            }
-
-
-            if (this.checkCollision(player, obs)) {
-                console.log(`[ObstacleManager] Collision with ${obs.type}!`);
-
-                if (player && typeof player.isInvincibleActive === "function" &&
-                    player.isInvincibleActive() &&
-                    obs.config && obs.config.type !== "BUFF") {
-                    this.obstacles.splice(i, 1);
-                    continue;
-                }
-
-                this.handleCollision(player, obs);
-                this.obstacles.splice(i, 1);
-            }
-        }
-
-        this.updatePromoterProjectile(scrollSpeed);
+    update(scrollSpeed, player) {
+        // [Logic Disabled] No obstacles will spawn or translate on the Y-axis.
+        // Reuse the existing array instead of allocating a new one every frame.
+        this.obstacles.length = 0;
     }
 
     display() {
@@ -699,7 +630,7 @@ class ObstacleManager {
      */
     stopSpawning() {
         console.log("[ObstacleManager] Spawning stopped - Victory phase active");
-        this.obstacles = [];
+        this.obstacles.length = 0;
     }
 
     renderPromoterEffects() {
