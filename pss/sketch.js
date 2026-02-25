@@ -294,7 +294,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 46;
+const totalAssetsToLoad = 48;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -389,6 +389,8 @@ function preload() {
     assets.btnImg = loadImage('assets/buttons/button.png', itemLoaded);
     assets.backImg = loadImage('assets/buttons/back.png', itemLoaded);
     assets.pauseImg = loadImage('assets/buttons/pause.png', itemLoaded);
+    assets.musicOn  = loadImage('assets/buttons/music_on.png',  itemLoaded);
+    assets.musicOff = loadImage('assets/buttons/music_off.png', itemLoaded);
 
     // Entity preview sprites (no progress tracking — non-critical)
     if (!assets.previews) assets.previews = {};
@@ -925,6 +927,22 @@ function mousePressed() {
             if (typeof playSFX === 'function') playSFX(sfxClick);
             handleRestartChoice();
         } else if (showStoryRecap) {
+            // Right-side up/down arrow clicks
+            let arrowX   = width - 90;
+            let centerY  = height / 2;
+            let arrowGap = 90;
+            if (storyRecapDay >= 1 && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35) {
+                storyRecapDay--;
+                storyScrollOffset = 0;
+                if (typeof playSFX === 'function') playSFX(sfxSelect);
+                return;
+            }
+            if (storyRecapDay <= 5 && dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35) {
+                storyRecapDay++;
+                storyScrollOffset = 0;
+                if (typeof playSFX === 'function') playSFX(sfxSelect);
+                return;
+            }
             // story recap sidebar clicks
             let sidebarX = width * 0.16;
             let sidebarBaseY = height * 0.45;
@@ -956,7 +974,7 @@ function mousePressed() {
             return false;
         }
         // Pause button hit-test
-        if (dist(mouseX, mouseY, width - 95, 85) < 80) {
+        if (dist(mouseX, mouseY, width - 95, 65) < 80) {
             playSFX(sfxClick);
             togglePause();
             pauseIndex = -1;
@@ -1284,8 +1302,8 @@ function drawInteractionPrompts() {
  */
 function drawPauseButton() {
     push();
-    let bx = width - 95;
-    let by = 85;
+    let bx = width - 65;
+    let by = 65;
     let isHover = dist(mouseX, mouseY, bx, by) < 80;
 
     if (assets.pauseImg) {

@@ -204,7 +204,7 @@ class TimeWheel {
                 if (!this._isBreathing) {
                     // Start the breathe phase — short static pause then scale-up before colorizing
                     this._isBreathing = true;
-                    this._breatheTimer = 65;
+                    this._breatheTimer = 35;
                 } else {
                     this._breatheTimer--;
                     if (this._breatheTimer <= 0) {
