@@ -264,7 +264,8 @@ const STORY_RECAPS = {
 let tutorialHints = {
     dayVisuallyUnlocked: {},   // { 1: true/false, 2: true/false, … } per-day first-click unlock
     levelSelectShownForDay: 0,
-    roomPhase: 'DESK'
+    roomPhase: 'DESK',
+    moveTutorialDone: false    // true once the player has dismissed the WASD/arrow-key hint
 };
 
 // ─── SPLASH LOGO ANIMATION STATE ─────────────────────────────────────────────
@@ -811,7 +812,12 @@ function keyPressed() {
     // Close inventory with ESC
     if (gameState.currentState === STATE_INVENTORY && keyCode === ESCAPE) {
         if (tutorialHints.roomPhase === 'CLOSE_BP') {
-            tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
+            if (backpackUI && backpackUI.hasRequiredItems()) {
+                tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
+            } else {
+                // Required items not yet packed — keep desk hint active
+                tutorialHints.roomPhase = 'DESK';
+            }
         }
         gameState.currentState = STATE_ROOM;
         return false;
@@ -1046,7 +1052,9 @@ function setupRun(dayID) {
     roomScene.reset();
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
-    if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DESK';
+    if (typeof tutorialHints !== 'undefined') {
+        tutorialHints.roomPhase = (dayID === 1 && !tutorialHints.moveTutorialDone) ? 'MOVE' : 'DESK';
+    }
     if (backpackUI) backpackUI.resetForNewDay();
     if (endScreenManager) endScreenManager._activeScreen = null;
 

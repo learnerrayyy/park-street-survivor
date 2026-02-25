@@ -47,22 +47,9 @@ class RoomScene {
         // Timer for the "missing items" warning prompt (frames)
         this.doorBlockTimer = 0;
         this.doorBlockMessage = "";
-        // Dialog / Typewriter state
-        this.dialogActive = false;
-        this.dialogTimerMax = 120;   // 总时长（帧）2s
-        this.dialogTimer = 0;
 
-        this.dialogFullText = "";
-        this.dialogWords = [];
-        this.dialogWordIndex = 0;
-        this.dialogDisplayed = "";
-
-        // typing pacing (frames per word)
-        this.wordInterval = 4;
-        this.wordTick = 0;
-
-        // sound hook placeholder
-        this.typingSfx = null; // 找到音源后赋值，比如 sfxType
+        // Reusable dialogue box (typewriter-style bottom bar)
+        this.dialogueBox = new DialogueBox();
 
         // ── PERFORMANCE: Lazy-cached scale values for background images ──
         // Computed once on first render so we avoid per-frame division.
@@ -96,13 +83,7 @@ class RoomScene {
         this.isPlayerNearDoor = false;
         this.doorBlockTimer = 0;
         this.doorBlockMessage = "";
-        this.dialogActive = false;
-        this.dialogTimer = 0;
-        this.dialogFullText = "";
-        this.dialogWords = [];
-        this.dialogWordIndex = 0;
-        this.dialogDisplayed = "";
-        this.wordTick = 0;
+        this.dialogueBox.reset();
     }
 
     // ─── COLLISION ───────────────────────────────────────────────────────────
@@ -197,17 +178,12 @@ class RoomScene {
     }
 
     /**
-     * Trigger dialog box 
+     * Triggers the dialogue box with the given text using the default player portrait.
+     * To use a different portrait, call this.dialogueBox.trigger(text, portraitImg) directly.
+     * @param {string} text - The message to display.
      */
     triggerDialog(text) {
-        this.dialogActive = true;
-        this.dialogTimer = this.dialogTimerMax;
-
-        this.dialogFullText = text;
-        this.dialogWords = text.trim().split(/\s+/); // 按空格分词
-        this.dialogWordIndex = 0;
-        this.dialogDisplayed = "";
-        this.wordTick = 0;
+        this.dialogueBox.trigger(text);
     }
 
 
@@ -251,10 +227,22 @@ class RoomScene {
 
         // 3. Update and draw interaction indicators
         this.checkInteraction();
+
+        // Dismiss the movement tutorial once the player has walked 50px from spawn
+        if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'MOVE' &&
+            typeof player !== 'undefined') {
+            let dx = player.x - this.playerSpawnX;
+            let dy = player.y - this.playerSpawnY;
+            if (dx * dx + dy * dy > 50 * 50) {
+                tutorialHints.roomPhase = 'DESK';
+                tutorialHints.moveTutorialDone = true;
+            }
+        }
+
         this.drawInteractionIndicators();
 
-        // 4. Door-blocked warning prompt
-        this.drawDoorBlockedPrompt();
+        // 4. Door-blocked dialogue box
+        this.dialogueBox.display();
         this.drawTutorialHints();
 
         // 5. Back button
@@ -295,10 +283,16 @@ class RoomScene {
 
         push();
 
-        let target = showDeskBox
-            ? { label: "CHECK DESK", key: 'e',     x: this.deskX, y: this.deskY, w: this.deskBoxW, h: this.deskBoxH }
-
-            : { label: "LEAVE ROOM", key: 'enter', x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
+        // When the tutorial explicitly targets the door (phase === 'DOOR'), always
+        // show the door yellow box — even if the player happens to also be near the desk.
+        let target;
+        if (phase === 'DOOR') {
+            target = { label: "LEAVE ROOM", key: 'enter', x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
+        } else if (showDeskBox) {
+            target = { label: "CHECK DESK",  key: 'e',     x: this.deskX, y: this.deskY, w: this.deskBoxW, h: this.deskBoxH };
+        } else {
+            target = { label: "LEAVE ROOM", key: 'enter', x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
+        }
 
         let roomTopY = (this._roomTopY !== null) ? this._roomTopY : 100;
         let pulse = (sin(frameCount * 0.1) + 1) * 0.5;
@@ -341,8 +335,15 @@ class RoomScene {
      * Pulses at the same frequency as the yellow outline box so they flash in sync.
      */
     drawTutorialHints() {
-        if (typeof tutorialHints === 'undefined' || !assets.warningImg) return;
+        if (typeof tutorialHints === 'undefined') return;
         let phase = tutorialHints.roomPhase;
+
+        if (phase === 'MOVE') {
+            this.drawMoveTutorial();
+            return;
+        }
+
+        if (!assets.warningImg) return;
         if (phase !== 'DESK' && phase !== 'DOOR') return;
 
         // Same pulse as the yellow box in drawInteractionIndicators()
@@ -360,6 +361,93 @@ class RoomScene {
         } else {
             image(img, this.doorX + 35, this.doorY - 55, renderW, renderH);
         }
+        pop();
+    }
+
+    /**
+     * Draws the bottom-bar movement key guide shown on Day 1 (first entry only).
+     * Dismissed automatically when the player moves 50 px from spawn.
+     */
+    drawMoveTutorial() {
+        let barH = 220;
+        let barY = height - barH;
+        let cy   = height - barH / 2;
+        let pulse    = (sin(frameCount * 0.08) + 1) * 0.5;
+        let keyAlpha = 180 + pulse * 75;
+
+        push();
+
+        // Dark purple bar
+        noStroke();
+        fill(25, 12, 50, 230);
+        rectMode(CORNER);
+        rect(0, barY, width, barH, 20);
+
+        // Subtle top border line
+        stroke(130, 80, 200, 120);
+        strokeWeight(2);
+        line(0, barY, width, barY);
+        noStroke();
+
+        // ── Keys rendered at their natural aspect ratio ──
+        // targetH: desired display height for every key sprite
+        let targetH = 85;
+
+        // Helper: draw one animated key sprite at natural aspect ratio, centred at (x, y)
+        let drawKey = (sheet, x, y) => {
+            if (!sheet) return;
+            let frame   = floor(frameCount / 20) % 3;
+            let sw      = sheet.width / 3;          // single-frame pixel width
+            let sh      = sheet.height;              // single-frame pixel height
+            let renderH = targetH;
+            let renderW = (sw / sh) * renderH;       // preserve original proportions
+            imageMode(CENTER);
+            tint(255, keyAlpha);
+            image(sheet, x, y, renderW, renderH, frame * sw, 0, sw, sh);
+            noTint();
+        };
+
+        // Measure key width from the first available sprite so spacing auto-scales
+        let refSheet  = assets.keys.w;
+        let keyRenderW = refSheet
+            ? (refSheet.width / 3 / refSheet.height) * targetH
+            : targetH * 1.1;
+        let colGap = keyRenderW + 15;  // horizontal distance between key centres
+        let rowOff = targetH + 15;     // vertical distance between the two rows
+
+        let topRowY = cy - rowOff / 2;
+        let botRowY = cy + rowOff / 2;
+
+        // ── WASD group (left of canvas centre) ──
+        let wasdX = width / 2 - 420;
+        drawKey(assets.keys.w, wasdX,           topRowY);
+        drawKey(assets.keys.a, wasdX - colGap,  botRowY);
+        drawKey(assets.keys.s, wasdX,           botRowY);
+        drawKey(assets.keys.d, wasdX + colGap,  botRowY);
+
+        // ── Arrow keys group (right of canvas centre) ──
+        let arrX = width / 2 + 420;
+        drawKey(assets.keys.up,    arrX,           topRowY);
+        drawKey(assets.keys.left,  arrX - colGap,  botRowY);
+        drawKey(assets.keys.down,  arrX,           botRowY);
+        drawKey(assets.keys.right, arrX + colGap,  botRowY);
+
+        // ── Centre label ──
+        textAlign(CENTER, CENTER);
+        textFont(fonts.body);
+        textSize(32);
+        stroke(0, 0, 0, 160);
+        strokeWeight(4);
+        fill(255, 220, 80, keyAlpha);
+        text("USE WASD OR ARROW KEYS TO MOVE", width / 2, cy - 65);
+        noStroke();
+        fill(255, 220, 80, keyAlpha);
+        text("USE WASD OR ARROW KEYS TO MOVE", width / 2, cy - 65);
+
+        textSize(22);
+        fill(200, 175, 255, keyAlpha * 0.75);
+        text("MOVE TO DISMISS", width / 2, cy + 22);
+
         pop();
     }
 
@@ -391,89 +479,6 @@ class RoomScene {
         rect(this.walkableArea.minX, this.walkableArea.minY, this.walkableArea.maxX, this.walkableArea.maxY);
         rect(this.carpetArea.minX, this.carpetArea.minY, this.carpetArea.maxX, this.carpetArea.maxY);
         pop();
-    }
-
-    /**
-     * Shows a timed warning when the player tries to leave without required items.
-     */
-    drawDoorBlockedPrompt() {
-        if (!this.dialogActive || this.dialogTimer <= 0) return;
-
-        // countdown
-        this.dialogTimer--;
-
-        // ---- Typewriter update (word-by-word) ----
-        // 只要还没显示完，就按节奏追加单词
-        if (this.dialogWordIndex < this.dialogWords.length) {
-            this.wordTick++;
-            if (this.wordTick >= this.wordInterval) {
-                this.wordTick = 0;
-
-                // append next word
-                let w = this.dialogWords[this.dialogWordIndex];
-                this.dialogDisplayed += (this.dialogDisplayed ? " " : "") + w;
-                this.dialogWordIndex++;
-
-                // typing sfx hook (placeholder)
-                // 音源确定后：this.typingSfx = sfxType; 并确保 playSFX 存在
-                if (typeof playSFX === "function" && this.typingSfx) {
-                    playSFX(this.typingSfx);
-                }
-            }
-        }
-
-        // ---- Simple pop-in animation ----
-        let alpha = 230; // 90% black ≈ 230
-
-        // ---- Scale mapping from 1920x1080 design space ----
-        const DESIGN_W = 1920;
-        const DESIGN_H = 1080;
-        // 用统一缩放，避免图片/布局被拉伸
-        const s = min(width / DESIGN_W, height / DESIGN_H);
-
-        // ---- Dialog box: fixed 1920x220 in design space -> scaled to canvas ----
-        const boxH = 220 * s;
-        rectMode(CORNER);
-        noStroke();
-        fill(56, 39, 96, alpha);
-        rect(0, height - boxH, width, boxH); 
-
-        // ---- Portrait: design (30,700) size 380x380 -> scaled ----
-        const px = 30 * s;
-        const py = 700 * s;
-        const pSize = 380 * s;
-
-        imageMode(CORNER);
-        if (assets && assets.portraitPlayerNormal) {
-            image(assets.portraitPlayerNormal, px, py, pSize, pSize);
-        } else {
-            fill(255, 255, 255, 40);
-            rect(px, py, pSize, pSize, 18 * s);
-        }
-
-        // ---- Text: fixed top-left at (496,932) in design space -> scaled ----
-        const tx = 496 * s;
-        const ty = 932 * s;
-
-        // 文本框宽高也按设计值缩放（右边留 40px，上下留白自己调）
-        const tw = (1920 - 496 - 40) * s;
-        const th = (220 - 30) * s;
-
-        textFont(fonts.body);
-        textSize(48);
-        fill(255);
-        noStroke();
-        textAlign(LEFT, TOP);
-
-        // p5 自动换行：传入 w/h
-        text(this.dialogDisplayed, tx, ty, tw, th);
-
-        pop();
-
-        // timer finished -> close
-        if (this.dialogTimer <= 0) {
-            this.dialogActive = false;
-        }
     }
 
     /**

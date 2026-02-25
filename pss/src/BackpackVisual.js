@@ -103,6 +103,10 @@ class BackpackVisual {
         // Tutorial drag animation (Day 1 only)
         this.showDragTutorial = false;
         this.tutorialAnimT    = 0;
+        // Track which required items were unpacked last frame so we can
+        // detect a state change and reset the timer cleanly (prevents ghost flash).
+        this._tutNeedsID     = true;
+        this._tutNeedsLaptop = true;
 
         // ── DEV DRAG STATE ────────────────────────────────────────────────────
         // Tracks interactive manipulation of debug zones and backpack in dev mode.
@@ -118,7 +122,12 @@ class BackpackVisual {
         // Back arrow button — returns to room and advances tutorial phase
         this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => {
             if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'CLOSE_BP') {
-                tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
+                if (this.hasRequiredItems()) {
+                    tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
+                } else {
+                    // Required items not yet packed — keep desk hint active
+                    tutorialHints.roomPhase = 'DESK';
+                }
             }
             gameState.currentState = STATE_ROOM;
         });
@@ -141,6 +150,8 @@ class BackpackVisual {
         this.messageTimer      = 0;
         this.showDragTutorial  = (currentDayID === 1);
         this.tutorialAnimT     = 0;
+        this._tutNeedsID       = true;
+        this._tutNeedsLaptop   = true;
         this.initScatteredItems();
     }
 
@@ -192,29 +203,67 @@ class BackpackVisual {
     // ─── RENDERING ───────────────────────────────────────────────────────────
 
     /**
-     * Ghost-drag tutorial: animates the Student ID sliding toward the backpack.
-     * Loops until the player starts dragging any desk item.
+     * Ghost-drag tutorial: shows which required items still need to be packed.
+     * When both are missing, the ghost alternates between Student ID and Laptop.
+     * When only one is missing, that item's ghost plays on a loop.
+     * Automatically dismisses once both required items are in the backpack.
      * Only active on Day 1.
      */
     drawDragTutorial() {
-        if (!this.showDragTutorial || !assets.studentCardImg) return;
+        if (!this.showDragTutorial) return;
 
-        const CYCLE   = 130; // total frames per loop
-        const MOVE    = 90;  // frames spent moving (rest = pause before restart)
-        this.tutorialAnimT = (this.tutorialAnimT + 1) % CYCLE;
+        // Auto-dismiss as soon as both required items are packed
+        if (this.hasRequiredItems()) {
+            this.showDragTutorial = false;
+            return;
+        }
 
-        let t = constrain(this.tutorialAnimT / MOVE, 0, 1);
+        // Pause the animation (and hide the ghost) while the player is dragging
+        if (this.draggedItem) return;
 
-        // Smooth ease-in-out
+        let needsID     = !this.topSlots.includes("UoB Student ID");
+        let needsLaptop = !this.topSlots.includes("Laptop Computer");
+
+        // If the set of unpacked items changed (e.g. student card was just packed),
+        // restart the timer from 0 so the next ghost begins a clean slide animation
+        // instead of teleporting to whatever position the old counter left off at.
+        if (needsID !== this._tutNeedsID || needsLaptop !== this._tutNeedsLaptop) {
+            this.tutorialAnimT   = 0;
+            this._tutNeedsID     = needsID;
+            this._tutNeedsLaptop = needsLaptop;
+        }
+
+        const CYCLE = 130; // frames per single-item loop
+        const MOVE  = 90;  // frames spent in motion (rest = pause at end)
+        // Use double cycle only when both items are still unpacked
+        const TOTAL = (needsID && needsLaptop) ? CYCLE * 2 : CYCLE;
+
+        this.tutorialAnimT = (this.tutorialAnimT + 1) % TOTAL;
+
+        // Determine which ghost to render this frame
+        let itemName, itemImg;
+        if (needsID && needsLaptop) {
+            let cyclePhase = floor(this.tutorialAnimT / CYCLE);
+            itemName = (cyclePhase === 0) ? "UoB Student ID" : "Laptop Computer";
+            itemImg  = (cyclePhase === 0) ? assets.studentCardImg : assets.computerImg;
+        } else if (needsID) {
+            itemName = "UoB Student ID";
+            itemImg  = assets.studentCardImg;
+        } else {
+            itemName = "Laptop Computer";
+            itemImg  = assets.computerImg;
+        }
+
+        if (!itemImg) return;
+        let posData = this.itemFixedPositions[itemName];
+        if (!posData) return;
+
+        let frameInCycle = this.tutorialAnimT % CYCLE;
+        let t     = constrain(frameInCycle / MOVE, 0, 1);
         let eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-        let startX = this.itemFixedPositions["UoB Student ID"].x;
-        let startY = this.itemFixedPositions["UoB Student ID"].y;
-        let endX   = this.backpackX;
-        let endY   = this.backpackY;
-
-        let gx = lerp(startX, endX, eased);
-        let gy = lerp(startY, endY, eased);
+        let gx = lerp(posData.x, this.backpackX, eased);
+        let gy = lerp(posData.y, this.backpackY, eased);
 
         // Alpha: fade in → full → fade out
         let alpha;
@@ -222,13 +271,15 @@ class BackpackVisual {
         else if (t < 0.75) alpha = 210;
         else               alpha = map(t, 0.75, 1.0,  210, 0);
 
-        let posData  = this.itemFixedPositions["UoB Student ID"];
-        let maxSize  = 180 * (posData ? (posData.size || 1.0) : 1.0) * 0.65;
+        // Render at natural image aspect ratio so ghost matches the real item
+        let baseSize = (itemName === "Laptop Computer") ? 300 : 180;
+        let ghostH   = baseSize * (posData.size || 1.0) * 0.65;
+        let ghostW   = ghostH * (itemImg.width / itemImg.height);
 
         push();
         imageMode(CENTER);
         tint(255, alpha);
-        image(assets.studentCardImg, gx, gy, maxSize, maxSize);
+        image(itemImg, gx, gy, ghostW, ghostH);
         noTint();
         pop();
     }
@@ -1114,7 +1165,6 @@ class BackpackVisual {
         for (let i = this.scatteredItems.length - 1; i >= 0; i--) {
             let s = this.scatteredItems[i];
             if (dist(mx, my, s.x, s.y) < 100) {
-                this.showDragTutorial = false; // player started interacting — hide tutorial
                 this.draggedItem = s.item;
                 this.dragSource = 'desk';
                 this.dragIndex = i;
@@ -1184,7 +1234,7 @@ class BackpackVisual {
                 // Released near desk → remove from slot and snap to fixed desk position
                 this.topSlots[this.dragIndex] = null;
                 this.addToDesk(item);
-                this.showMessage("✓ " + item.name + " returned to desk");
+                this.showMessage(item.name + " returned to desk");
             }
         }
 
