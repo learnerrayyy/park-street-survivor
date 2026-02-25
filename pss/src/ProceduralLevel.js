@@ -6,7 +6,7 @@ const DIFFICULTY_PROGRESSION = {
   //level 1 is tutorial, so no procedural generation config needed
   1: {
     description: "Day 1 - The Morning Commute",
-    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "COFFEE", "EMPTY_SCOOTER"],
+    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
       spawnRatePerFrame: 0.01,
       minObstacleInterval: 40,
@@ -18,7 +18,7 @@ const DIFFICULTY_PROGRESSION = {
 
   2: {
     description: "Day 2 - Running Late",
-    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "COFFEE", "EMPTY_SCOOTER"],
+    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
       spawnRatePerFrame: 0.01,
       minObstacleInterval: 50,
@@ -30,7 +30,7 @@ const DIFFICULTY_PROGRESSION = {
 
   3: {
     description: "Day 3 - Midweek Rush",
-    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "COFFEE", "EMPTY_SCOOTER"],
+    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
       spawnRatePerFrame: 0.018,
       minObstacleInterval: 40,
@@ -42,7 +42,7 @@ const DIFFICULTY_PROGRESSION = {
 
   4: {
     description: "Day 4 - Deadline Pressure",
-    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "COFFEE", "EMPTY_SCOOTER"],
+    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
       spawnRatePerFrame: 0.020,
       minObstacleInterval: 35,
@@ -54,7 +54,7 @@ const DIFFICULTY_PROGRESSION = {
 
   5: {
     description: "Day 5 - Final Challenge",
-    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "COFFEE", "EMPTY_SCOOTER"],
+    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
       spawnRatePerFrame: 0.022,
       minObstacleInterval: 30,

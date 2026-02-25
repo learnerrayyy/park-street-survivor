@@ -189,6 +189,37 @@ const OBSTACLE_CONFIG = {
    },
 
    /**
+    * Small Business (Ice-cream cart / Kebab cart)
+    * Characteristics: 10 damage + scolding SFX on hit
+    * NOTE: Placeholder art uses black rectangle in obstacle renderer when sprite is unavailable.
+    */
+   SMALL_BUSINESS: {
+      baseType: "SMALL_BUSINESS",
+      type: "HAZARD",
+      name: "Small Business",
+      description: "Deals 10 damage and plays scolding SFX on hit",
+
+      // Physical parameters (same footprint as HOMELESS)
+      speed: { min: 0, max: 0 },
+      size: { width: 140, height: 140 },
+
+      // Damage parameters
+      damage: 10,
+      instantKill: false,
+      effect: "damage",
+
+      // Generation constraints
+      allowedLanes: [1, 4],
+      mutualExclusion: [],
+
+      // Variants (use placeholder until final art is ready)
+      variants: [
+         { id: "small_business_icecream", name: "Ice Cream Cart", sprite: null },
+         { id: "small_business_kebab", name: "Kebab Cart", sprite: null }
+      ]
+   },
+
+   /**
     * Fantasy Coffee (TODO)
     * Characteristics: 10 damage + full-screen distortion effect
     * NOTE: Visual distortion pipeline is not implemented yet.

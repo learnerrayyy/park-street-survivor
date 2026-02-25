@@ -249,7 +249,21 @@ class TestingPanel {
         this.dayParamHitboxes = [];
         this.homelessParamHitboxes = [];
 
-        this.obstacleOrder = Object.keys(OBSTACLE_CONFIG);
+        const preferredObstacleOrder = [
+            "LARGE_CAR",
+            "SMALL_CAR",
+            "SCOOTER_RIDER",
+            "HOMELESS",
+            "PROMOTER",
+            "SMALL_BUSINESS",
+            "FANTASY_COFFEE",
+            "COFFEE",
+            "EMPTY_SCOOTER"
+        ];
+        this.obstacleOrder = preferredObstacleOrder.filter(k => !!OBSTACLE_CONFIG[k]);
+        for (const key of Object.keys(OBSTACLE_CONFIG)) {
+            if (!this.obstacleOrder.includes(key)) this.obstacleOrder.push(key);
+        }
         this.dayOrder = Object.keys(DIFFICULTY_PROGRESSION).map(Number).sort((a, b) => a - b);
         this.baseDayMap = this.buildBaseDayMap();
 

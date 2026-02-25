@@ -37,7 +37,7 @@ let assets = {
     }
 };
 let fonts = {};
-let bgm, sfxSelect, sfxClick;
+let bgm, sfxSelect, sfxClick, sfxScold;
 
 // ─── AUDIO VOLUME CONTROLS ───────────────────────────────────────────────────
 let masterVolumeBGM = 0.25;
@@ -361,6 +361,7 @@ function preload() {
     bgm = loadSound('assets/audio/music/MainTheme.mp3', itemLoaded);
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
     sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
+    sfxScold = sfxSelect;
 
     // Control key sprites
     assets.keys.w = loadImage('assets/control_keys/W.png', itemLoaded);

@@ -289,7 +289,11 @@ class ObstacleManager {
                 if (img) {
                     imageMode(CENTER);
                     image(img, obs.x, obs.y, obs.width, obs.height);
+                } else {
+                    this.drawMissingSpritePlaceholder(obs);
                 }
+            } else {
+                this.drawMissingSpritePlaceholder(obs);
             }
 
             if (obs.type === "HOMELESS" && obs.dialogue) {
@@ -448,9 +452,22 @@ class ObstacleManager {
     handleCollision(player, obs) {
         const config = obs.config;
 
+        // Empty scooter buff is cancelled by promoter/homeless only,
+        // and no extra collision effects are applied in that hit.
+        if (player && ["PROMOTER", "HOMELESS"].includes(obs.type) &&
+            typeof player.hasEmptyScooterBuffActive === "function" &&
+            typeof player.cancelEmptyScooterBuff === "function" &&
+            player.hasEmptyScooterBuffActive()) {
+            player.cancelEmptyScooterBuff();
+            return;
+        }
 
         if (config.damage > 0) {
             player.takeDamage(config.damage, obs.type);
+        }
+
+        if (obs.type === "SMALL_BUSINESS") {
+            this.playSmallBusinessScoldSFX();
         }
 
         if (config.effect === "stun" && typeof player.applyScooterRiderHit === "function") {
@@ -480,6 +497,25 @@ class ObstacleManager {
 
         if (config.effect === "leaflet") {
             this.startPromoterInteraction(obs);
+        }
+    }
+
+    drawMissingSpritePlaceholder(obs) {
+        if (!obs || !obs.width || !obs.height) return;
+        noStroke();
+        fill(0);
+        rectMode(CENTER);
+        rect(obs.x, obs.y, obs.width, obs.height);
+    }
+
+    playSmallBusinessScoldSFX() {
+        if (typeof playSFX !== "function") return;
+        if (typeof sfxScold !== "undefined" && sfxScold) {
+            playSFX(sfxScold);
+            return;
+        }
+        if (typeof sfxSelect !== "undefined" && sfxSelect) {
+            playSFX(sfxSelect);
         }
     }
 

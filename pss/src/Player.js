@@ -584,6 +584,20 @@ class Player {
         this.activeSpeedMultiplier = speedMultiplier || 1.2;
     }
 
+    hasEmptyScooterBuffActive() {
+        return this.speedBoostFramesRemaining > 0 || this.invincibleFramesRemaining > 0;
+    }
+
+    cancelEmptyScooterBuff() {
+        this.speedBoostFramesRemaining = 0;
+        this.invincibleFramesRemaining = 0;
+        this.activeSpeedMultiplier = 1;
+        if (this.baseRunScrollSpeed !== null) {
+            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed;
+        }
+        this.wasSpeedBoostActive = false;
+    }
+
     applyCoffeeBuff(healAmount, overflowEffect, hpLockDurationSec) {
         const prevHealth = this.health;
         this.health = min(this.maxHealth, this.health + (healAmount || 0));
