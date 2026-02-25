@@ -45,7 +45,8 @@ The gameplay area is divided into four lanes: Lanes 1 & 4 (Sidewalks, 200px) and
 | **obstacle_bus**       | 170x420        | A large double-decker public transit bus (First Bus style).                | ArtAsset\Obstacle |
 | **obstacle_ambulance** | 140x260        | Emergency medical vehicle (Yellow ambulance).                              | ArtAsset\Obstacle |
 | **obstacle_car**       | 110x210        | Standard passenger automobile.                                             | ArtAsset\Obstacle |
-| **obstacle_scooter**   | 110*230        | A motorized scooter operated by a driver.                                  | ArtAsset\Obstacle |
+| **obstacle_scooter**   | 110x230        | A motorized scooter operated by a driver.                                  | ArtAsset\Obstacle |
+| **obstacle_kebab**    | 320x230        | Kebab stall on side-walk.| ArtAsset\Obstacle |
 | **obstacle_puddle**    | 260x120        | Environmental hazard; appears exclusively during rainy weather conditions. | ArtAsset\Obstacle |
 ## Sidewalk Obstacles (Lanes 1 & 4)
 | **Asset Name**        | **Dimensions** | **Description**                                                 | Path              |
