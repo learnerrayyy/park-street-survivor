@@ -11,6 +11,7 @@ All background assets are standard **1920x1080** resolution unless otherwise spe
 | **bg_destination** | 1920x1920      | The end of road, the Wills Memorial Building.                                                               | ArtAsset\Background\bg_sunny |
 | **bg_library**     | 1920x1080      | In library, player and NPC dialogue scene.                                                                  | ArtAsset\Background          |
 | **bg_news**        | 1920x1080      | News report on incident.                                                                                    | ArtAsset\Background         |
+| **bg_tutorial**        | 1920x1080      | Picture used in tutorial.                                                                                    | ArtAsset\Background         |
 ## Dialogue & UI Backgrounds
 | **Asset Name**  | **Dimensions** | Description**                                                    | Path                        |
 | --------------- | -------------- | ---------------------------------------------------------------- | --------------------------- |
