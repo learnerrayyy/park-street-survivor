@@ -451,6 +451,7 @@ class ObstacleManager {
 
     handleCollision(player, obs) {
         const config = obs.config;
+        const isBuff = config && config.type === "BUFF";
 
         // Empty scooter buff is cancelled by promoter/homeless only,
         // and no extra collision effects are applied in that hit.
@@ -458,16 +459,47 @@ class ObstacleManager {
             typeof player.hasEmptyScooterBuffActive === "function" &&
             typeof player.cancelEmptyScooterBuff === "function" &&
             player.hasEmptyScooterBuffActive()) {
+            if (typeof feedbackLayer !== "undefined" && feedbackLayer &&
+                typeof feedbackLayer.onCollision === "function") {
+                feedbackLayer.onCollision(obs.type, {
+                    damage: 0,
+                    effect: "cancelScooterBuff",
+                    cancelledScooterBuff: true,
+                    playerX: player ? player.x : width / 2,
+                    playerY: player ? player.y : height * 0.66
+                });
+            }
             player.cancelEmptyScooterBuff();
             return;
         }
 
-        if (config.damage > 0) {
-            player.takeDamage(config.damage, obs.type);
+        if (typeof feedbackLayer !== "undefined" && feedbackLayer) {
+            if (isBuff && typeof feedbackLayer.onBuffPickup === "function") {
+                feedbackLayer.onBuffPickup(obs.type, {
+                    effect: config.effect || "",
+                    playerX: player ? player.x : width / 2,
+                    playerY: player ? player.y : height * 0.66
+                });
+            } else if (obs.type === "SMALL_BUSINESS" &&
+                typeof feedbackLayer.onSmallBusinessCollision === "function") {
+                feedbackLayer.onSmallBusinessCollision(obs.type, {
+                    damage: config.damage || 0,
+                    effect: config.effect || "",
+                    playerX: player ? player.x : width / 2,
+                    playerY: player ? player.y : height * 0.66
+                });
+            } else if (typeof feedbackLayer.onCollision === "function") {
+                feedbackLayer.onCollision(obs.type, {
+                    damage: config.damage || 0,
+                    effect: config.effect || "",
+                    playerX: player ? player.x : width / 2,
+                    playerY: player ? player.y : height * 0.66
+                });
+            }
         }
 
-        if (obs.type === "SMALL_BUSINESS") {
-            this.playSmallBusinessScoldSFX();
+        if (config.damage > 0) {
+            player.takeDamage(config.damage, obs.type);
         }
 
         if (config.effect === "stun" && typeof player.applyScooterRiderHit === "function") {
@@ -506,17 +538,6 @@ class ObstacleManager {
         fill(0);
         rectMode(CENTER);
         rect(obs.x, obs.y, obs.width, obs.height);
-    }
-
-    playSmallBusinessScoldSFX() {
-        if (typeof playSFX !== "function") return;
-        if (typeof sfxScold !== "undefined" && sfxScold) {
-            playSFX(sfxScold);
-            return;
-        }
-        if (typeof sfxSelect !== "undefined" && sfxSelect) {
-            playSFX(sfxSelect);
-        }
     }
 
     startPromoterInteraction(obs) {

@@ -244,6 +244,7 @@ class TestingPanel {
         this.inputBuffer = "";
 
         this.rowHitboxes = [];
+        this.obstacleHeaderHitboxes = [];
         this.dayButtons = [];
         this.devButtons = [];
         this.dayParamHitboxes = [];
@@ -363,6 +364,14 @@ class TestingPanel {
             available.sort((a, b) => this.obstacleOrder.indexOf(a) - this.obstacleOrder.indexOf(b));
         }
 
+        this.applyLiveConfigIfActiveDay();
+    }
+
+    disableAllObstaclesForSelectedDay() {
+        const cfg = this.getCurrentDifficultyConfig();
+        if (!cfg) return;
+        cfg.availableObstacles = [];
+        if (this.editTarget && this.editTarget.kind === "weight") this.cancelEditing();
         this.applyLiveConfigIfActiveDay();
     }
 
@@ -546,6 +555,16 @@ class TestingPanel {
                 this.commitEdit();
                 this.beginHomelessParamEdit(box.key);
                 return true;
+            }
+        }
+
+        for (const box of this.obstacleHeaderHitboxes) {
+            if (mx >= box.x && mx <= box.x + box.w && my >= box.y && my <= box.y + box.h) {
+                this.commitEdit();
+                if (box.action === "all_off") {
+                    this.disableAllObstaclesForSelectedDay();
+                    return true;
+                }
             }
         }
 
@@ -805,6 +824,7 @@ class TestingPanel {
         if (!cfg) return;
 
         this.rowHitboxes = [];
+        this.obstacleHeaderHitboxes = [];
 
         const rowH = 38;
         const headerH = 30;
@@ -820,17 +840,42 @@ class TestingPanel {
         strokeWeight(1);
         fill(242);
         rect(x, y, w, headerH, 8);
+
+        const allOffW = 104;
+        const allOffH = 24;
+        const allOffX = x + 8;
+        const allOffY = y + (headerH - allOffH) / 2;
+        stroke(0, 150);
+        strokeWeight(1);
+        fill(205);
+        rect(allOffX, allOffY, allOffW, allOffH, 6);
+
+        noStroke();
+        fill(0);
+        textStyle(BOLD);
+        textSize(16);
+        textAlign(CENTER, CENTER);
+        text("ALL OFF", allOffX + allOffW / 2, allOffY + allOffH / 2 + 1);
+
         noStroke();
         fill(0);
         textStyle(BOLD);
         textSize(21);
         textAlign(LEFT, CENTER);
-        text("Obstacle", colTypeX, y + headerH / 2 + 1);
+        text("Obstacle", colTypeX + 116, y + headerH / 2 + 1);
         text("Category", colCatX, y + headerH / 2 + 1);
         text("Damage", colDamageX, y + headerH / 2 + 1);
         text("Effect", colEffectX, y + headerH / 2 + 1);
         text("Default Days", colDayX, y + headerH / 2 + 1);
         text("Weight", colWeightX + 8, y + headerH / 2 + 1);
+
+        this.obstacleHeaderHitboxes.push({
+            action: "all_off",
+            x: allOffX,
+            y: allOffY,
+            w: allOffW,
+            h: allOffH
+        });
 
         const maxRows = floor((h - headerH) / rowH);
         const rowsToDraw = min(this.obstacleOrder.length, maxRows);

@@ -6,6 +6,7 @@ let gameState, mainMenu, roomScene, inventory, env, player, obstacleManager, lev
 let backpackUI;
 let endScreenManager;
 let testingPanel;
+let feedbackLayer;
 
 // ─── GAME PROGRESS STATE ─────────────────────────────────────────────────────
 let currentUnlockedDay = 1;
@@ -361,7 +362,7 @@ function preload() {
     bgm = loadSound('assets/audio/music/MainTheme.mp3', itemLoaded);
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
     sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
-    sfxScold = sfxSelect;
+    // sfxScold = loadSound('assets/audio/effects/Scold.wav', itemLoaded); // TODO: add asset later
 
     // Control key sprites
     assets.keys.w = loadImage('assets/control_keys/W.png', itemLoaded);
@@ -474,6 +475,7 @@ function setup() {
     levelController = new LevelController();
     endScreenManager = new EndScreenManager();
     testingPanel = new TestingPanel();
+    feedbackLayer = new FeedbackLayer();
 
     textFont(fonts.body);
     gameState.currentState = STATE_LOADING;
@@ -580,6 +582,11 @@ function draw() {
         console.error("[Core Systems] Runtime Exception:", e);
     }
 
+    if (feedbackLayer) {
+        feedbackLayer.update();
+        feedbackLayer.display();
+    }
+
     renderGlobalFade();
 
     // TestingPanel always draws on top of everything (dev overlay)
@@ -590,19 +597,37 @@ function draw() {
  * Updates all game-world systems for a single frame during the run state.
  */
 function runGameLoop() {
-    if (levelController) { levelController.update(); }
-    if (env) { env.update(GLOBAL_CONFIG.scrollSpeed); env.display(); }
     const levelPhase = levelController ? levelController.getLevelPhase() : "RUNNING";
-    if (obstacleManager) { obstacleManager.update(GLOBAL_CONFIG.scrollSpeed, player, levelPhase); obstacleManager.display(); }
-    if (player) { player.update(); player.display(); }
+    const freezeGameplay = feedbackLayer && typeof feedbackLayer.isHitStopActive === "function"
+        ? feedbackLayer.isHitStopActive()
+        : false;
+
+    if (!freezeGameplay) {
+        if (levelController) { levelController.update(); }
+        if (env) { env.update(GLOBAL_CONFIG.scrollSpeed); }
+        if (obstacleManager) { obstacleManager.update(GLOBAL_CONFIG.scrollSpeed, player, levelPhase); }
+        if (player) { player.update(); }
+    }
+
+    let cameraOffset = { x: 0, y: 0 };
+    if (feedbackLayer && typeof feedbackLayer.getCameraOffset === "function") {
+        cameraOffset = feedbackLayer.getCameraOffset();
+    }
+
+    push();
+    translate(cameraOffset.x, cameraOffset.y);
+    if (env) env.display();
+    if (obstacleManager) obstacleManager.display();
+    if (player) player.display();
     if (obstacleManager && typeof obstacleManager.renderPromoterEffects === 'function') {
         obstacleManager.renderPromoterEffects();
     }
+    pop();
 
     if (levelController) { levelController.display(); }
 
     // Win condition: settlement point reached
-    if (levelController && levelController.checkSettlementPoint()) {
+    if (!freezeGameplay && levelController && levelController.checkSettlementPoint()) {
         console.log("[runGameLoop] STATE_WIN triggered!");
         gameState.setState(STATE_WIN);
     }
