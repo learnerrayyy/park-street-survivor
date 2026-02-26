@@ -144,6 +144,14 @@ class ObstacleManager {
         return allowed[Math.floor(Math.random() * allowed.length)];
     }
 
+    resolveSpritePath(config, variant, lane) {
+        if (variant && variant.spriteBySide) {
+            const side = lane <= 2 ? "left" : "right";
+            return variant.spriteBySide[side] || variant.sprite || config.sprite || null;
+        }
+        return (variant && variant.sprite) ? variant.sprite : config.sprite;
+    }
+
 
     spawnObstacle(forceBuff = false) {
         if (!this.currentLevelConfig) {
@@ -172,20 +180,21 @@ class ObstacleManager {
         const variant = config.variants && config.variants.length > 0
             ? config.variants[Math.floor(Math.random() * config.variants.length)]
             : config.variants?.[0];
+        const obstacleSize = (variant && variant.size) ? variant.size : config.size;
 
         const obstacle = {
             type: obstacleType,
             baseType: config.baseType,
             lane: lane,
             x: GLOBAL_CONFIG.lanes[`lane${lane}`],
-            y: -config.size.height,
-            width: config.size.width,
-            height: config.size.height,
+            y: -obstacleSize.height,
+            width: obstacleSize.width,
+            height: obstacleSize.height,
             speed: config.speed.min + Math.random() * (config.speed.max - config.speed.min),
             damage: config.damage,
             effect: config.effect,
             variant: variant,
-            spritePath: (variant && variant.sprite) ? variant.sprite : config.sprite,
+            spritePath: this.resolveSpritePath(config, variant, lane),
             config: config,
             variantId: variantId
         };

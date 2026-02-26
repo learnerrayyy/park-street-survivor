@@ -212,10 +212,26 @@ const OBSTACLE_CONFIG = {
       allowedLanes: [1, 4],
       mutualExclusion: [],
 
-      // Variants (use placeholder until final art is ready)
+      // Variants with side-specific sprites.
       variants: [
-         { id: "small_business_icecream", name: "Ice Cream Cart", sprite: null },
-         { id: "small_business_kebab", name: "Kebab Cart", sprite: null }
+         {
+            id: "small_business_icecream",
+            name: "Ice Cream Cart",
+            size: { width: 270, height: 311 },
+            spriteBySide: {
+               left: "assets/obstacles/obstacle_scoop_left.png",
+               right: "assets/obstacles/obstacle_scoop_right.png"
+            }
+         },
+         {
+            id: "small_business_kebab",
+            name: "Kebab Cart",
+            size: { width: 320, height: 230 },
+            spriteBySide: {
+               left: "assets/obstacles/obstacle_kebab_left.png",
+               right: "assets/obstacles/obstacle_kebab_right.png"
+            }
+         }
       ]
    },
 
