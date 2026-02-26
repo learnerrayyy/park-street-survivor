@@ -109,16 +109,17 @@ class EndScreenBase {
         pop();
     }
 
-    /** * Draws navigation buttons horizontally, scaled up 1.5x, matching MainMenu style. 
-     */
+    /** Draws navigation buttons horizontally, using shared devMenu sizing vars. */
     drawButtons(cx, y) {
-        // Scaled up 1.5x (originally 256x96)
         let isModeSelect = (this.stateStep === "MODE_SELECT");
-        let optW = isModeSelect ? 530 : 384; 
-        let optH = 144;  
-        let spacing = isModeSelect ? 520 : 300; // Increased spacing to prevent overlapping
-        
-        // Calculate the starting X position so the row is centered
+        let bW = typeof devMenuBtnW !== 'undefined' ? devMenuBtnW : 260;
+        let bH = typeof devMenuBtnH !== 'undefined' ? devMenuBtnH : 90;
+        // MODE_SELECT labels ("BACK TO ROOM") are longer so use a smaller text size
+        let ts = isModeSelect ? 38 : (typeof devMenuTextSize !== 'undefined' ? devMenuTextSize : 55);
+        let optW = bW;
+        let optH = bH;
+        let spacing = isModeSelect ? 320 : 300;
+
         let totalW = (this.options.length - 1) * spacing;
         let startX = cx - totalW / 2;
 
@@ -130,29 +131,24 @@ class EndScreenBase {
 
             push();
             translate(btnX, y);
-            
-            // Hover effect: scale up if selected
-            if (isSelected) {
-                scale(1.15); 
-            }
 
-            // Render button background image
+            if (isSelected) scale(1.15);
+
             imageMode(CENTER);
             if (assets.btnImg) {
                 image(assets.btnImg, 0, 0, optW, optH);
             }
 
-            // Button label with stroke for readability
-            textFont(fonts.body); 
-            textSize(36); // Scaled up 1.5x (originally 24)
-            stroke(0, 0, 0, 180); 
-            strokeWeight(7); // Thicker stroke for larger text
+            textFont(fonts.body);
+            textSize(ts);
+            stroke(0, 0, 0, 180);
+            strokeWeight(5);
             fill(255, 215, 0);
-            text(this.options[i], 0, -9); // Shifted slightly more due to scale
-            noStroke(); 
+            text(this.options[i], 0, -10);
+            noStroke();
             fill(255, 215, 0);
-            text(this.options[i], 0, -9);
-            
+            text(this.options[i], 0, -10);
+
             pop();
         }
         pop();
@@ -215,16 +211,15 @@ class EndScreenBase {
 
         let cx = width / 2;
         let isModeSelect = (this.stateStep === "MODE_SELECT");
-        let optW = isModeSelect ? 530 : 384;
-        let optH = 144; // Scaled up 1.5x (originally 96)
-        let spacing = isModeSelect ? 520 : 300; // Increased spacing to prevent overlapping
+        let optW = typeof devMenuBtnW !== 'undefined' ? devMenuBtnW : 260;
+        let optH = typeof devMenuBtnH !== 'undefined' ? devMenuBtnH : 90;
+        let spacing = isModeSelect ? 320 : 300;
         let totalW = (this.options.length - 1) * spacing;
         let startX = cx - totalW / 2;
         let btnY = this._getButtonStartY();
 
         for (let i = 0; i < this.options.length; i++) {
             let btnX = startX + i * spacing;
-            // Horizontal hitbox check
             if (mx > btnX - optW / 2 && mx < btnX + optW / 2 &&
                 my > btnY - optH / 2 && my < btnY + optH / 2) {
                 this.selectedIndex = i;
@@ -239,9 +234,9 @@ class EndScreenBase {
     handleMouseMove(mx, my) {
         let cx = width / 2;
         let isModeSelect = (this.stateStep === "MODE_SELECT");
-        let optW = isModeSelect ? 530 : 384; // Scaled up 1.5x (originally 256)
-        let optH = 144; // Scaled up 1.5x (originally 96)
-        let spacing = isModeSelect ? 520 : 300; // Increased spacing to prevent overlapping
+        let optW = typeof devMenuBtnW !== 'undefined' ? devMenuBtnW : 260;
+        let optH = typeof devMenuBtnH !== 'undefined' ? devMenuBtnH : 90;
+        let spacing = isModeSelect ? 320 : 300;
         let totalW = (this.options.length - 1) * spacing;
         let startX = cx - totalW / 2;
         let btnY = this._getButtonStartY();

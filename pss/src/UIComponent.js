@@ -43,15 +43,18 @@ class UIButton {
                 image(assets.backImg, 0, 0, this.w * 2, this.h * 2);
             }
         } else {
-            // Standard button — button.png 2× render size, no tint
+            // Standard button — fixed uniform size, drag corners in dev mode to resize
+            let bW = (typeof devMenuBtnW !== 'undefined') ? devMenuBtnW : (assets.btnImg ? assets.btnImg.width  : 240);
+            let bH = (typeof devMenuBtnH !== 'undefined') ? devMenuBtnH : (assets.btnImg ? assets.btnImg.height : 60);
+            let ts = (typeof devMenuTextSize !== 'undefined') ? devMenuTextSize : 24;
+            // Store dims for corner-drag hit detection (world space, unscaled)
+            this._bW = bW;
+            this._bH = bH;
             if (assets.btnImg) {
-                image(assets.btnImg, 0, 0, this.w * 2, this.h * 2);
+                image(assets.btnImg, 0, 0, bW, bH);
             }
-
-            // Text label on top — 1.8× original (24 * 1.8 ≈ 43)
-            // ← adjust the number below to change main menu button text size
-            // ← adjust the -6 below to move text up/down inside the button
-            textSize(43);
+            textFont(fonts.body);
+            textSize(ts);
             textAlign(CENTER, CENTER);
             stroke(0, 0, 0, 180);
             strokeWeight(5);
@@ -62,6 +65,53 @@ class UIButton {
             text(this.label, 0, -10);
         }
         pop();
+
+        // Dev-mode resize handles drawn in world space (outside push/scale)
+        if (developerMode && this._bW && this.label !== "BACK_ARROW") {
+            this._drawResizeHandles();
+        }
+    }
+
+    /** Draw 4 corner handles + outline in world space. */
+    _drawResizeHandles() {
+        let hw = this._bW / 2, hh = this._bH / 2;
+        push();
+        // dashed-style outline
+        noFill();
+        stroke(80, 140, 255, 180);
+        strokeWeight(1.5);
+        rectMode(CORNER);
+        rect(this.x - hw, this.y - hh, this._bW, this._bH);
+        // four corner squares
+        let corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+        for (let [sx, sy] of corners) {
+            let cx = this.x + sx * hw;
+            let cy = this.y + sy * hh;
+            let active = devResizeState &&
+                         devResizeState.signX === sx &&
+                         devResizeState.signY === sy;
+            stroke(active ? 255 : 80, active ? 120 : 140, active ? 0 : 255);
+            strokeWeight(2);
+            fill(active ? 255 : 255, active ? 200 : 255, active ? 0 : 80, 230);
+            rectMode(CENTER);
+            rect(cx, cy, 18, 18, 3);
+        }
+        pop();
+    }
+
+    /** Returns { signX, signY } if (mx,my) is near a corner handle, else null. */
+    checkResizeCorner(mx, my) {
+        if (!this._bW) return null;
+        let hw = this._bW / 2, hh = this._bH / 2;
+        let corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+        for (let [sx, sy] of corners) {
+            let cx = this.x + sx * hw;
+            let cy = this.y + sy * hh;
+            if (abs(mx - cx) < 14 && abs(my - cy) < 14) {
+                return { signX: sx, signY: sy };
+            }
+        }
+        return null;
     }
 
     /**
@@ -69,8 +119,9 @@ class UIButton {
      * Essential for mouse-to-index synchronization in MainMenu.
      */
     checkMouse(mx, my) {
-        // Slightly larger hit area for easier clicking (1.3× logical size)
-        let hw = this.w * 0.65, hh = this.h * 0.65;
+        // Use actual rendered button dimensions for hit detection
+        let hw = (typeof devMenuBtnW !== 'undefined') ? devMenuBtnW / 2 : this.w * 0.65;
+        let hh = (typeof devMenuBtnH !== 'undefined') ? devMenuBtnH / 2 : this.h * 0.65;
         return (mx > this.x - hw && mx < this.x + hw &&
                 my > this.y - hh && my < this.y + hh);
     }

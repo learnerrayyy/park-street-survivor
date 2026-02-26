@@ -4,6 +4,16 @@
 //             Press '0' in-game to toggle developerMode at runtime.
 //             Press ` or F2 to open the TestingPanel overlay.
 
+// ─── UI TUNING VARS (live-editable from TestingPanel / corner-drag) ──────────
+/** Render width for all main-menu buttons (uniform). */
+let devMenuBtnW     = 260;
+/** Render height for all main-menu buttons (uniform). */
+let devMenuBtnH     = 90;
+/** Text size drawn on main-menu buttons. */
+let devMenuTextSize = 55;
+/** Active corner-drag state for main-menu button resize. null = not dragging. */
+let devResizeState  = null;
+
 // ─── DEBUG FLAGS ─────────────────────────────────────────────────────────────
 
 /**
@@ -242,6 +252,7 @@ class TestingPanel {
 
         this.editTarget = null;
         this.inputBuffer = "";
+        this.sliderDragging = null;  // { key, trackX, trackW, min, maxVal }
 
         this.rowHitboxes = [];
         this.obstacleHeaderHitboxes = [];
@@ -249,6 +260,12 @@ class TestingPanel {
         this.devButtons = [];
         this.dayParamHitboxes = [];
         this.homelessParamHitboxes = [];
+        this.uiTunerHitboxes = [];
+        this.uiTunerDefs = [
+            { key: "devMenuBtnW",     label: "Btn Width"  },
+            { key: "devMenuBtnH",     label: "Btn Height" },
+            { key: "devMenuTextSize", label: "Text Size"  }
+        ];
 
         const preferredObstacleOrder = [
             "LARGE_CAR",
@@ -387,6 +404,16 @@ class TestingPanel {
         return this.editTarget && this.editTarget.kind === "homelessParam" && this.editTarget.paramKey === paramKey;
     }
 
+    isEditingUITuner(key) {
+        return this.editTarget && this.editTarget.kind === "uiTuner" && this.editTarget.key === key;
+    }
+
+    beginUITunerEdit(key) {
+        const map = { devMenuBtnW, devMenuBtnH, devMenuTextSize };
+        this.editTarget = { kind: "uiTuner", key };
+        this.inputBuffer = String(map[key] ?? 0);
+    }
+
     beginWeightEdit(obstacleType) {
         const cfg = this.getCurrentDifficultyConfig();
         if (!cfg || !this.isObstacleEnabled(obstacleType)) return;
@@ -452,6 +479,14 @@ class TestingPanel {
                 if (typeof def.min === "number") num = Math.max(def.min, num);
                 cfg[def.key] = num;
             }
+        }
+
+        if (this.editTarget.kind === "uiTuner") {
+            let num = parseFloat(this.inputBuffer);
+            if (!Number.isFinite(num)) num = 0;
+            if (this.editTarget.key === "devMenuBtnW")     devMenuBtnW     = Math.max(40,  Math.round(num));
+            if (this.editTarget.key === "devMenuBtnH")     devMenuBtnH     = Math.max(10,  Math.round(num));
+            if (this.editTarget.key === "devMenuTextSize") devMenuTextSize = Math.max(8,   Math.round(num));
         }
 
         this.cancelEditing();
@@ -558,6 +593,14 @@ class TestingPanel {
             }
         }
 
+        for (const box of this.uiTunerHitboxes) {
+            if (mx >= box.x && mx <= box.x + box.w && my >= box.y && my <= box.y + box.h) {
+                this.commitEdit();
+                this.beginUITunerEdit(box.key);
+                return true;
+            }
+        }
+
         for (const box of this.obstacleHeaderHitboxes) {
             if (mx >= box.x && mx <= box.x + box.w && my >= box.y && my <= box.y + box.h) {
                 this.commitEdit();
@@ -645,6 +688,15 @@ class TestingPanel {
             this.visible = false;
             return;
         }
+
+        if (actionId === "goto_pause") {
+            if (gameState) {
+                gameState.previousState = gameState.currentState;
+                gameState.currentState = STATE_PAUSED;
+            }
+            this.visible = false;
+            return;
+        }
     }
 
     draw() {
@@ -678,7 +730,8 @@ class TestingPanel {
         this.drawDaySelector(panelX + 24, panelY + 80);
         this.drawDayParams(panelX + 24, panelY + 126, panelW - 48, 164);
         this.drawHomelessBubbleParams(panelX + 24, panelY + 296, panelW - 48, 82);
-        this.drawObstacleTable(panelX + 24, panelY + 386, panelW - 48, panelH - 508);
+        this.drawUITuner(panelX + 24, panelY + 386, panelW - 48, 64);
+        this.drawObstacleTable(panelX + 24, panelY + 458, panelW - 48, panelH - 580);
         this.drawDevActions(panelX + 24, panelY + panelH - 108, panelW - 48, 84);
         pop();
     }
@@ -819,6 +872,56 @@ class TestingPanel {
         }
     }
 
+    drawUITuner(x, y, w, h) {
+        this.uiTunerHitboxes = [];
+
+        stroke(0, 150);
+        strokeWeight(1);
+        fill(235, 245, 255);
+        rect(x, y, w, h, 8);
+        noStroke();
+        fill(0);
+        textStyle(BOLD);
+        textSize(21);
+        textAlign(LEFT, CENTER);
+        text("Main Menu Buttons  (btnW = textWidth + PadW,  btnH = TextSize + PadH)", x + 12, y + 16);
+
+        const startX = x + 12;
+        const startY = y + 38;
+        const gap = 14;
+        const cellW = floor((w - 24 - gap * 2) / 3);
+        const curVals = { devMenuBtnW, devMenuBtnH, devMenuTextSize };
+
+        for (let i = 0; i < this.uiTunerDefs.length; i++) {
+            const def = this.uiTunerDefs[i];
+            const cellX = startX + i * (cellW + gap);
+
+            fill(0);
+            textStyle(BOLD);
+            textSize(18);
+            textAlign(LEFT, CENTER);
+            text(def.label, cellX, startY + 14);
+
+            const valueW = 120;
+            const valueX = cellX + cellW - valueW;
+            const isEditing = this.isEditingUITuner(def.key);
+            stroke(0, 160);
+            strokeWeight(1);
+            fill(isEditing ? 255 : 238);
+            rect(valueX, startY, valueW, 26, 5);
+
+            noStroke();
+            fill(0);
+            textAlign(CENTER, CENTER);
+            textStyle(BOLD);
+            textSize(18);
+            const valText = isEditing ? `${this.inputBuffer}_` : String(curVals[def.key]);
+            text(valText, valueX + valueW / 2, startY + 13);
+
+            this.uiTunerHitboxes.push({ key: def.key, x: valueX, y: startY, w: valueW, h: 26 });
+        }
+    }
+
     drawObstacleTable(x, y, w, h) {
         const cfg = this.getCurrentDifficultyConfig();
         if (!cfg) return;
@@ -949,6 +1052,7 @@ class TestingPanel {
             { id: "restart_current", label: "Restart Current" },
             { id: "run_selected_day", label: `Run Day ${this.selectedDay}` },
             { id: "goto_room", label: "Go Room" },
+            { id: "goto_pause", label: "Open Pause" },
             { id: "refill", label: "Refill HP" },
             { id: "toggle_dev", label: developerMode ? "Dev ON" : "Dev OFF" },
             { id: "win", label: "Force Win" },

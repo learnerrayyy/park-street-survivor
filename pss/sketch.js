@@ -7,6 +7,7 @@ let backpackUI;
 let endScreenManager;
 let testingPanel;
 let feedbackLayer;
+let tutorialDialogue;   // global dialogue box for tutorial page explanations
 
 // ─── GAME PROGRESS STATE ─────────────────────────────────────────────────────
 let currentUnlockedDay = 1;
@@ -266,7 +267,9 @@ let tutorialHints = {
     dayVisuallyUnlocked: {},   // { 1: true/false, 2: true/false, … } per-day first-click unlock
     levelSelectShownForDay: 0,
     roomPhase: 'DESK',
-    moveTutorialDone: false    // true once the player has dismissed the WASD/arrow-key hint
+    moveTutorialDone: false,   // true once the player has dismissed the WASD/arrow-key hint
+    uiTutorialDone: false,     // true once the pause/help/settings/story intro is complete
+    uiIntroStep: 0             // current step within UI intro (0 = pause, 1 = help, 2 = settings, 3 = story)
 };
 
 // ─── SPLASH LOGO ANIMATION STATE ─────────────────────────────────────────────
@@ -476,6 +479,8 @@ function setup() {
     endScreenManager = new EndScreenManager();
     testingPanel = new TestingPanel();
     feedbackLayer = new FeedbackLayer();
+    tutorialDialogue = new DialogueBox();
+    tutorialDialogue.timerMax = 300;   // 5 s — long enough to read tutorial page explanations
 
     textFont(fonts.body);
     gameState.currentState = STATE_LOADING;
@@ -516,12 +521,17 @@ function draw() {
                     }
                     mainMenu.display();
                 }
+                // Show tutorial page explanation overlay on SETTINGS and HELP pages
+                if (tutorialDialogue) tutorialDialogue.display();
                 break;
 
             case STATE_ROOM:
                 if (roomScene) roomScene.display();
                 if (player) {
-                    player.update();
+                    // Block movement while the UI intro tutorial is showing
+                    if (typeof tutorialHints === 'undefined' || tutorialHints.roomPhase !== 'UI_INTRO') {
+                        player.update();
+                    }
                     player.display();
                 }
                 drawPauseButton();
@@ -549,13 +559,27 @@ function draw() {
                     }
                 }
                 renderPauseOverlay();
+                // Show tutorial dialogue on top of pause overlay (e.g. STORY explanation)
+                if (tutorialDialogue) tutorialDialogue.display();
                 break;
 
             case STATE_FAIL:
-                // Draw frozen gameplay behind the overlay
-                if (env) env.display();
-                if (obstacleManager) obstacleManager.display();
-                if (player) player.display();
+                // Draw frozen gameplay behind the overlay.
+                // If env is null (e.g. jumped here via dev shortcut), render a static
+                // fallback so the screen is never just a blank dark rectangle.
+                if (env) {
+                    env.display();
+                    if (obstacleManager) obstacleManager.display();
+                    if (player) player.display();
+                } else {
+                    // Fallback: fill with the shared other-screen background
+                    if (assets.otherBg) {
+                        let s = max(width / assets.otherBg.width, height / assets.otherBg.height);
+                        imageMode(CENTER);
+                        image(assets.otherBg, width / 2, height / 2,
+                              assets.otherBg.width * s, assets.otherBg.height * s);
+                    }
+                }
                 if (endScreenManager) {
                     if (!endScreenManager._activeScreen) {
                         endScreenManager.activateFail(gameState.failReason || "EXHAUSTED");
@@ -724,6 +748,10 @@ function keyPressed() {
         if (testingPanel.handleKeyPressed(key, keyCode)) return false;
     }
 
+    // Lock all input while the level-select entrance animation plays
+    if (state === STATE_LEVEL_SELECT &&
+        mainMenu && mainMenu.timeWheel && mainMenu.timeWheel.isEntering) return;
+
     // Dev shortcuts: 8 = instant WIN, 9 = instant FAIL
     if (developerMode) {
         if (key === '8') { devGoToWin();  return; }
@@ -861,21 +889,51 @@ function handlePauseSelection() {
         togglePause();
         pauseFromState = null;
     } else if (selected === "STORY") {
+        // Tutorial first-pause: mark done then open story
+        if (typeof tutorialHints !== 'undefined' &&
+            tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
+            tutorialHints.uiTutorialDone = true;
+            tutorialHints.uiIntroStep    = 0;
+            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+        }
         showStoryRecap = true;
         storyRecapDay = 1;
         storyScrollOffset = 0;
     } else if (selected === "SETTINGS") {
+        // Tutorial first-pause: mark done then open settings
+        if (typeof tutorialHints !== 'undefined' &&
+            tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
+            tutorialHints.uiTutorialDone = true;
+            tutorialHints.uiIntroStep    = 0;
+            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+        }
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         mainMenu.diffToastTimer = 0;
         gameState.currentState = STATE_SETTINGS;
         mainMenu.menuState     = STATE_SETTINGS;
     } else if (selected === "HELP") {
+        // Tutorial first-pause: mark done then open help
+        if (typeof tutorialHints !== 'undefined' &&
+            tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
+            tutorialHints.uiTutorialDone = true;
+            tutorialHints.uiIntroStep    = 0;
+            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+        }
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         gameState.currentState = STATE_HELP;
         mainMenu.menuState     = STATE_HELP;
         mainMenu.helpPage      = 0;
+    } else if (selected === "EXPLORE ON MY OWN") {
+        // Tutorial first-pause: player skips guidance, mark done and resume
+        if (typeof tutorialHints !== 'undefined') {
+            tutorialHints.uiTutorialDone = true;
+            tutorialHints.uiIntroStep    = 0;
+            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+        }
+        togglePause();
+        pauseFromState = null;
     } else if (selected === "RESTART") {
         showRestartChoice  = true;
         restartChoiceIndex = -1;
@@ -920,11 +978,29 @@ function handleRestartChoice() {
 function mousePressed() {
     if (globalFade.isFading || !gameState) return;
 
+    // Dev corner-drag: intercept before everything else
+    if (developerMode && gameState.currentState === STATE_MENU && mainMenu) {
+        for (let btn of mainMenu.buttons) {
+            let corner = btn.checkResizeCorner(mouseX, mouseY);
+            if (corner) {
+                devResizeState = {
+                    startMX: mouseX, startMY: mouseY,
+                    startW: devMenuBtnW, startH: devMenuBtnH,
+                    signX: corner.signX, signY: corner.signY
+                };
+                return false;
+            }
+        }
+    }
+
     // TestingPanel intercepts all clicks when visible
     if (testingPanel && testingPanel.isVisible()) {
         if (testingPanel.handleMousePressed(mouseX, mouseY)) return false;
     }
 
+    // Lock all input while the level-select entrance animation plays
+    if (gameState.currentState === STATE_LEVEL_SELECT &&
+        mainMenu && mainMenu.timeWheel && mainMenu.timeWheel.isEntering) return;
 
     let state = gameState.currentState;
 
@@ -1025,6 +1101,7 @@ function mousePressed() {
  */
 function mouseReleased() {
     if (!gameState) return;
+    if (devResizeState) { devResizeState = null; return; }
     if (mainMenu) mainMenu.handleRelease();
     if (gameState.currentState === STATE_INVENTORY) {
         if (backpackUI) backpackUI.handleMouseReleased(mouseX, mouseY);
@@ -1036,6 +1113,14 @@ function mouseReleased() {
  */
 function mouseDragged() {
     if (!gameState) return;
+    // Dev corner-drag resize
+    if (devResizeState) {
+        let dx = mouseX - devResizeState.startMX;
+        let dy = mouseY - devResizeState.startMY;
+        devMenuBtnW = Math.max(40, Math.round(devResizeState.startW + 2 * devResizeState.signX * dx));
+        devMenuBtnH = Math.max(10, Math.round(devResizeState.startH + 2 * devResizeState.signY * dy));
+        return;
+    }
     if (gameState.currentState === STATE_INVENTORY) {
         if (backpackUI) backpackUI.handleMouseDragged(mouseX, mouseY);
     }
@@ -1063,8 +1148,11 @@ function mouseMoved() {
  * Toggles between the paused state and the previous active state.
  */
 function togglePause() {
-    if (gameState.currentState === STATE_PAUSED) gameState.setState(gameState.previousState);
-    else gameState.setState(STATE_PAUSED);
+    if (gameState.currentState === STATE_PAUSED) {
+        gameState.setState(gameState.previousState);
+    } else {
+        gameState.setState(STATE_PAUSED);
+    }
 }
 
 /**
@@ -1079,7 +1167,14 @@ function setupRun(dayID) {
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
     if (typeof tutorialHints !== 'undefined') {
-        tutorialHints.roomPhase = (dayID === 1 && !tutorialHints.moveTutorialDone) ? 'MOVE' : 'DESK';
+        if (dayID === 1 && !tutorialHints.uiTutorialDone) {
+            tutorialHints.roomPhase  = 'UI_INTRO';
+            tutorialHints.uiIntroStep = 0;
+        } else if (dayID === 1 && !tutorialHints.moveTutorialDone) {
+            tutorialHints.roomPhase = 'MOVE';
+        } else {
+            tutorialHints.roomPhase = 'DESK';
+        }
     }
     if (backpackUI) backpackUI.resetForNewDay();
     if (endScreenManager) endScreenManager._activeScreen = null;
@@ -1345,7 +1440,7 @@ function drawPauseButton() {
         translate(bx, by);
         if (isHover) scale(1.15);
         imageMode(CENTER);
-        image(assets.pauseImg, 0, 0, 160, 160);
+        image(assets.pauseImg, 0, 0,);
         pop();
     } else {
         push();
@@ -1387,7 +1482,13 @@ function renderPauseOverlay() {
     if (showStoryRecap) {
         renderStoryRecap();
     } else if (showRestartChoice) {
-        let titleY = height / 2 - 280;
+        let btnW = (assets.btnImg ? assets.btnImg.width  : 240) * 1.5;
+        let btnH = (assets.btnImg ? assets.btnImg.height : 60)  * 1.5;
+        let spacing = 145;
+        let totalH = (RESTART_OPTIONS.length - 1) * spacing;
+        let startY = (height / 2) - (totalH / 2) + 20;
+        let titleY = startY - btnH / 2 - 110;
+
         textAlign(CENTER, CENTER);
         textFont(fonts.title);
         textSize(48);
@@ -1396,17 +1497,12 @@ function renderPauseOverlay() {
         noStroke(); fill(255, 215, 0);
         text("RESTART?", width / 2, titleY);
 
-        let optW = 280, optH = 80;
-        let spacing = 95;
-        let totalH = (RESTART_OPTIONS.length - 1) * spacing;
-        let startY = (height / 2) - (totalH / 2) + 20;
-
         let anyRestartHover = false;
         for (let i = 0; i < RESTART_OPTIONS.length; i++) {
             let ox = width / 2;
             let oy = startY + i * spacing;
-            let isHover = (mouseX > ox - optW / 2 && mouseX < ox + optW / 2 &&
-                           mouseY > oy - optH / 2 && mouseY < oy + optH / 2);
+            let isHover = (mouseX > ox - btnW / 2 && mouseX < ox + btnW / 2 &&
+                           mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
             if (isHover) { restartChoiceIndex = i; anyRestartHover = true; }
             let isSelected = (i === restartChoiceIndex) && restartChoiceIndex >= 0;
 
@@ -1414,8 +1510,8 @@ function renderPauseOverlay() {
             translate(ox, oy);
             if (isSelected) scale(1.15);
             imageMode(CENTER);
-            if (assets.btnImg) image(assets.btnImg, 0, 0, optW * 2, optH * 2);
-            textFont(fonts.body); textSize(24); textAlign(CENTER, CENTER);
+            if (assets.btnImg) image(assets.btnImg, 0, 0, btnW, btnH);
+            textFont(fonts.body); textSize(36); textAlign(CENTER, CENTER);
             stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
             text(RESTART_OPTIONS[i], 0, -6);
             noStroke(); fill(255, 215, 0);
@@ -1425,7 +1521,14 @@ function renderPauseOverlay() {
         if (!anyRestartHover && !keyIsPressed) restartChoiceIndex = -1;
     } else {
         let options = getPauseOptions();
-        let titleY = height / 2 - 320;
+        let btnW = (assets.btnImg ? assets.btnImg.width  : 240) * 1.5;
+        let btnH = (assets.btnImg ? assets.btnImg.height : 60)  * 1.5;
+        let spacing = 145;
+        let totalH = (options.length - 1) * spacing;
+        let startY = (height / 2) - (totalH / 2) + 30;
+
+        let titleY = startY - btnH / 2 - 110;
+
         textAlign(CENTER, CENTER);
         textFont(fonts.title);
         textSize(60);
@@ -1434,17 +1537,12 @@ function renderPauseOverlay() {
         noStroke(); fill(255, 215, 0);
         text("PAUSED", width / 2, titleY);
 
-        let optW = 280, optH = 80;
-        let spacing = 95;
-        let totalH = (options.length - 1) * spacing;
-        let startY = (height / 2) - (totalH / 2) + 30;
-
         let anyPauseHover = false;
         for (let i = 0; i < options.length; i++) {
             let ox = width / 2;
             let oy = startY + i * spacing;
-            let isHover = (mouseX > ox - optW / 2 && mouseX < ox + optW / 2 &&
-                           mouseY > oy - optH / 2 && mouseY < oy + optH / 2);
+            let isHover = (mouseX > ox - btnW / 2 && mouseX < ox + btnW / 2 &&
+                           mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
             if (isHover) { pauseIndex = i; anyPauseHover = true; }
             let isSelected = (i === pauseIndex) && pauseIndex >= 0;
 
@@ -1452,8 +1550,8 @@ function renderPauseOverlay() {
             translate(ox, oy);
             if (isSelected) scale(1.15);
             imageMode(CENTER);
-            if (assets.btnImg) image(assets.btnImg, 0, 0, optW * 2, optH * 2);
-            textFont(fonts.body); textSize(24); textAlign(CENTER, CENTER);
+            if (assets.btnImg) image(assets.btnImg, 0, 0, btnW, btnH);
+            textFont(fonts.body); textSize(36); textAlign(CENTER, CENTER);
             stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
             text(options[i], 0, -6);
             noStroke(); fill(255, 215, 0);

@@ -158,6 +158,13 @@ class RoomScene {
         }
 
         if (this.isPlayerNearDoor && (keyCode === ENTER || keyCode === 13)) {
+            // Tutorial gate: door is locked until the backpack phase is fully done
+            if (typeof tutorialHints !== 'undefined' &&
+                tutorialHints.roomPhase !== 'DOOR' &&
+                tutorialHints.roomPhase !== 'DONE') {
+                this.triggerDialog("I should finish getting ready first.");
+                return;
+            }
             // Check required items before leaving
             if (typeof backpackUI !== 'undefined' && backpackUI && !backpackUI.hasRequiredItems()) {
                 let missing = backpackUI.getMissingRequiredItems();
@@ -261,6 +268,23 @@ class RoomScene {
      * @returns {boolean} True if the click was consumed.
      */
     handleMousePressed(mx, my) {
+        // ── UI intro: click anywhere (except the pause button) to advance pages ──
+        if (typeof tutorialHints !== 'undefined' &&
+            tutorialHints.roomPhase === 'UI_INTRO') {
+            // Let pause-button clicks pass through
+            if (dist(mx, my, width - 65, 65) >= 80) {
+                if (typeof playSFX === 'function') playSFX(sfxClick);
+                if (tutorialHints.uiIntroStep === 0) {
+                    tutorialHints.uiIntroStep = 1;
+                } else {
+                    tutorialHints.uiTutorialDone = true;
+                    tutorialHints.uiIntroStep    = 0;
+                    tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+                }
+                return true;
+            }
+        }
+
         if (this.backButton.checkMouse(mx, my)) {
             this.backButton.handleClick();
             return true;
@@ -278,44 +302,51 @@ class RoomScene {
         let phase = (typeof tutorialHints !== 'undefined') ? tutorialHints.roomPhase : 'DONE';
 
         let showDeskBox = this.isPlayerNearDesk || (phase === 'DESK');
-        let showDoorBox = this.isPlayerNearDoor || (phase === 'DOOR');
+        // Door is only interactive once the tutorial reaches the DOOR or DONE phase
+        let doorUnlocked = (phase === 'DOOR' || phase === 'DONE');
+        let showDoorBox = doorUnlocked && (this.isPlayerNearDoor || (phase === 'DOOR'));
         if (!showDeskBox && !showDoorBox) return;
 
         push();
 
-        // When the tutorial explicitly targets the door (phase === 'DOOR'), always
-        // show the door yellow box — even if the player happens to also be near the desk.
-        let target;
-        if (phase === 'DOOR') {
-            target = { label: "LEAVE ROOM", key: 'enter', x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
-        } else if (showDeskBox) {
-            target = { label: "CHECK DESK",  key: 'e',     x: this.deskX, y: this.deskY, w: this.deskBoxW, h: this.deskBoxH };
-        } else {
-            target = { label: "LEAVE ROOM", key: 'enter', x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
-        }
-
         let roomTopY = (this._roomTopY !== null) ? this._roomTopY : 100;
         let pulse = (sin(frameCount * 0.1) + 1) * 0.5;
 
-        // Pulsing outline box — always visible when tutorial phase or proximity active
+        // ── Outline box: tracks the tutorial's current phase target ──
+        // Drawn regardless of player proximity so the tutorial goal is always visible.
+        let boxTarget;
+        if (phase === 'DOOR') {
+            boxTarget = { x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
+        } else if (showDeskBox) {
+            boxTarget = { x: this.deskX, y: this.deskY, w: this.deskBoxW, h: this.deskBoxH };
+        } else {
+            boxTarget = { x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
+        }
         noFill();
         stroke(255, 216, 0, 150 + pulse * 105);
         strokeWeight(2);
         rectMode(CENTER);
-        rect(target.x, target.y, target.w, target.h, 8);
+        rect(boxTarget.x, boxTarget.y, boxTarget.w, boxTarget.h, 8);
 
-        // Prompt text + key icon — only when close enough to actually interact
-        let playerNear = (showDeskBox && this.isPlayerNearDesk) || (showDoorBox && this.isPlayerNearDoor);
-        if (playerNear) {
+        // ── Proximity prompt: tracks what the player is actually near ──
+        // Door takes priority over desk so the correct prompt always shows.
+        let promptTarget = null;
+        if (doorUnlocked && this.isPlayerNearDoor) {
+            promptTarget = { label: "LEAVE ROOM", key: 'enter' };
+        } else if (this.isPlayerNearDesk) {
+            promptTarget = { label: "CHECK DESK", key: 'e' };
+        }
+
+        if (promptTarget) {
             textAlign(CENTER, CENTER);
             textFont(fonts.title);
             textSize(22);
             fill(255, 216, 0, 180 + pulse * 75);
             noStroke();
-            text(`PRESS [${target.key.toUpperCase()}] TO ${target.label}`, width / 2, roomTopY);
+            text(`PRESS [${promptTarget.key.toUpperCase()}] TO ${promptTarget.label}`, width / 2, roomTopY);
 
-            if (assets.keys && assets.keys[target.key]) {
-                let sheet = assets.keys[target.key];
+            if (assets.keys && assets.keys[promptTarget.key]) {
+                let sheet = assets.keys[promptTarget.key];
                 let frame = floor(frameCount / 15) % 3;
                 let sw    = sheet.width / 3;
                 imageMode(CENTER);
@@ -323,7 +354,6 @@ class RoomScene {
                 image(sheet, width / 2, roomTopY - 60, 50, 40, frame * sw, 0, sw, sheet.height);
                 noTint();
             }
-
         }
 
         pop();
@@ -337,6 +367,11 @@ class RoomScene {
     drawTutorialHints() {
         if (typeof tutorialHints === 'undefined') return;
         let phase = tutorialHints.roomPhase;
+
+        if (phase === 'UI_INTRO') {
+            this.drawUIIntroTutorial();
+            return;
+        }
 
         if (phase === 'MOVE') {
             this.drawMoveTutorial();
@@ -365,88 +400,217 @@ class RoomScene {
     }
 
     /**
+     * Draws the UI intro tutorial overlay (phase 'UI_INTRO').
+     * Phase chain: UI_INTRO → MOVE → DESK → CLOSE_BP → DOOR → DONE
+     *
+     * Renders:
+     *  • Pulsing glow rings + pointing arrow toward the pause button (top-right)
+     *  • Bottom bar with player portrait, step-message text, step dots, and SPACE prompt
+     *
+     * Player movement is blocked externally (sketch.js draw loop) while this phase is active.
+     * Advance by pressing SPACE/ENTER or clicking anywhere (except the back button).
+     */
+    drawUIIntroTutorial() {
+        if (typeof tutorialHints === 'undefined') return;
+
+        let step = tutorialHints.uiIntroStep;
+
+        // ── Breathing yellow outline frame around the pause button ──
+        push();
+        let bx     = width - 65;
+        let by     = 65;
+        let breathe = sin(frameCount * 0.05);
+        let frameS  = 105 + breathe * 8;
+        noFill();
+        stroke(255, 215, 0, 130 + breathe * 70);
+        strokeWeight(4);
+        rectMode(CENTER);
+        rect(bx, by, frameS, frameS, 10);
+        pop();
+
+        // ── VN-style tutorial panel (橙光 visual novel format) ──
+        const DESIGN_W = 1920;
+        const DESIGN_H = 1080;
+        const s = min(width / DESIGN_W, height / DESIGN_H);
+
+        const panelW = 1440 * s;
+        const panelH = 280  * s;
+        const panelX = width  / 2;
+        const panelY = height - (panelH / 2) - (30 * s);
+
+        push();
+        rectMode(CENTER);
+
+        // Panel shadow
+        noStroke();
+        fill(0, 0, 0, 80);
+        rect(panelX + 4 * s, panelY + 6 * s, panelW, panelH, 18 * s);
+
+        // Panel background
+        fill(18, 8, 42, 220);
+        rect(panelX, panelY, panelW, panelH, 18 * s);
+
+        // Gold outer border
+        noFill();
+        stroke(255, 200, 60, 180);
+        strokeWeight(2.5);
+        rect(panelX, panelY, panelW, panelH, 18 * s);
+
+        // Inner border (decorative inset)
+        stroke(255, 200, 60, 60);
+        strokeWeight(1);
+        rect(panelX, panelY, panelW - 14 * s, panelH - 14 * s, 13 * s);
+
+        // ── Page indicator (1/2 · 2/2) ──
+        if (typeof fonts !== 'undefined' && fonts.body) textFont(fonts.body);
+        textSize(22 * s);
+        textAlign(RIGHT, TOP);
+        noStroke();
+        fill(255, 200, 80, 170);
+        text((step + 1) + " / 2",
+            panelX + panelW / 2 - 26 * s,
+            panelY - panelH / 2 + 16 * s);
+
+        // ── Main text (line-by-line to guarantee text stays inside the panel) ──
+        textSize(28 * s);
+        fill(235, 230, 255);
+        noStroke();
+        textAlign(LEFT, TOP);
+
+        const MSGS = [
+            [
+                "There's a PAUSE button in the top-right corner of the screen.",
+                "Click it — or press [P] on your keyboard — anytime during gameplay."
+            ],
+            [
+                "From the pause menu you can access:",
+                "HELP — Controls guide, character wiki & item list",
+                "SETTINGS — BGM and sound effects volume",
+                "STORY — Day recap and narrative journal",
+                "EXIT — Return to the main menu"
+            ]
+        ];
+
+        const lineH = 42 * s;
+        let tx = panelX - panelW / 2 + 50 * s;
+        let ty = panelY - panelH / 2 + 30 * s;
+        let maxY = panelY + panelH / 2 - 30 * s;   // keep above the hint text
+        let lines = MSGS[step];
+        for (let i = 0; i < lines.length; i++) {
+            let lineY = ty + i * lineH;
+            if (lineY + lineH > maxY) break;        // safety: stop before overflow
+            text(lines[i], tx, lineY);
+        }
+
+        // ── "Click to continue" indicator ──
+        let pulse = (sin(frameCount * 0.1) + 1) * 0.5;
+        textSize(21 * s);
+        fill(255, 215, 0, 130 + pulse * 125);
+        textAlign(RIGHT, BOTTOM);
+        let hint = (step === 0) ? "click anywhere to continue" : "click anywhere to start";
+        text(hint,
+            panelX + panelW / 2 - 26 * s,
+            panelY + panelH / 2 - 14 * s);
+
+        pop();
+    }
+
+    /**
      * Draws the bottom-bar movement key guide shown on Day 1 (first entry only).
      * Dismissed automatically when the player moves 50 px from spawn.
      */
     drawMoveTutorial() {
-        let barH = 220;
-        let barY = height - barH;
-        let cy   = height - barH / 2;
+        const DESIGN_W = 1920;
+        const DESIGN_H = 1080;
+        const s = min(width / DESIGN_W, height / DESIGN_H);
+
+        const panelW = 1440 * s;
+        const panelH = 280  * s;
+        const panelX = width  / 2;
+        const panelY = height - (panelH / 2) - (30 * s);
+
         let pulse    = (sin(frameCount * 0.08) + 1) * 0.5;
         let keyAlpha = 180 + pulse * 75;
 
         push();
+        rectMode(CENTER);
 
-        // Dark purple bar
+        // Panel shadow
         noStroke();
-        fill(25, 12, 50, 230);
-        rectMode(CORNER);
-        rect(0, barY, width, barH, 20);
+        fill(0, 0, 0, 80);
+        rect(panelX + 4 * s, panelY + 6 * s, panelW, panelH, 18 * s);
 
-        // Subtle top border line
-        stroke(130, 80, 200, 120);
-        strokeWeight(2);
-        line(0, barY, width, barY);
-        noStroke();
+        // Panel background
+        fill(18, 8, 42, 220);
+        rect(panelX, panelY, panelW, panelH, 18 * s);
+
+        // Gold outer border
+        noFill();
+        stroke(255, 200, 60, 180);
+        strokeWeight(2.5);
+        rect(panelX, panelY, panelW, panelH, 18 * s);
+
+        // Inner border (decorative inset)
+        stroke(255, 200, 60, 60);
+        strokeWeight(1);
+        rect(panelX, panelY, panelW - 14 * s, panelH - 14 * s, 13 * s);
 
         // ── Keys rendered at their natural aspect ratio ──
-        // targetH: desired display height for every key sprite
-        let targetH = 85;
+        let targetH = 75 * s;
 
-        // Helper: draw one animated key sprite at natural aspect ratio, centred at (x, y)
         let drawKey = (sheet, x, y) => {
             if (!sheet) return;
             let frame   = floor(frameCount / 20) % 3;
-            let sw      = sheet.width / 3;          // single-frame pixel width
-            let sh      = sheet.height;              // single-frame pixel height
+            let sw      = sheet.width / 3;
+            let sh      = sheet.height;
             let renderH = targetH;
-            let renderW = (sw / sh) * renderH;       // preserve original proportions
+            let renderW = (sw / sh) * renderH;
             imageMode(CENTER);
             tint(255, keyAlpha);
             image(sheet, x, y, renderW, renderH, frame * sw, 0, sw, sh);
             noTint();
         };
 
-        // Measure key width from the first available sprite so spacing auto-scales
-        let refSheet  = assets.keys.w;
-        let keyRenderW = refSheet
-            ? (refSheet.width / 3 / refSheet.height) * targetH
-            : targetH * 1.1;
-        let colGap = keyRenderW + 15;  // horizontal distance between key centres
-        let rowOff = targetH + 15;     // vertical distance between the two rows
+        let refSheet   = assets.keys.w;
+        let keyRenderW = refSheet ? (refSheet.width / 3 / refSheet.height) * targetH : targetH * 1.1;
+        let colGap = keyRenderW + 12 * s;
+        let rowOff = targetH + 12 * s;
 
-        let topRowY = cy - rowOff / 2;
-        let botRowY = cy + rowOff / 2;
+        let keyCY   = panelY + 14 * s;
+        let topRowY = keyCY - rowOff / 2;
+        let botRowY = keyCY + rowOff / 2;
 
-        // ── WASD group (left of canvas centre) ──
-        let wasdX = width / 2 - 420;
+        // ── WASD group (left of panel centre) ──
+        let wasdX = panelX - 380 * s;
         drawKey(assets.keys.w, wasdX,           topRowY);
         drawKey(assets.keys.a, wasdX - colGap,  botRowY);
         drawKey(assets.keys.s, wasdX,           botRowY);
         drawKey(assets.keys.d, wasdX + colGap,  botRowY);
 
-        // ── Arrow keys group (right of canvas centre) ──
-        let arrX = width / 2 + 420;
+        // ── Arrow keys group (right of panel centre) ──
+        let arrX = panelX + 380 * s;
         drawKey(assets.keys.up,    arrX,           topRowY);
         drawKey(assets.keys.left,  arrX - colGap,  botRowY);
         drawKey(assets.keys.down,  arrX,           botRowY);
         drawKey(assets.keys.right, arrX + colGap,  botRowY);
 
-        // ── Centre label ──
+        // ── Labels ──
         textAlign(CENTER, CENTER);
         textFont(fonts.body);
-        textSize(32);
+
+        let labelY = panelY - panelH / 2 + 36 * s;
+        textSize(28 * s);
         stroke(0, 0, 0, 160);
         strokeWeight(4);
         fill(255, 220, 80, keyAlpha);
-        text("USE WASD OR ARROW KEYS TO MOVE", width / 2, cy - 65);
+        text("USE WASD OR ARROW KEYS TO MOVE", panelX, labelY);
         noStroke();
         fill(255, 220, 80, keyAlpha);
-        text("USE WASD OR ARROW KEYS TO MOVE", width / 2, cy - 65);
+        text("USE WASD OR ARROW KEYS TO MOVE", panelX, labelY);
 
-        textSize(22);
+        textSize(20 * s);
         fill(200, 175, 255, keyAlpha * 0.75);
-        text("MOVE TO DISMISS", width / 2, cy + 22);
+        text("MOVE TO DISMISS", panelX, panelY + panelH / 2 - 20 * s);
 
         pop();
     }

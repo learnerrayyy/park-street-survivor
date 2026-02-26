@@ -55,7 +55,7 @@ class MainMenu {
      */
     setupButtons() {
         let centerY = height - 250;
-        let spacing = 320;
+        let spacing = 420;
         this.buttons.push(new UIButton(width / 2 - spacing, centerY, 256, 96, "START", () => {
             triggerTransition(() => {
                 this.menuState = STATE_LEVEL_SELECT;
