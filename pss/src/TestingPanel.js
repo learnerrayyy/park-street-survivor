@@ -258,12 +258,14 @@ class TestingPanel {
         this.obstacleHeaderHitboxes = [];
         this.dayButtons = [];
         this.devButtons = [];
+        this.sectionHeaderHitboxes = [];
         this.dayParamHitboxes = [];
         this.homelessParamHitboxes = [];
         this.modeButtons = [];
         this.modeSequenceHitbox = null;
         this.modeConfigHitboxes = [];
         this.buffControlHitboxes = [];
+        this.uiTunerHitboxes = [];
         this.selectedModeId = 1;
 
         const preferredObstacleOrder = [
@@ -310,6 +312,14 @@ class TestingPanel {
             { key: "respawnJitter", label: "buffRespawnJitter(0-1)", valueType: "number", min: 0, max: 1 },
             { key: "buffWeights", label: "buffWeights (JSON)", valueType: "json" }
         ];
+        this.sectionExpanded = {
+            daySelector: false,
+            modeSequence: false,
+            modeIndex: false,
+            modeConfig: false,
+            buffControl: false,
+            devActions: false
+        };
 
         this.initializeDifficultyDebugFields();
         this.initializeHomelessDebugFields();
@@ -365,6 +375,15 @@ class TestingPanel {
 
     isVisible() {
         return this.visible;
+    }
+
+    isSectionExpanded(sectionKey) {
+        return !!this.sectionExpanded[sectionKey];
+    }
+
+    toggleSectionExpanded(sectionKey) {
+        if (sectionKey === "daySelector" || sectionKey === "devActions") return;
+        this.sectionExpanded[sectionKey] = !this.isSectionExpanded(sectionKey);
     }
 
     getCurrentDifficultyConfig() {
@@ -461,7 +480,7 @@ class TestingPanel {
     }
 
     getCurrentBuffControlConfigByDay(dayID) {
-        const cfg = DIFFICULTY_PROGRESSION[dayID];
+        const cfg = DAYS_CONFIG[dayID];
         if (!cfg) return null;
         if (!cfg.buffControlConfig || typeof cfg.buffControlConfig !== "object") {
             cfg.buffControlConfig = {
@@ -884,6 +903,14 @@ class TestingPanel {
     handleMousePressed(mx, my) {
         if (!this.visible) return false;
 
+        for (const box of this.sectionHeaderHitboxes) {
+            if (mx >= box.x && mx <= box.x + box.w && my >= box.y && my <= box.y + box.h) {
+                this.commitEdit();
+                this.toggleSectionExpanded(box.sectionKey);
+                return true;
+            }
+        }
+
         for (const btn of this.dayButtons) {
             if (mx >= btn.x && mx <= btn.x + btn.w && my >= btn.y && my <= btn.y + btn.h) {
                 this.commitEdit();
@@ -943,13 +970,7 @@ class TestingPanel {
             }
         }
 
-        for (const box of this.uiTunerHitboxes) {
-            if (mx >= box.x && mx <= box.x + box.w && my >= box.y && my <= box.y + box.h) {
-                this.commitEdit();
-                this.beginUITunerEdit(box.key);
-                return true;
-            }
-        }
+        // Legacy UI tuner branch retired.
 
         for (const box of this.obstacleHeaderHitboxes) {
             if (mx >= box.x && mx <= box.x + box.w && my >= box.y && my <= box.y + box.h) {
@@ -992,14 +1013,67 @@ class TestingPanel {
     }
 
     executeDevAction(actionId) {
+        const applySingleModeLoopForDay = (day, modeId) => {
+            const safeDay = Number.isFinite(Number(day)) ? Number(day) : 1;
+            const safeModeId = Math.max(1, Math.min(10, Math.round(Number(modeId || 1))));
+            this.ensureModeCycleConfigForDay(safeDay);
+            const diffCfg = DIFFICULTY_PROGRESSION[safeDay];
+            const cycle = diffCfg ? (diffCfg.difficultyModeCycleConfig || diffCfg.modeCycleConfig) : null;
+            if (!cycle || typeof cycle !== "object") return;
+            if (!cycle.modes || typeof cycle.modes !== "object") cycle.modes = {};
+            if (!cycle.modes[safeModeId]) cycle.modes[safeModeId] = this.createDefaultModeConfigForDay(safeDay);
+            cycle.modePattern = [safeModeId];
+            if (!cycle.modeDisplayMap || typeof cycle.modeDisplayMap !== "object") cycle.modeDisplayMap = {};
+            if (cycle.modeDisplayMap[safeModeId] === undefined) cycle.modeDisplayMap[safeModeId] = safeModeId;
+            this.selectedModeId = safeModeId;
+        };
+
+        const runDayDirect = (day) => {
+            const safeDay = Number.isFinite(Number(day)) ? Number(day) : 1;
+            try {
+                if (typeof setupRunDirectly === "function") {
+                    setupRunDirectly(safeDay);
+                    return;
+                }
+                if (typeof setupRunTestMode === "function") {
+                    setupRunTestMode(safeDay);
+                    return;
+                }
+            } catch (err) {
+                console.error("[DEV] runDayDirect primary path failed:", err);
+            }
+
+            // Hard fallback: force-init DAY_RUN even if helper APIs fail.
+            try {
+                currentDayID = safeDay;
+                if (player && typeof player.applyLevelStats === "function") player.applyLevelStats(safeDay);
+                if (player) {
+                    player.x = GLOBAL_CONFIG.lanes.lane1;
+                    player.y = PLAYER_RUN_FOOT_Y;
+                }
+                obstacleManager = new ObstacleManager();
+                if (levelController && typeof levelController.initializeLevel === "function") {
+                    levelController.initializeLevel(safeDay);
+                }
+                if (gameState && typeof gameState.setState === "function") {
+                    gameState.setState(STATE_DAY_RUN);
+                } else if (gameState) {
+                    gameState.currentState = STATE_DAY_RUN;
+                }
+            } catch (fallbackErr) {
+                console.error("[DEV] runDayDirect fallback failed:", fallbackErr);
+            }
+        };
+
         if (actionId === "restart_current") {
             const day = Number((levelController && levelController.currentDayID) || currentDayID || this.selectedDay || 1);
-            if (typeof setupRunTestMode === "function") setupRunTestMode(day);
+            runDayDirect(day);
             return;
         }
 
         if (actionId === "run_selected_day") {
-            if (typeof setupRunTestMode === "function") setupRunTestMode(this.selectedDay);
+            applySingleModeLoopForDay(this.selectedDay, this.selectedModeId);
+            runDayDirect(this.selectedDay);
             return;
         }
 
@@ -1086,22 +1160,84 @@ class TestingPanel {
 
         const topY = panelY + 80;
         const contentW = panelW - 48;
-        const actionsY = panelY + panelH - 108;
+        this.dayButtons = [];
+        this.devButtons = [];
         this.modeSequenceHitbox = null;
         this.modeButtons = [];
         this.modeConfigHitboxes = [];
         this.buffControlHitboxes = [];
         this.rowHitboxes = [];
+        this.sectionHeaderHitboxes = [];
         this.obstacleHeaderHitboxes = [];
         this.dayParamHitboxes = [];
         this.homelessParamHitboxes = [];
-        this.drawDaySelector(panelX + 24, topY);
-        this.drawModeSequenceEditor(panelX + 24, topY + 46, contentW, 86);
-        this.drawModeIndexSelector(panelX + 24, topY + 140, contentW, 66);
-        this.drawModeConfigEditor(panelX + 24, topY + 214, contentW, 252);
-        this.drawBuffControlEditor(panelX + 24, topY + 474, contentW, actionsY - (topY + 474) - 10);
-        this.drawDevActions(panelX + 24, panelY + panelH - 108, panelW - 48, 84);
+
+        const sectionX = panelX + 24;
+        const sectionW = contentW;
+        const sectionGap = 8;
+        const collapsedGap = 4;
+        let cursorY = topY;
+
+        this.drawDaySelector(sectionX + 10, cursorY + 8);
+        cursorY += 50;
+        cursorY += sectionGap;
+
+        cursorY = this.drawSectionHeader(sectionX, cursorY, sectionW, "Difficulty Mode Sequence", "modeSequence");
+        if (this.isSectionExpanded("modeSequence")) {
+            this.drawModeSequenceEditor(sectionX, cursorY + 6, sectionW, 86);
+            cursorY += 92;
+        } else {
+            cursorY += collapsedGap;
+        }
+        cursorY += sectionGap;
+
+        cursorY = this.drawSectionHeader(sectionX, cursorY, sectionW, "Mode Index (1-10)", "modeIndex");
+        if (this.isSectionExpanded("modeIndex")) {
+            this.drawModeIndexSelector(sectionX, cursorY + 6, sectionW, 66);
+            cursorY += 72;
+        } else {
+            cursorY += collapsedGap;
+        }
+        cursorY += sectionGap;
+
+        cursorY = this.drawSectionHeader(sectionX, cursorY, sectionW, `Mode ${this.selectedModeId} Config`, "modeConfig");
+        if (this.isSectionExpanded("modeConfig")) {
+            this.drawModeConfigEditor(sectionX, cursorY + 6, sectionW, 252);
+            cursorY += 258;
+        } else {
+            cursorY += collapsedGap;
+        }
+        cursorY += sectionGap;
+
+        cursorY = this.drawSectionHeader(sectionX, cursorY, sectionW, "Buff Control", "buffControl");
+        if (this.isSectionExpanded("buffControl")) {
+            this.drawBuffControlEditor(sectionX, cursorY + 6, sectionW, 142);
+            cursorY += 148;
+        } else {
+            cursorY += collapsedGap;
+        }
+        cursorY += sectionGap;
+
+        this.drawDevActions(sectionX, cursorY + 6, sectionW, 84);
+        cursorY += 90;
         pop();
+    }
+
+    drawSectionHeader(x, y, w, label, sectionKey) {
+        const h = 30;
+        stroke(0, 150);
+        strokeWeight(1);
+        fill(236);
+        rect(x, y, w, h, 8);
+        noStroke();
+        fill(0);
+        textAlign(LEFT, CENTER);
+        textStyle(BOLD);
+        textSize(19);
+        const mark = this.isSectionExpanded(sectionKey) ? "[-]" : "[+]";
+        text(`${mark} ${label}`, x + 10, y + h / 2 + 1);
+        this.sectionHeaderHitboxes.push({ sectionKey, x, y, w, h });
+        return y + h;
     }
 
     drawDaySelector(x, y) {
@@ -1642,7 +1778,7 @@ class TestingPanel {
 
         const buttons = [
             { id: "restart_current", label: "Restart Current" },
-            { id: "run_selected_day", label: `Run Day ${this.selectedDay}` },
+            { id: "run_selected_day", label: `Run Day ${this.selectedDay} (M${this.selectedModeId})` },
             { id: "goto_room", label: "Go Room" },
             { id: "goto_pause", label: "Open Pause" },
             { id: "refill", label: "Refill HP" },

@@ -69,6 +69,11 @@ const DAYS_CONFIG = {
         baseScrollSpeed: 15,
         basePlayerSpeed: 10,
         healthDecay: 0.02,
+        buffControlConfig: {
+            avgRespawnSec: 2.0,
+            respawnJitter: 0.5,
+            buffWeights: { COFFEE: 1.0, EMPTY_SCOOTER: 1.0 }
+        },
         type: "NORMAL"
     },
     2: {
@@ -77,7 +82,12 @@ const DAYS_CONFIG = {
         obstacleSpawnInterval: 60,
         baseScrollSpeed: 15,
         basePlayerSpeed: 18,
-        healthDecay: 0.06,
+        healthDecay: 0.04,
+        buffControlConfig: {
+            avgRespawnSec: 3.5,
+            respawnJitter: 0.2,
+            buffWeights: { COFFEE: 0.7, EMPTY_SCOOTER: 0.5 }
+        },
         type: "NORMAL"
     },
     3: {
@@ -86,7 +96,12 @@ const DAYS_CONFIG = {
         obstacleSpawnInterval: 60,
         baseScrollSpeed: 18,
         basePlayerSpeed: 23,
-        healthDecay: 0.07,
+        healthDecay: 0.04,
+        buffControlConfig: {
+            avgRespawnSec: 4.0,
+            respawnJitter: 0.3,
+            buffWeights: { COFFEE: 1.0, EMPTY_SCOOTER: 0.65 }
+        },
         type: "NORMAL"
     },
     4: {
@@ -96,6 +111,11 @@ const DAYS_CONFIG = {
         baseScrollSpeed: 23,
         basePlayerSpeed: 25,
         healthDecay: 0.08,
+        buffControlConfig: {
+            avgRespawnSec: 5.0,
+            respawnJitter: 0.25,
+            buffWeights: { COFFEE: 1.0, EMPTY_SCOOTER: 0.45 }
+        },
         type: "NORMAL"
     },
     5: {
@@ -105,6 +125,11 @@ const DAYS_CONFIG = {
         baseScrollSpeed: 25,
         basePlayerSpeed: 28,
         healthDecay: 0.10,
+        buffControlConfig: {
+            avgRespawnSec: 5.5,
+            respawnJitter: 0.35,
+            buffWeights: { COFFEE: 1.0, EMPTY_SCOOTER: 0.4 }
+        },
         type: "NORMAL"
     }
 };
