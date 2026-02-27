@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Park Street Survivor | The Architects</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="theme.js"></script>
+</head>
+<body>
+
+    <nav>
+        <div class="nav-container container">
+            <span class="logo">Park Street Survivor</span>
+            <div class="nav-links">
+                <a href="index.html"     class="nav-item">Home</a>
+                <a href="labs.html"      class="nav-item">Labs</a>
+                <a href="meetings.html"  class="nav-item">Meetings</a>
+                <a href="technical.html" class="nav-item">Tech_Log</a>
+                <a href="team.html"      class="nav-item active">Team</a>
+            </div>
+            <div class="nav-actions">
+                <a href="#" class="nav-icon-btn" target="_blank" title="GitHub Repository">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                </a>
+                <a href="#" class="nav-icon-btn" target="_blank" title="Jira Board">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215l2.13-.001V18.5c0 2.902 2.325 5.252 5.215 5.215V12.518c-.01-.564-.464-1.005-1.006-1.005zm5.57-5.558H5.571a5.218 5.218 0 0 0 5.232 5.215l2.13-.001v1.774c0 2.902 2.325 5.252 5.215 5.215V6.961c0-.558-.449-1.006-1.006-1.006zm5.572-5.955H11.143a5.218 5.218 0 0 0 5.232 5.215l2.13-.001v1.774c0 2.902 2.325 5.252 5.215 5.215V1.005A1.005 1.005 0 0 0 22.713 0z"/></svg>
+                </a>
+                <button class="theme-toggle" id="themeToggle" aria-label="Switch theme"></button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+
+        <div class="page-hero">
+            <h1 class="page-title">The Architects</h1>
+            <p class="page-subtitle">Five minds building one dream — Group 7</p>
+        </div>
+
+        <!-- Group Photo -->
+        <div class="card" style="text-align: center;">
+            <h2 class="section-title">✿ Group Photo</h2>
+            <div class="pixel-img-frame">
+                <div class="pixel-img-placeholder">
+                    [ Team Photo Placeholder ]<br>
+                    <span style="font-size:0.85rem;">Upload team-pixel-photo.png to assets/</span>
+                </div>
+            </div>
+            <p class="caption">"Hope is the thing with feathers..." — Our journey on Park Street.</p>
+        </div>
+
+        <!-- Team Members -->
+        <div class="team-list">
+
+            <div class="card member-card">
+                <div class="member-header">
+                    <div class="avatar" style="background: var(--headline);"></div>
+                    <div class="member-info">
+                        <h3 class="member-name">Charlotte Yu</h3>
+                        <p class="member-role">Core Mechanism &amp; Systems Architect</p>
+                    </div>
+                </div>
+                <p class="member-desc">
+                    Leads the core finite state machine architecture and systems integration.
+                    Establishes rigorous development audit trails — mapping Jira issues to
+                    GitHub commits — to ensure robust game mechanics and a healthy,
+                    well-documented codebase throughout every sprint.
+                </p>
+            </div>
+
+            <div class="card member-card">
+                <div class="member-header">
+                    <div class="avatar" style="background: #d4d8f0;"></div>
+                    <div class="member-info">
+                        <h3 class="member-name">Kangrui Wang</h3>
+                        <p class="member-role">Level Designer</p>
+                    </div>
+                </div>
+                <p class="member-desc">
+                    Designs the spatial layout and interaction logic for the Park Street ramp level.
+                    Uses environmental storytelling and carefully tuned difficulty curves to guide
+                    players through the emotional highs and lows of the survival experience.
+                </p>
+            </div>
+
+            <div class="card member-card">
+                <div class="member-header">
+                    <div class="avatar" style="background: #fffffe; border: 3px solid var(--stroke);"></div>
+                    <div class="member-info">
+                        <h3 class="member-name">Layla Pei</h3>
+                        <p class="member-role">UI/UX &amp; Audio Designer</p>
+                    </div>
+                </div>
+                <p class="member-desc">
+                    Responsible for interface usability and audio atmosphere. Designs the HUD,
+                    dialogue overlays, and interactive UI elements, while crafting the game's
+                    soundscape using Howler.js to deepen player immersion in the narrative world.
+                </p>
+            </div>
+
+            <div class="card member-card">
+                <div class="member-header">
+                    <div class="avatar" style="background: var(--main-accent);"></div>
+                    <div class="member-info">
+                        <h3 class="member-name">Lucca Zhou</h3>
+                        <p class="member-role">Aesthetic Designer</p>
+                    </div>
+                </div>
+                <p class="member-desc">
+                    Defines the project's visual identity and style guide. Responsible for
+                    pixel asset creation, duotone colour grading, and ensuring visual
+                    consistency across all game scenes — giving Park Street its
+                    distinctive melancholic yet hopeful look.
+                </p>
+            </div>
+
+            <div class="card member-card">
+                <div class="member-header">
+                    <div class="avatar" style="background: var(--highlight);"></div>
+                    <div class="member-info">
+                        <h3 class="member-name">Keyu Zhou</h3>
+                        <p class="member-role">Narrative &amp; Script Designer</p>
+                    </div>
+                </div>
+                <p class="member-desc">
+                    Authors the core narrative text and handles literary deconstruction.
+                    Transforms Emily Dickinson's poetic imagery into in-game dialogue,
+                    narrative triggers, and emotional anchors embedded within
+                    the dialogue system and event logic.
+                </p>
+            </div>
+
+        </div><!-- /.team-list -->
+
+    </div><!-- /.container -->
+
+    <footer>
+        <p>Built with ♡ by Group 7 · The Architects · MSc Computer Science @ University of Bristol</p>
+    </footer>
+
+</body>
+</html>
