@@ -125,10 +125,10 @@ const OBSTACLE_CONFIG = {
       // Dialogue test copy (fallback for all days until day-specific lines are authored)
       defaultDialogue: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die.",
       dialoguesByDay: {
-         1: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die.",
-         2: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die.",
-         3: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die.",
-         4: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die.",
+         1: "A word",
+         2: "Yes or Yes!",
+         3: "Oh my god?",
+         4: "Shit!",
          5: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die."
       },
       bubbleOffsetX: 0,      // Horizontal offset relative to homeless X (pixels)
@@ -268,9 +268,7 @@ const OBSTACLE_CONFIG = {
    /**
     * Puddle
     * Characteristics: Environmental obstacle - Minor damage
-    * TODO: Add sprite file
     */
-   /*
    PUDDLE: {
       baseType: "PUDDLE",
       type: "ENVIRONMENTAL",
@@ -289,12 +287,8 @@ const OBSTACLE_CONFIG = {
       allowedLanes: [2, 3],  // Only on the road
       mutualExclusion: [],
 
-      // No variants
-      variants: [
-         { name: "Puddle", sprite: "assets/obstacles/obstacle_puddle.png" }
-      ]
+      sprite: null
    },
-   */
 
    // ===== BUFF Items =====
 

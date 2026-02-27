@@ -2,17 +2,106 @@
 // Defines the obstacle generation rules for each level:
 // available obstacles, generation rate, variant pool, dialogue text, etc.
 
+const MODE_PRESETS = {
+  1: {
+    avgbuffPerWindow: 3.0,
+    buffGlobalMinGapSec: 5.0,
+    buffTypeMinGapSec: { COFFEE: 4, EMPTY_SCOOTER: 14.0 },
+    avgobPerWindow: 2.2,
+    obTypeMinGapSec: { LARGE_CAR: 6.0, PROMOTER: 8.0 },
+    obWeights: {
+      LARGE_CAR: 0.8,
+      SMALL_CAR: 2.2,
+      SCOOTER_RIDER: 0.9,
+      HOMELESS: 1.0,
+      PROMOTER: 0.8,
+      SMALL_BUSINESS: 1.0
+    },
+    minOnScreenOb: 1,
+    maxOnScreenOb: 4
+  },
+  2: {
+    avgbuffPerWindow: 0.6,
+    buffGlobalMinGapSec: 9.0,
+    buffTypeMinGapSec: { COFFEE: 10.0, EMPTY_SCOOTER: 16.0 },
+    avgobPerWindow: 3.0,
+    obTypeMinGapSec: { LARGE_CAR: 4.5, PROMOTER: 7.0 },
+    obWeights: {
+      LARGE_CAR: 1.3,
+      SMALL_CAR: 1.8,
+      SCOOTER_RIDER: 1.0,
+      HOMELESS: 1.2,
+      PROMOTER: 1.0,
+      SMALL_BUSINESS: 1.1,
+      FANTASY_COFFEE: 0.5,
+      PUDDLE: 0.8
+    },
+    minOnScreenOb: 2,
+    maxOnScreenOb: 5
+  },
+  3: {
+    avgbuffPerWindow: 1.0,
+    buffGlobalMinGapSec: 7.5,
+    buffTypeMinGapSec: { COFFEE: 9.0, EMPTY_SCOOTER: 12.0 },
+    avgobPerWindow: 2.5,
+    obTypeMinGapSec: { LARGE_CAR: 5.0, PROMOTER: 7.0 },
+    obWeights: {
+      LARGE_CAR: 0.9,
+      SMALL_CAR: 1.4,
+      SCOOTER_RIDER: 1.3,
+      HOMELESS: 1.6,
+      PROMOTER: 1.4,
+      SMALL_BUSINESS: 1.3,
+      FANTASY_COFFEE: 0.8,
+      PUDDLE: 0.9
+    },
+    minOnScreenOb: 1,
+    maxOnScreenOb: 4
+  },
+  4: {
+    avgbuffPerWindow: 0.4,
+    buffGlobalMinGapSec: 10.0,
+    buffTypeMinGapSec: { COFFEE: 12.0, EMPTY_SCOOTER: 18.0 },
+    avgobPerWindow: 3.6,
+    obTypeMinGapSec: { LARGE_CAR: 3.8, PROMOTER: 6.0 },
+    obWeights: {
+      LARGE_CAR: 1.8,
+      SMALL_CAR: 1.6,
+      SCOOTER_RIDER: 1.6,
+      HOMELESS: 1.1,
+      PROMOTER: 0.9,
+      SMALL_BUSINESS: 1.0,
+      FANTASY_COFFEE: 1.0,
+      PUDDLE: 1.2
+    },
+    minOnScreenOb: 2,
+    maxOnScreenOb: 6
+  }
+};
+
+function createModeCycleConfig(modePattern, modePresets, windowSec = 5) {
+  const sanitizedPattern = Array.isArray(modePattern) && modePattern.length > 0
+    ? modePattern.map(v => Number(v)).filter(v => Number.isFinite(v))
+    : [1];
+  const modeDisplayMap = {};
+  for (const id of sanitizedPattern) modeDisplayMap[id] = id;
+  return {
+    windowSec: Math.max(1, Number(windowSec || 5)),
+    modePattern: sanitizedPattern.length > 0 ? sanitizedPattern : [1],
+    modes: { ...modePresets },
+    modeDisplayMap
+  };
+}
+
 const DIFFICULTY_PROGRESSION = {
   //level 1 is tutorial, so no procedural generation config needed
   1: {
     description: "Day 1 - The Morning Commute",
     availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
-      spawnRatePerFrame: 0.01,
-      minObstacleInterval: 40,
-      buffSpawnRatio: 0.15,
-      buffMinIntervalSec: 10.0,
+      minObstacleInterval: 30
     },
+    modeCycleConfig: createModeCycleConfig([1, 2, 3, 1, 2, 3, 1, 2, 3, 4, 3], MODE_PRESETS, 5),
     variants: {}
   },
 
@@ -20,47 +109,39 @@ const DIFFICULTY_PROGRESSION = {
     description: "Day 2 - Running Late",
     availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
-      spawnRatePerFrame: 0.01,
-      minObstacleInterval: 50,
-      buffSpawnRatio: 0.005,
-      buffMinIntervalSec: 12.0,
+      minObstacleInterval: 50
     },
+    modeCycleConfig: createModeCycleConfig([1, 2, 1, 3], MODE_PRESETS, 5),
     variants: {}
   },
 
   3: {
     description: "Day 3 - Midweek Rush",
-    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
+    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "FANTASY_COFFEE", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
-      spawnRatePerFrame: 0.018,
-      minObstacleInterval: 40,
-      buffSpawnRatio: 0.10,
-      buffMinIntervalSec: 9.0,
+      minObstacleInterval: 40
     },
+    modeCycleConfig: createModeCycleConfig([2, 3, 2, 4], MODE_PRESETS, 5),
     variants: {}
   },
 
   4: {
     description: "Day 4 - Deadline Pressure",
-    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
+    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "FANTASY_COFFEE", "PUDDLE", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
-      spawnRatePerFrame: 0.020,
-      minObstacleInterval: 35,
-      buffSpawnRatio: 0.08,
-      buffMinIntervalSec: 10.0,
+      minObstacleInterval: 35
     },
+    modeCycleConfig: createModeCycleConfig([2, 4, 3, 4, 2], MODE_PRESETS, 5),
     variants: {}
   },
 
   5: {
     description: "Day 5 - Final Challenge",
-    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
+    availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "FANTASY_COFFEE", "PUDDLE", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
-      spawnRatePerFrame: 0.022,
-      minObstacleInterval: 30,
-      buffSpawnRatio: 0.06,
-      buffMinIntervalSec: 11.0,
+      minObstacleInterval: 30
     },
+    modeCycleConfig: createModeCycleConfig([3, 4, 2, 4, 3, 4], MODE_PRESETS, 5),
     variants: {}
   }
 };

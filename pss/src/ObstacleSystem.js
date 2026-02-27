@@ -19,11 +19,6 @@ class ObstacleManager {
 
         this.spriteCache = {};
 
-        this.buffGuaranteeFrames = 0;
-        this.buffGuaranteeTimer = 0;
-        this.buffMinIntervalFrames = 0;
-        this.buffCooldownFrames = 0;
-
         this.promoterInteraction = {
             active: false,
             spacePressCount: 0,
@@ -32,20 +27,139 @@ class ObstacleManager {
             projectile: null
         };
         this.promoterCooldownFramesRemaining = 0;
+        this.modeCycleState = null;
+        this.elapsedSpawnFrames = 0;
+        this.typeLastSpawnFrame = {};
+        this.buffSpawnState = {
+            timerFrames: 0,
+            avgRespawnFrames: this.secondsToFrames(6),
+            respawnJitter: 0,
+            buffWeights: { COFFEE: 1, EMPTY_SCOOTER: 1 }
+        };
+        this.modeSwitchIndicator = {
+            framesLeft: 0,
+            durationFrames: this.secondsToFrames(1.2),
+            displayText: ""
+        };
     }
 
 
     setLevelConfig(difficultyConfig) {
         this.currentLevelConfig = difficultyConfig;
         console.log("[ObstacleManager] Level config set:", difficultyConfig.description);
-        const guaranteeSec = (difficultyConfig.spawnConfig && difficultyConfig.spawnConfig.buffGuaranteeIntervalSec) || 0;
-        this.buffGuaranteeFrames = Math.max(0, this.secondsToFrames(guaranteeSec));
-        this.buffGuaranteeTimer = this.buffGuaranteeFrames;
-        const buffMinSec = (difficultyConfig.spawnConfig && difficultyConfig.spawnConfig.buffMinIntervalSec) || 0;
-        this.buffMinIntervalFrames = Math.max(0, this.secondsToFrames(buffMinSec));
-        this.buffCooldownFrames = 0;
+        this.elapsedSpawnFrames = 0;
+        this.typeLastSpawnFrame = {};
+        this.initializeModeCycleState(difficultyConfig);
+        this.initializeBuffControlState(difficultyConfig);
     }
 
+    initializeModeCycleState(difficultyConfig) {
+        const cfg = difficultyConfig && (difficultyConfig.difficultyModeCycleConfig || difficultyConfig.modeCycleConfig);
+        const pattern = cfg && Array.isArray(cfg.modePattern) ? cfg.modePattern : [];
+        const modes = cfg && cfg.modes ? cfg.modes : null;
+        if (!modes || pattern.length === 0) {
+            this.modeCycleState = null;
+            return;
+        }
+
+        const windowSec = Number(cfg.windowSec || 5);
+        const modeDisplayMap = (cfg && cfg.modeDisplayMap && typeof cfg.modeDisplayMap === "object")
+            ? { ...cfg.modeDisplayMap }
+            : {};
+        for (const modeId of pattern) {
+            if (modeDisplayMap[modeId] === undefined) modeDisplayMap[modeId] = modeId;
+        }
+        this.modeCycleState = {
+            windowFrames: Math.max(1, this.secondsToFrames(windowSec)),
+            pattern: [...pattern],
+            modes: { ...modes },
+            modeDisplayMap,
+            elapsedFrames: 0,
+            windowIndex: 0,
+            currentModeId: pattern[0]
+        };
+    }
+
+    updateModeCycleWindowProgress() {
+        if (!this.modeCycleState) return;
+        const state = this.modeCycleState;
+        state.elapsedFrames++;
+        const nextWindowIndex = Math.floor(state.elapsedFrames / state.windowFrames);
+        if (nextWindowIndex === state.windowIndex) return;
+
+        state.windowIndex = nextWindowIndex;
+        const patternIndex = state.windowIndex % state.pattern.length;
+        const nextModeId = state.pattern[patternIndex];
+        if (nextModeId !== state.currentModeId) {
+            state.currentModeId = nextModeId;
+            this.triggerModeSwitchIndicator(nextModeId);
+        }
+    }
+
+    getActiveModeConfig() {
+        if (!this.modeCycleState) return null;
+        const modeId = this.modeCycleState.currentModeId;
+        return this.modeCycleState.modes[modeId] || null;
+    }
+
+    isModeCycleEnabled() {
+        return !!(this.modeCycleState && this.getActiveModeConfig());
+    }
+
+    initializeBuffControlState(difficultyConfig) {
+        const cfg = difficultyConfig && difficultyConfig.buffControlConfig ? difficultyConfig.buffControlConfig : {};
+        const avgSecRaw = Number(cfg.avgRespawnSec || 6.0);
+        const jitterRaw = Number(cfg.respawnJitter || 0);
+        this.buffSpawnState.avgRespawnFrames = Math.max(1, this.secondsToFrames(Number.isFinite(avgSecRaw) ? avgSecRaw : 6.0));
+        this.buffSpawnState.respawnJitter = Math.max(0, Math.min(1, Number.isFinite(jitterRaw) ? jitterRaw : 0));
+        this.buffSpawnState.buffWeights = (cfg.buffWeights && typeof cfg.buffWeights === "object")
+            ? { ...cfg.buffWeights }
+            : { COFFEE: 1, EMPTY_SCOOTER: 1 };
+        this.scheduleNextBuffSpawn();
+    }
+
+    scheduleNextBuffSpawn() {
+        const avg = Math.max(1, Number(this.buffSpawnState.avgRespawnFrames || 1));
+        const jitter = Math.max(0, Math.min(1, Number(this.buffSpawnState.respawnJitter || 0)));
+        const factor = 1 + ((Math.random() * 2 - 1) * jitter);
+        this.buffSpawnState.timerFrames = Math.max(1, Math.round(avg * factor));
+    }
+
+    getModeDisplayValue(modeId) {
+        if (!this.modeCycleState || !this.modeCycleState.modeDisplayMap) return modeId;
+        const mapped = this.modeCycleState.modeDisplayMap[modeId];
+        if (mapped === undefined || mapped === null || mapped === "") return modeId;
+        return mapped;
+    }
+
+    triggerModeSwitchIndicator(modeId) {
+        const mapped = this.getModeDisplayValue(modeId);
+        this.modeSwitchIndicator.displayText = String(mapped);
+        this.modeSwitchIndicator.framesLeft = this.modeSwitchIndicator.durationFrames;
+    }
+
+    getOnScreenCountByCategory(category) {
+        if (!category) return 0;
+        if (category === "BUFF") {
+            return this.obstacles.filter(o => o && o.config && o.config.type === "BUFF").length;
+        }
+        return this.obstacles.filter(o => o && o.config && o.config.type !== "BUFF").length;
+    }
+
+    getTypeMinGapFrames(obstacleType, gapMap) {
+        if (!gapMap || !obstacleType) return 0;
+        const raw = Number(gapMap[obstacleType] || 0);
+        if (!Number.isFinite(raw) || raw <= 0) return 0;
+        return this.secondsToFrames(raw);
+    }
+
+    passesTypeMinGap(obstacleType, gapMap) {
+        const requiredGap = this.getTypeMinGapFrames(obstacleType, gapMap);
+        if (requiredGap <= 0) return true;
+        const lastFrame = this.typeLastSpawnFrame[obstacleType];
+        if (lastFrame === undefined) return true;
+        return (this.elapsedSpawnFrames - lastFrame) >= requiredGap;
+    }
 
     getVariantForObstacle(obstacleType) {
         if (!this.currentLevelConfig || !this.currentLevelConfig.variants) {
@@ -62,55 +176,51 @@ class ObstacleManager {
         return pool[randomIndex];
     }
 
-    selectRandomObstacle(forceBuff = false) {
-        if (!this.currentLevelConfig || !this.currentLevelConfig.availableObstacles) {
-            console.log("[DEBUG] selectRandomObstacle: no config or no availableObstacles");
-            return null;
-        }
-
-        const available = this.currentLevelConfig.availableObstacles;
-        console.log(`[DEBUG] selectRandomObstacle: available=${JSON.stringify(available)}`);
-
-        const buffObstacles = ["COFFEE", "EMPTY_SCOOTER"];
-        const buffInAvailable = available.filter(o => buffObstacles.includes(o));
-        const hasActiveBuffOnScreen = this.obstacles.some(o => o.config && o.config.type === "BUFF");
-        if (forceBuff) {
-            if (buffInAvailable.length === 0 || hasActiveBuffOnScreen) return null;
-            return this.pickWeightedObstacle(buffInAvailable);
-        }
-
-        const isBuff = !hasActiveBuffOnScreen &&
-            this.buffCooldownFrames <= 0 &&
-            (Math.random() < this.currentLevelConfig.spawnConfig.buffSpawnRatio);
-        console.log(`[DEBUG] isBuff=${isBuff}, buffSpawnRatio=${this.currentLevelConfig.spawnConfig.buffSpawnRatio}`);
-
-        if (isBuff) {
-
-            if (buffInAvailable.length > 0) {
-                return this.pickWeightedObstacle(buffInAvailable);
-            }
-        }
-
-        let hazardsInAvailable = available.filter(o => !buffObstacles.includes(o));
-        if (this.promoterCooldownFramesRemaining > 0) {
-            hazardsInAvailable = hazardsInAvailable.filter(o => o !== "LARGE_CAR");
-        }
-        console.log(`[DEBUG] hazardsInAvailable=${JSON.stringify(hazardsInAvailable)}`);
-
-        if (hazardsInAvailable.length > 0) {
-            const selected = this.pickWeightedObstacle(hazardsInAvailable);
-            console.log(`[DEBUG] selected hazard: ${selected}`);
-            return selected;
-        }
-
-        const fallback = this.pickWeightedObstacle(available);
-        console.log(`[DEBUG] fallback selection: ${fallback}`);
-        return fallback;
+    getBuffObstacleTypes(available) {
+        return (available || []).filter(type => {
+            const cfg = OBSTACLE_CONFIG[type];
+            return cfg && cfg.type === "BUFF";
+        });
     }
 
-    pickWeightedObstacle(candidates) {
+    getHazardObstacleTypes(available) {
+        let hazards = (available || []).filter(type => {
+            const cfg = OBSTACLE_CONFIG[type];
+            return cfg && cfg.type !== "BUFF";
+        });
+        if (this.promoterCooldownFramesRemaining > 0) {
+            hazards = hazards.filter(type => type !== "LARGE_CAR");
+        }
+        return hazards;
+    }
+
+    applyModeTypeGapFilter(candidates, modeConfig) {
+        if (!modeConfig || !candidates || candidates.length === 0) return candidates || [];
+        const typeGapMap = modeConfig.obTypeMinGapSec || {};
+        return candidates.filter(type => this.passesTypeMinGap(type, typeGapMap));
+    }
+
+    selectDifficultyObstacle(modeConfig) {
+        if (!this.currentLevelConfig || !this.currentLevelConfig.availableObstacles) return null;
+        const available = this.currentLevelConfig.availableObstacles;
+        let candidates = this.getHazardObstacleTypes(available);
+        candidates = this.applyModeTypeGapFilter(candidates, modeConfig);
+        const modeWeights = modeConfig && modeConfig.obWeights ? modeConfig.obWeights : null;
+        return this.pickWeightedObstacle(candidates, modeWeights);
+    }
+
+    selectBuffByControlConfig() {
+        if (!this.currentLevelConfig || !this.currentLevelConfig.availableObstacles) return null;
+        const available = this.currentLevelConfig.availableObstacles;
+        const hasActiveBuffOnScreen = this.obstacles.some(o => o.config && o.config.type === "BUFF");
+        if (hasActiveBuffOnScreen) return null;
+        const buffTypes = this.getBuffObstacleTypes(available);
+        return this.pickWeightedObstacle(buffTypes, this.buffSpawnState.buffWeights || null);
+    }
+
+    pickWeightedObstacle(candidates, weightOverrides = null) {
         if (!candidates || candidates.length === 0) return null;
-        const weights = (this.currentLevelConfig && this.currentLevelConfig.obstacleWeights) || {};
+        const weights = weightOverrides || (this.currentLevelConfig && this.currentLevelConfig.obstacleWeights) || {};
 
         const normalized = candidates.map(type => {
             const raw = Number(weights[type] ?? 1.0);
@@ -152,24 +262,69 @@ class ObstacleManager {
         return (variant && variant.sprite) ? variant.sprite : config.sprite;
     }
 
+    tryModeCycleSpawning(canSpawn) {
+        if (!canSpawn) return false;
+        const modeConfig = this.getActiveModeConfig();
+        if (!modeConfig || !this.modeCycleState) return false;
 
-    spawnObstacle(forceBuff = false) {
-        if (!this.currentLevelConfig) {
-            console.log("[DEBUG] spawnObstacle: no currentLevelConfig");
-            return;
+        const hazardOnScreen = this.getOnScreenCountByCategory("OBSTACLE");
+        const minOnScreen = Math.max(0, Number(modeConfig.minOnScreenOb || 0));
+        const maxOnScreen = Math.max(minOnScreen, Number(modeConfig.maxOnScreenOb || 0));
+
+        if (hazardOnScreen < minOnScreen) {
+            const forcedType = this.selectDifficultyObstacle(modeConfig);
+            if (forcedType) {
+                return this.spawnObstacle({ obstacleType: forcedType });
+            }
+            return false;
         }
 
-        const obstacleType = this.selectRandomObstacle(forceBuff);
-        console.log(`[DEBUG] selectRandomObstacle returned: ${obstacleType}`);
+        const windowFrames = Math.max(1, this.modeCycleState.windowFrames);
+        const rawAvgOb = Number(modeConfig.avgobPerWindow ?? modeConfig.obPerWindowMean);
+        const avgOb = Number.isFinite(rawAvgOb) ? rawAvgOb : 2.2;
+        const obChance = constrain(avgOb / windowFrames, 0, 1);
+
+        if (hazardOnScreen >= maxOnScreen) return false;
+        if (Math.random() < obChance) {
+            const hazardType = this.selectDifficultyObstacle(modeConfig);
+            if (hazardType) {
+                return this.spawnObstacle({ obstacleType: hazardType });
+            }
+        }
+        return false;
+    }
+
+    tryBuffTimedSpawning(canSpawn) {
+        if (!canSpawn) return;
+        if (!this.buffSpawnState) return;
+        if (this.buffSpawnState.timerFrames > 0) {
+            this.buffSpawnState.timerFrames--;
+            return;
+        }
+        const buffType = this.selectBuffByControlConfig();
+        if (!buffType) return;
+        const spawned = this.spawnObstacle({ obstacleType: buffType });
+        if (spawned) this.scheduleNextBuffSpawn();
+    }
+
+
+    spawnObstacle(options = {}) {
+        if (!this.currentLevelConfig) {
+            console.log("[DEBUG] spawnObstacle: no currentLevelConfig");
+            return false;
+        }
+
+        const normalized = options || {};
+        const obstacleType = normalized.obstacleType;
         if (!obstacleType) {
             console.log("[DEBUG] spawnObstacle: obstacleType is null");
-            return;
+            return false;
         }
 
         const config = OBSTACLE_CONFIG[obstacleType];
         if (!config) {
             console.warn(`[ObstacleManager] Unknown obstacle type: ${obstacleType}`);
-            return;
+            return false;
         }
 
 
@@ -214,13 +369,9 @@ class ObstacleManager {
         }
 
         this.obstacles.push(obstacle);
-        if (config.type === "BUFF" && this.buffGuaranteeFrames > 0) {
-            this.buffGuaranteeTimer = this.buffGuaranteeFrames;
-        }
-        if (config.type === "BUFF" && this.buffMinIntervalFrames > 0) {
-            this.buffCooldownFrames = this.buffMinIntervalFrames;
-        }
+        this.typeLastSpawnFrame[obstacleType] = this.elapsedSpawnFrames;
         console.log(`[ObstacleManager] Spawned ${obstacleType} at lane ${lane}`);
+        return true;
     }
 
     /**
@@ -231,27 +382,17 @@ class ObstacleManager {
             return;
         }
 
-        const randVal = Math.random();
-        const spawnRate = this.currentLevelConfig.spawnConfig.spawnRatePerFrame;
-        if (this.buffCooldownFrames > 0) this.buffCooldownFrames--;
+        this.elapsedSpawnFrames++;
+        this.updateModeCycleWindowProgress();
         if (this.promoterCooldownFramesRemaining > 0) this.promoterCooldownFramesRemaining--;
 
         const lastObs = this.obstacles[this.obstacles.length - 1];
+        const minObstacleInterval = (this.currentLevelConfig.spawnConfig && this.currentLevelConfig.spawnConfig.minObstacleInterval) || 0;
         const canSpawn = this.obstacles.length === 0 ||
-            lastObs.y > this.currentLevelConfig.spawnConfig.minObstacleInterval;
+            lastObs.y > minObstacleInterval;
 
-        // Buff guarantee spawn: if timeout reached, force one buff spawn.
-        if (this.buffGuaranteeFrames > 0) {
-            this.buffGuaranteeTimer--;
-            if (this.buffGuaranteeTimer <= 0 && canSpawn) {
-                this.spawnObstacle(true);
-                this.buffGuaranteeTimer = this.buffGuaranteeFrames;
-            }
-        }
-
-        if (randVal < spawnRate && canSpawn) {
-            this.spawnObstacle();
-        }
+        const spawnedByMode = this.tryModeCycleSpawning(canSpawn);
+        this.tryBuffTimedSpawning(canSpawn && !spawnedByMode);
 
         for (let i = this.obstacles.length - 1; i >= 0; i--) {
             const obs = this.obstacles[i];
@@ -312,6 +453,24 @@ class ObstacleManager {
             pop();
         }
 
+        this.displayModeSwitchIndicator();
+    }
+
+    displayModeSwitchIndicator() {
+        if (!this.modeSwitchIndicator || this.modeSwitchIndicator.framesLeft <= 0) return;
+
+        const t = this.modeSwitchIndicator.framesLeft / Math.max(1, this.modeSwitchIndicator.durationFrames);
+        const alpha = Math.round(255 * t);
+        push();
+        textAlign(CENTER, CENTER);
+        textStyle(BOLD);
+        textSize(96);
+        stroke(0, alpha);
+        strokeWeight(6);
+        fill(255, 240, 80, alpha);
+        text(this.modeSwitchIndicator.displayText, width / 2, height / 2);
+        pop();
+        this.modeSwitchIndicator.framesLeft--;
     }
 
     getHomelessDialogueText(config) {
@@ -364,6 +523,7 @@ class ObstacleManager {
         const towardRoadDir = obs.x <= roadCenterX ? 1 : -1;
         const directionalOffsetX = bubbleOffsetX * towardRoadDir;
 
+        const minBubbleWidth = 180;
         const maxBubbleWidth = 420;
         const textPaddingX = 14;
         const textPaddingY = 12;
@@ -374,10 +534,15 @@ class ObstacleManager {
         textAlign(LEFT, TOP);
         textStyle(BOLD);
         textSize(bubbleTextSize);
-        const textMaxWidth = maxBubbleWidth - textPaddingX * 2;
+        const rawTextWidth = textWidth(textContent);
+        const preferredBubbleWidth = constrain(rawTextWidth + textPaddingX * 2, minBubbleWidth, maxBubbleWidth);
+        const textMaxWidth = preferredBubbleWidth - textPaddingX * 2;
         const lines = this.wrapTextToWidth(textContent, textMaxWidth);
-
-        const bubbleW = maxBubbleWidth;
+        let maxLineWidth = 0;
+        for (const ln of lines) {
+            maxLineWidth = Math.max(maxLineWidth, textWidth(ln));
+        }
+        const bubbleW = constrain(maxLineWidth + textPaddingX * 2, minBubbleWidth, maxBubbleWidth);
         const bubbleH = textPaddingY * 2 + lines.length * lineHeight;
         const headY = obs.y - obs.height / 2;
         const bubbleBottomY = headY - bubbleGap;
@@ -408,8 +573,26 @@ class ObstacleManager {
 
         const lines = [];
         let currentLine = words[0];
+        while (textWidth(currentLine) > maxWidth && currentLine.length > 1) {
+            let splitIdx = currentLine.length - 1;
+            while (splitIdx > 1 && textWidth(currentLine.slice(0, splitIdx)) > maxWidth) splitIdx--;
+            lines.push(currentLine.slice(0, splitIdx));
+            currentLine = currentLine.slice(splitIdx);
+        }
         for (let i = 1; i < words.length; i++) {
             const next = words[i];
+            if (textWidth(next) > maxWidth) {
+                if (currentLine) lines.push(currentLine);
+                let chunk = next;
+                while (textWidth(chunk) > maxWidth && chunk.length > 1) {
+                    let splitIdx = chunk.length - 1;
+                    while (splitIdx > 1 && textWidth(chunk.slice(0, splitIdx)) > maxWidth) splitIdx--;
+                    lines.push(chunk.slice(0, splitIdx));
+                    chunk = chunk.slice(splitIdx);
+                }
+                currentLine = chunk;
+                continue;
+            }
             const candidate = `${currentLine} ${next}`;
             if (textWidth(candidate) <= maxWidth) {
                 currentLine = candidate;
