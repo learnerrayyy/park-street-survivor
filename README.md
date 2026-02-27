@@ -1,19 +1,9 @@
 # 2026-group-7
-2026 COMSM0166 group 7
 
-# COMSM0166 Project Template
-A project template for the Software Engineering Discipline and Practice module (COMSM0166).
+![Theme](https://img.shields.io/badge/Theme-Pastel--Purple-b8c1ec?style=for-the-badge&labelColor=232946)
+![Highlight](https://img.shields.io/badge/Main--Accent-EEBBC3?style=for-the-badge&labelColor=121629)
 
-## Info
-
-This is the template for your group project repo/report. We'll be setting up your repo and assigning you to it after the group forming activity. You can delete this info section, but please keep the rest of the repo structure intact.
-
-You will be developing your game using [P5.js](https://p5js.org) a javascript library that provides you will all the tools you need to make your game. However, we won't be teaching you javascript, this is a chance for you and your team to learn a (friendly) new language and framework quickly, something you will almost certainly have to do with your summer project and in future. There is a lot of documentation online, you can start with:
-
-- [P5.js tutorials](https://p5js.org/tutorials/) 
-- [Coding Train P5.js](https://thecodingtrain.com/tracks/code-programming-with-p5-js) course - go here for enthusiastic video tutorials from Dan Shiffman (recommended!)
-
-## Park Street Survivor
+# Park Street Survivor
 
 STRAPLINE. Add an exciting one sentence description of your game here.
 
@@ -27,11 +17,13 @@ VIDEO. Include a demo video of your game here (you don't have to wait until the 
 
 ![member_pic](https://github.com/user-attachments/assets/fda2ff8c-4f41-4851-841c-9c95e34b5fc4)
 
-- Charlotte Yu, fe22207@bristol.ac.uk, Core Mechanism Designer
-- Lucca Zhou, pn25381@bristol.ac.uk, Aesthetic Designer
-- Ray Wang, nz25771@briatol.ac.uk, Level Designer
-- Layla Pei, jj25661@bristol.ac.uk, UI/UX & Audio Designer
-- Keyu Zhou,nq25289@brsitol.ac.uk, Scripts Designer
+| <font color="#232946">Role</font> | <font color="#232946">Name</font> | <font color="#232946">Email</font> |
+| :--- | :--- | :--- |
+| **Core Mechanism** | Charlotte Yu | fe22207@bristol.ac.uk |
+| **Aesthetic** | Lucca Zhou | pn25381@bristol.ac.uk |
+| **Level** | Ray Wang | nz25771@briatol.ac.uk |
+| **UI/UX & Audio** | Layla Pei | jj25661@bristol.ac.uk |
+| **Scripts** | Keyu Zhou | nq25289@brsitol.ac.uk |
 
 ## Project Report
 
