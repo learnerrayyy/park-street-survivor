@@ -7,11 +7,11 @@ class UIButton {
         this.w = w; this.h = h;
         this.label = label;
         this.onClick = onClick;
-        
+
         // Animation State: Current and Target scale for smooth feedback
         this.currentScale = 1.0;
         this.targetScale = 1.0;
-        this.isFocused = false; 
+        this.isFocused = false;
     }
 
     /**
@@ -43,15 +43,18 @@ class UIButton {
                 image(assets.backImg, 0, 0, this.w * 2, this.h * 2);
             }
         } else {
-            // Standard button — button.png 2× render size, no tint
+            // Standard button — fixed uniform size, drag corners in dev mode to resize
+            let bW = (typeof devMenuBtnW !== 'undefined') ? devMenuBtnW : (assets.btnImg ? assets.btnImg.width  : 240);
+            let bH = (typeof devMenuBtnH !== 'undefined') ? devMenuBtnH : (assets.btnImg ? assets.btnImg.height : 60);
+            let ts = (typeof devMenuTextSize !== 'undefined') ? devMenuTextSize : 24;
+            // Store dims for corner-drag hit detection (world space, unscaled)
+            this._bW = bW;
+            this._bH = bH;
             if (assets.btnImg) {
-                image(assets.btnImg, 0, 0, this.w * 2, this.h * 2);
+                image(assets.btnImg, 0, 0, bW, bH);
             }
-
-            // Text label on top — 1.8× original (24 * 1.8 ≈ 43)
-            // ← adjust the number below to change main menu button text size
-            // ← adjust the -6 below to move text up/down inside the button
-            textSize(43);
+            textFont(fonts.body);
+            textSize(ts);
             textAlign(CENTER, CENTER);
             stroke(0, 0, 0, 180);
             strokeWeight(5);
@@ -62,6 +65,53 @@ class UIButton {
             text(this.label, 0, -10);
         }
         pop();
+
+        // Dev-mode resize handles drawn in world space (outside push/scale)
+        if (developerMode && this._bW && this.label !== "BACK_ARROW") {
+            this._drawResizeHandles();
+        }
+    }
+
+    /** Draw 4 corner handles + outline in world space. */
+    _drawResizeHandles() {
+        let hw = this._bW / 2, hh = this._bH / 2;
+        push();
+        // dashed-style outline
+        noFill();
+        stroke(80, 140, 255, 180);
+        strokeWeight(1.5);
+        rectMode(CORNER);
+        rect(this.x - hw, this.y - hh, this._bW, this._bH);
+        // four corner squares
+        let corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+        for (let [sx, sy] of corners) {
+            let cx = this.x + sx * hw;
+            let cy = this.y + sy * hh;
+            let active = devResizeState &&
+                         devResizeState.signX === sx &&
+                         devResizeState.signY === sy;
+            stroke(active ? 255 : 80, active ? 120 : 140, active ? 0 : 255);
+            strokeWeight(2);
+            fill(active ? 255 : 255, active ? 200 : 255, active ? 0 : 80, 230);
+            rectMode(CENTER);
+            rect(cx, cy, 18, 18, 3);
+        }
+        pop();
+    }
+
+    /** Returns { signX, signY } if (mx,my) is near a corner handle, else null. */
+    checkResizeCorner(mx, my) {
+        if (!this._bW) return null;
+        let hw = this._bW / 2, hh = this._bH / 2;
+        let corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+        for (let [sx, sy] of corners) {
+            let cx = this.x + sx * hw;
+            let cy = this.y + sy * hh;
+            if (abs(mx - cx) < 14 && abs(my - cy) < 14) {
+                return { signX: sx, signY: sy };
+            }
+        }
+        return null;
     }
 
     /**
@@ -69,8 +119,9 @@ class UIButton {
      * Essential for mouse-to-index synchronization in MainMenu.
      */
     checkMouse(mx, my) {
-        // Slightly larger hit area for easier clicking (1.3× logical size)
-        let hw = this.w * 0.65, hh = this.h * 0.65;
+        // Use actual rendered button dimensions for hit detection
+        let hw = (typeof devMenuBtnW !== 'undefined') ? devMenuBtnW / 2 : this.w * 0.65;
+        let hh = (typeof devMenuBtnH !== 'undefined') ? devMenuBtnH / 2 : this.h * 0.65;
         return (mx > this.x - hw && mx < this.x + hw &&
                 my > this.y - hh && my < this.y + hh);
     }
@@ -97,16 +148,16 @@ class TimeWheel {
         this.config = config;
         this.selectedDay = 1;
         this.totalDays = 5;
-        
+
         // Motion system for sidebar scrolling
         this.targetIndex = 0;
         this.currentIndex = 0;
-        
+
         // Layout parameters
         this.anchorX = width * 0.15;
         this.verticalSpacing = 160;
         this.dayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
-        
+
         // Background blend state
         this.bgAlpha = 0;
 
@@ -119,26 +170,29 @@ class TimeWheel {
         let delays = [0, 4, 10, 6, 2];
         for (let i = 0; i < this.totalDays; i++) {
             this._drops.push({
-                y:       -400 - random(100),
-                vy:      0,
-                landed:  false,
-                delay:   delays[i],
+                y: -400 - random(100),
+                vy: 0,
+                landed: false,
+                delay: delays[i],
                 rotation: random(-25, 25)
             });
         }
 
         // Cloud drop physics (single cloud, synced with selected day)
         this._cloudDrop = {
-            y:       -800,
-            vy:      0,
-            landed:  false,
-            delay:   8,
+            y: -800,
+            vy: 0,
+            landed: false,
+            delay: 8,
             rotation: random(-15, 15)
         };
 
         // Cloud hover scale (smooth lerp)
         this._cloudScale = 1.0;
 
+        // Breathing phase: cloud breathes in gray after landing, before colorization
+        this._isBreathing = false;
+        this._breatheTimer = 0;
     }
 
     /**
@@ -153,21 +207,24 @@ class TimeWheel {
         let delays = [0, 4, 10, 6, 2];
         for (let i = 0; i < this.totalDays; i++) {
             this._drops[i] = {
-                y:       -400 - random(100),
-                vy:      0,
-                landed:  false,
-                delay:   delays[i],
+                y: -400 - random(100),
+                vy: 0,
+                landed: false,
+                delay: delays[i],
                 rotation: random(-25, 25)
             };
         }
 
         this._cloudDrop = {
-            y:       -800,
-            vy:      0,
-            landed:  false,
-            delay:   8,
+            y: -800,
+            vy: 0,
+            landed: false,
+            delay: 8,
             rotation: random(-15, 15)
         };
+        this._cloudScale = 1.0;
+        this._isBreathing = false;
+        this._breatheTimer = 0;
     }
 
     /**
@@ -194,8 +251,18 @@ class TimeWheel {
                 }
             }
 
-            if (this._drops.every(d => d.landed) && this.entryTimer > 20) {
-                this.isEntering = false;
+            if (this._drops.every(d => d.landed) && this._cloudDrop.landed && this.entryTimer > 20) {
+                if (!this._isBreathing) {
+                    // Start the breathe phase — short static pause then scale-up before colorizing
+                    this._isBreathing = true;
+                    this._breatheTimer = 35;
+                } else {
+                    this._breatheTimer--;
+                    if (this._breatheTimer <= 0) {
+                        this.isEntering = false;
+                        this._isBreathing = false;
+                    }
+                }
             }
         }
 
@@ -274,7 +341,7 @@ class TimeWheel {
      * Applies to both sidebar cards and cloud preview.
      */
     _updateDropPhysics() {
-        const cardGravity  = 6.0; // sidebar day-cards (sped up)
+        const cardGravity = 6.0; // sidebar day-cards (sped up)
         const cloudGravity = 4.5; // cloud preview — original first-version value
 
         // Sidebar cards
@@ -288,13 +355,13 @@ class TimeWheel {
             let targetY = diff * this.verticalSpacing;
 
             drop.vy += cardGravity;
-            drop.y  += drop.vy;
+            drop.y += drop.vy;
             drop.rotation *= 0.88;
 
             if (drop.y >= targetY) {
-                drop.y        = targetY;
-                drop.vy       = 0;
-                drop.landed   = true;
+                drop.y = targetY;
+                drop.vy = 0;
+                drop.landed = true;
                 drop.rotation = 0;
             }
         }
@@ -304,13 +371,13 @@ class TimeWheel {
         if (!cloud.landed) {
             if (this.entryTimer >= cloud.delay) {
                 cloud.vy += cloudGravity;
-                cloud.y  += cloud.vy;
+                cloud.y += cloud.vy;
                 cloud.rotation *= 0.88;
 
                 if (cloud.y >= 0) {
-                    cloud.y        = 0;
-                    cloud.vy       = 0;
-                    cloud.landed   = true;
+                    cloud.y = 0;
+                    cloud.vy = 0;
+                    cloud.landed = true;
                     cloud.rotation = 0;
                 }
             }
@@ -321,17 +388,20 @@ class TimeWheel {
      * RENDERER: BACKGROUND BLEND
      * Lerps bgAlpha (0=lock image, 255=unlock image) based on whether the selected day
      * is locked. Day 1 is treated as locked until the player clicks once, so flipping
-     * day1VisuallyUnlocked automatically starts the fade-in to the colorful background.
+     * dayVisuallyUnlocked[day] flipping to true automatically starts the fade-in to the colorful background.
      */
     drawDynamicBackground() {
         let isLocked = (this.selectedDay > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
-        // Day 1 stays visually locked until the player clicks once (skipped in dev mode)
-        if (this.selectedDay === 1 && !tutorialHints.day1VisuallyUnlocked && !developerMode) {
+        // Every newly-unlocked day stays visually locked until the player clicks once
+        if (!developerMode && !DEBUG_UNLOCK_ALL &&
+            typeof tutorialHints !== 'undefined' &&
+            !tutorialHints.dayVisuallyUnlocked[this.selectedDay]) {
+
             isLocked = true;
         }
 
         let targetAlpha = isLocked ? 0 : 255;
-        this.bgAlpha = lerp(this.bgAlpha, targetAlpha, 0.04);
+        this.bgAlpha = lerp(this.bgAlpha, targetAlpha, 0.07);
 
         imageMode(CORNER);
         if (assets.selectBg.lock)   image(assets.selectBg.lock,   0, 0, width, height);
@@ -382,16 +452,24 @@ class TimeWheel {
         // Mouse hover scale-up (smooth lerp, doesn't conflict with float)
         let cloudW = 700, cloudH = 450;
         let isCloudHover = (mouseX > x - cloudW / 2 && mouseX < x + cloudW / 2 &&
-                            mouseY > y - cloudH / 2 && mouseY < y + cloudH / 2);
+            mouseY > y - cloudH / 2 && mouseY < y + cloudH / 2);
 
-        // Day 1 is "visually locked" (grayscale, same as Days 2-5) until the player clicks once (skipped in dev mode)
+        // Any available day stays visually locked (grayscale) until the player clicks once
         let visuallyLocked = isLocked ||
-            (dayID === 1 &&
+            (!developerMode && !DEBUG_UNLOCK_ALL &&
              typeof tutorialHints !== 'undefined' &&
-             !tutorialHints.day1VisuallyUnlocked &&
-             !developerMode);
+             !tutorialHints.dayVisuallyUnlocked[dayID]);
 
-        let targetScale = (isCloudHover && !visuallyLocked && !this.isEntering) ? 1.08 : 1.0;
+
+        let targetScale;
+        if (this._isBreathing) {
+            // Two-phase unlock animation:
+            //   breatheTimer 65→25  — cloud is static in gray (no movement)
+            //   breatheTimer 25→ 0  — single scale-up pop to signal unlock
+            targetScale = (this._breatheTimer > 25) ? 1.0 : 1.15;
+        } else {
+            targetScale = (isCloudHover && !visuallyLocked && !this.isEntering) ? 1.08 : 1.0;
+        }
         this._cloudScale = lerp(this._cloudScale, targetScale, 0.1);
         scale(this._cloudScale);
 
@@ -413,18 +491,10 @@ class TimeWheel {
         drawingContext.shadowBlur = 0;
         drawingContext.filter = 'none';
 
-        // ── Tutorial hint: breathing warning icon on cloud top-right ──
-        // Day 1: show while still visually locked (first-click prompt)
-        // Days 2-5: show on the newest-unlocked day before first entry
-        let showDay1Hint = typeof tutorialHints !== 'undefined' &&
-                           dayID === 1 &&
-                           !tutorialHints.day1VisuallyUnlocked;
-        let showNewDayHint = typeof tutorialHints !== 'undefined' &&
-                             typeof currentUnlockedDay !== 'undefined' &&
-                             !isLocked && dayID > 1 &&
-                             dayID === currentUnlockedDay &&
-                             tutorialHints.levelSelectShownForDay < currentUnlockedDay;
-        if ((showDay1Hint || showNewDayHint) && typeof assets !== 'undefined' && assets.warningImg) {
+        // ── Entry hint: breathing warning icon on selected unlocked cloud ──
+        // Only shows after colorization is complete, guiding the player to click / press Enter.
+        if (!visuallyLocked && dayID === this.selectedDay &&
+            typeof assets !== 'undefined' && assets.warningImg) {
             let warnX = cloudW / 2 - 80;
             let warnY = -cloudH / 2 + 55;
             drawWarningIcon(warnX, warnY, 100);
@@ -443,7 +513,7 @@ class TimeWheel {
     drawNavNode(i) {
         let diff = i - this.currentIndex;
         let distFromCenter = abs(diff);
-        
+
         let x = distFromCenter * 40;
         let y = diff * this.verticalSpacing;
 
@@ -462,11 +532,8 @@ class TimeWheel {
         }
 
         let isSelected = (i === this.selectedDay - 1);
-        let isLocked = (i + 1 > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
-
-        if (i === 0 && typeof tutorialHints !== 'undefined' && !tutorialHints.day1VisuallyUnlocked && !developerMode) {
-            isLocked = true;
-        }
+        let dayID = i + 1;
+        let isLocked = (dayID > currentUnlockedDay) && !DEBUG_UNLOCK_ALL;
 
         let alpha = map(distFromCenter, 0, 2, 255, 50);
         let s = map(distFromCenter, 0, 1, 1.2, 0.8);
@@ -479,7 +546,7 @@ class TimeWheel {
         } else {
             fill(isSelected ? [255, 20, 147, alpha] : [70, 20, 90, alpha * 0.6]);
         }
-        
+
         // P5 skewed trapezoid
         beginShape();
         vertex(-140, -40); vertex(160, -55);
@@ -498,7 +565,7 @@ class TimeWheel {
         textSize(22);  // Fixed size for all
         fill(isSelected ? color(255, 215, 0, alpha) : color(255, 215, 0, alpha * 0.8));  // Slightly dimmed when not selected
         text(this.dayNames[i], -20, 10);
-        
+
         if (isLocked) {
             fill(180, 60, 60, alpha);
             textSize(14);
@@ -531,28 +598,28 @@ class TimeWheel {
         rotate(radians(-5));
         textFont(fonts.title);
         textAlign(LEFT, CENTER);
-        
+
         // White stroke outline for readability
         strokeWeight(8);
         stroke(0, 0, 0, 180);
         fill(255);
         textSize(70);
         text("DAY", 0, 0);
-        
+
         noStroke();
         fill(255);
         text("DAY", 0, 0);
-        
+
         // Pink number with extra spacing
         strokeWeight(8);
         stroke(0, 0, 0, 180);
         fill(255, 105, 180);
         text(dayID.toString().padStart(2, '0'), 200, 0);  // Increased spacing from 170 to 200
-        
+
         noStroke();
         fill(255, 105, 180);
         text(dayID.toString().padStart(2, '0'), 200, 0);
-        
+
         pop();
     }
 
@@ -564,10 +631,18 @@ class TimeWheel {
         if (this.isEntering) return;
 
         if ((keyCode === UP_ARROW || keyCode === 87) && this.selectedDay > 1) {
+            let newDay = this.selectedDay - 1;
+            if (typeof tutorialHints !== 'undefined' && !tutorialHints.dayVisuallyUnlocked[newDay]) {
+                this.bgAlpha = 0;
+            }
             this.selectedDay--;
             this.targetIndex--;
             if (typeof playSFX === 'function') playSFX(sfxSelect);
         } else if ((keyCode === DOWN_ARROW || keyCode === 83) && this.selectedDay < this.totalDays) {
+            let newDay = this.selectedDay + 1;
+            if (typeof tutorialHints !== 'undefined' && !tutorialHints.dayVisuallyUnlocked[newDay]) {
+                this.bgAlpha = 0;
+            }
             this.selectedDay++;
             this.targetIndex++;
             if (typeof playSFX === 'function') playSFX(sfxSelect);
@@ -589,7 +664,7 @@ class UISlider {
         this.maxVal = maxVal;
         this.value = currentVal;
         this.label = label;
-        
+
         this.knobSize = 24;
         this.isDragging = false;
     }
@@ -653,7 +728,7 @@ class UISlider {
         if (this.isDragging) {
             let mousePos = constrain(mouseX, this.x - this.w / 2, this.x + this.w / 2);
             this.value = map(mousePos, this.x - this.w / 2, this.x + this.w / 2, this.minVal, this.maxVal);
-            
+
             if (typeof bgm !== 'undefined' && bgm) {
                 bgm.setVolume(this.value);
             }

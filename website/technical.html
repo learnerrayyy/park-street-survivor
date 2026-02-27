@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Park Street Survivor | Tech Log</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="theme.js"></script>
+</head>
+<body>
+
+    <nav>
+        <div class="nav-container container">
+            <span class="logo">Park Street Survivor</span>
+            <div class="nav-links">
+                <a href="index.html"     class="nav-item">Home</a>
+                <a href="labs.html"      class="nav-item">Labs</a>
+                <a href="meetings.html"  class="nav-item">Meetings</a>
+                <a href="technical.html" class="nav-item active">Tech_Log</a>
+                <a href="team.html"      class="nav-item">Team</a>
+            </div>
+            <div class="nav-actions">
+                <a href="#" class="nav-icon-btn" target="_blank" title="GitHub Repository">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                </a>
+                <a href="#" class="nav-icon-btn" target="_blank" title="Jira Board">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215l2.13-.001V18.5c0 2.902 2.325 5.252 5.215 5.215V12.518c-.01-.564-.464-1.005-1.006-1.005zm5.57-5.558H5.571a5.218 5.218 0 0 0 5.232 5.215l2.13-.001v1.774c0 2.902 2.325 5.252 5.215 5.215V6.961c0-.558-.449-1.006-1.006-1.006zm5.572-5.955H11.143a5.218 5.218 0 0 0 5.232 5.215l2.13-.001v1.774c0 2.902 2.325 5.252 5.215 5.215V1.005A1.005 1.005 0 0 0 22.713 0z"/></svg>
+                </a>
+                <button class="theme-toggle" id="themeToggle" aria-label="Switch theme"></button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+
+        <div class="page-hero">
+            <h1 class="page-title">Tech Log</h1>
+            <p class="page-subtitle">Engineering audit, sprint calendar &amp; backlog — Group 7</p>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+             SECTION 1 — TWO CHALLENGES
+             ═══════════════════════════════════════════════ -->
+        <div class="card">
+            <h2 class="section-title">✿ Two Core Challenges</h2>
+            <p>
+                Every game hides a handful of design problems that define the project. Here are the two
+                that shaped every technical and creative decision we made on Park Street Survivor.
+            </p>
+
+            <div class="challenge-grid">
+
+                <div class="challenge-card">
+                    <p class="challenge-num">Challenge 01</p>
+                    <h3 class="challenge-title">Translating Poetry into Playable Mechanics</h3>
+
+                    <p class="challenge-label">The Problem</p>
+                    <p class="challenge-text">
+                        Emily Dickinson's "Hope is the thing with feathers" is abstract — it speaks of
+                        perseverance through metaphor. How do you translate that into a game that must
+                        communicate the same feeling through player actions and rules, not just words?
+                        If the poetry is only decoration, the game is hollow.
+                    </p>
+
+                    <p class="challenge-label">Our Solution</p>
+                    <p class="challenge-text">
+                        We designed a <strong>Narrative State Machine</strong> that mirrors the player's
+                        physical struggle on the slope with curated lines from the poem. When stamina
+                        drops below 30%, the dialogue system surfaces
+                        <em>"And sore must be the storm —"</em>. When a checkpoint is reached,
+                        <em>"And sweetest — in the Gale — is heard."</em> The poem becomes a
+                        mechanical reward layer, not decoration.
+                    </p>
+                </div>
+
+                <div class="challenge-card">
+                    <p class="challenge-num">Challenge 02</p>
+                    <h3 class="challenge-title">Calibrating Difficulty to Emotional Tone</h3>
+
+                    <p class="challenge-label">The Problem</p>
+                    <p class="challenge-text">
+                        A physics-based hill climb must feel hard enough to create genuine tension —
+                        but if it's too punishing, players disconnect from the narrative before they
+                        encounter any poetry. Too easy, and the "survival" premise feels hollow. The
+                        difficulty curve had to serve the story, not fight it.
+                    </p>
+
+                    <p class="challenge-label">Our Solution</p>
+                    <p class="challenge-text">
+                        We built a tunable physics model with gravity, friction, and momentum as
+                        exposed parameters. After structured user testing in Week 4, we found that
+                        4 of 5 testers quit before the first poetry trigger. We reduced initial gravity
+                        by 15% and extended the stamina bar — bringing the run-completion rate to 80%
+                        without reducing the perceived sense of struggle.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+             SECTION 2 — SYSTEM ARCHITECTURE
+             ═══════════════════════════════════════════════ -->
+        <div class="card">
+            <h2 class="section-title">✿ System Architecture</h2>
+            <p>
+                The game is built on a <strong>Finite State Machine (FSM)</strong> at its core,
+                managing transitions between scenes, player states, and narrative events.
+                All modules communicate through a centralised event bus to keep components
+                decoupled and independently testable.
+            </p>
+
+            <div class="features-grid" style="margin-top: 24px;">
+                <div class="feature-card">
+                    <span class="feature-icon">⚙️</span>
+                    <h4 class="feature-title">State Machine</h4>
+                    <p class="feature-desc">FSM governs all game-loop transitions, player states, and scene routing.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🔊</span>
+                    <h4 class="feature-title">Audio Engine</h4>
+                    <p class="feature-desc">Howler.js for ambient soundscapes and state-triggered narrative cues.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🗺️</span>
+                    <h4 class="feature-title">Level Manager</h4>
+                    <p class="feature-desc">Tile-based loader with event trigger zones, collision layers, spawn points.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">💬</span>
+                    <h4 class="feature-title">Dialogue System</h4>
+                    <p class="feature-desc">JSON-driven engine with pacing control and branching narrative paths.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🖼️</span>
+                    <h4 class="feature-title">Render Pipeline</h4>
+                    <p class="feature-desc">HTML5 Canvas 2D with layered duotone pixel art rendering.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">📡</span>
+                    <h4 class="feature-title">Event Bus</h4>
+                    <p class="feature-desc">Centralised pub/sub bus decouples all game modules for testability.</p>
+                </div>
+            </div>
+
+            <div class="pixel-img-frame" style="margin-top:26px;">
+                <div class="pixel-img-placeholder">
+                    [ Architecture Diagram Placeholder ]<br>
+                    <span style="font-size:0.85rem;">Upload architecture.png to assets/</span>
+                </div>
+            </div>
+            <p class="caption">"The tune without the words" — our system in motion.</p>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+             SECTION 3 — SPRINT CALENDAR
+             ═══════════════════════════════════════════════ -->
+        <div class="card">
+            <h2 class="section-title">✿ Sprint Calendar</h2>
+            <p>
+                Development timeline across three sprints. Each bar shows whether an epic was
+                in active development or polish/review during that sprint.
+            </p>
+
+            <div class="gantt-v2">
+                <!-- Header -->
+                <div class="gantt-v2-head">
+                    <div class="gantt-epic-hdr">Epic</div>
+                    <div class="gantt-sprint-hdr">
+                        <span class="gantt-sprint-num">Sprint 01</span>
+                        <span class="gantt-sprint-name">Weeks 1 – 4</span>
+                        <span class="gantt-sprint-dates">[Date] — [Date]</span>
+                    </div>
+                    <div class="gantt-sprint-hdr">
+                        <span class="gantt-sprint-num">Sprint 02</span>
+                        <span class="gantt-sprint-name">Weeks 5 – 8</span>
+                        <span class="gantt-sprint-dates">[Date] — [Date]</span>
+                    </div>
+                    <div class="gantt-sprint-hdr">
+                        <span class="gantt-sprint-num">Sprint 03</span>
+                        <span class="gantt-sprint-name">Weeks 9 – 12</span>
+                        <span class="gantt-sprint-dates">[Date] — [Date]</span>
+                    </div>
+                </div>
+
+                <!-- Rows -->
+                <div class="gantt-v2-row">
+                    <div class="gantt-epic-label">Core Mechanics</div>
+                    <div class="gantt-cell"><span class="gz gz-active"></span></div>
+                    <div class="gantt-cell"><span class="gz gz-review"></span></div>
+                    <div class="gantt-cell"><span class="gz gz-review"></span></div>
+                </div>
+                <div class="gantt-v2-row">
+                    <div class="gantt-epic-label">Level Design</div>
+                    <div class="gantt-cell"><span class="gz gz-active"></span></div>
+                    <div class="gantt-cell"><span class="gz gz-split"></span></div>
+                    <div class="gantt-cell"></div>
+                </div>
+                <div class="gantt-v2-row">
+                    <div class="gantt-epic-label">Narrative System</div>
+                    <div class="gantt-cell"><span class="gz gz-split"></span></div>
+                    <div class="gantt-cell"><span class="gz gz-active"></span></div>
+                    <div class="gantt-cell"><span class="gz gz-split"></span></div>
+                </div>
+                <div class="gantt-v2-row">
+                    <div class="gantt-epic-label">Pixel Art</div>
+                    <div class="gantt-cell"><span class="gz gz-active"></span></div>
+                    <div class="gantt-cell"><span class="gz gz-split"></span></div>
+                    <div class="gantt-cell"></div>
+                </div>
+                <div class="gantt-v2-row">
+                    <div class="gantt-epic-label">UI/UX Design</div>
+                    <div class="gantt-cell"></div>
+                    <div class="gantt-cell"><span class="gz gz-active"></span></div>
+                    <div class="gantt-cell"><span class="gz gz-review"></span></div>
+                </div>
+                <div class="gantt-v2-row">
+                    <div class="gantt-epic-label">Audio Engineering</div>
+                    <div class="gantt-cell"></div>
+                    <div class="gantt-cell"><span class="gz gz-active"></span></div>
+                    <div class="gantt-cell"><span class="gz gz-review"></span></div>
+                </div>
+                <div class="gantt-v2-row">
+                    <div class="gantt-epic-label">Tech Infrastructure</div>
+                    <div class="gantt-cell"></div>
+                    <div class="gantt-cell"></div>
+                    <div class="gantt-cell"><span class="gz gz-split"></span></div>
+                </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="gantt-legend">
+                <div class="legend-item">
+                    <span class="legend-swatch gz-active"></span>
+                    Active development
+                </div>
+                <div class="legend-item">
+                    <span class="legend-swatch gz-review"></span>
+                    Polish &amp; review
+                </div>
+                <div class="legend-item">
+                    <span class="legend-swatch gz-split"></span>
+                    Active → review
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+             SECTION 4 — FILTERABLE BACKLOG
+             ═══════════════════════════════════════════════ -->
+        <div class="card">
+            <h2 class="section-title">✿ Development Backlog</h2>
+            <p>
+                All completed work items. Filter by assignee, sprint, epic, or type.
+                Story points (SP) reflect complexity estimates agreed at sprint planning.
+            </p>
+
+            <!-- Filters -->
+            <div class="filters-panel" style="margin-top:20px;">
+                <div class="filter-row">
+                    <span class="filter-row-label">Assignee</span>
+                    <div class="filter-row-chips">
+                        <button class="filter-chip active" data-group="assignee" data-value="all">All</button>
+                        <button class="filter-chip" data-group="assignee" data-value="charlotte">Charlotte</button>
+                        <button class="filter-chip" data-group="assignee" data-value="kangrui">Kangrui</button>
+                        <button class="filter-chip" data-group="assignee" data-value="layla">Layla</button>
+                        <button class="filter-chip" data-group="assignee" data-value="lucca">Lucca</button>
+                        <button class="filter-chip" data-group="assignee" data-value="keyu">Keyu</button>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <span class="filter-row-label">Sprint</span>
+                    <div class="filter-row-chips">
+                        <button class="filter-chip active" data-group="sprint" data-value="all">All</button>
+                        <button class="filter-chip" data-group="sprint" data-value="s1">Sprint 1</button>
+                        <button class="filter-chip" data-group="sprint" data-value="s2">Sprint 2</button>
+                        <button class="filter-chip" data-group="sprint" data-value="s3">Sprint 3</button>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <span class="filter-row-label">Epic</span>
+                    <div class="filter-row-chips">
+                        <button class="filter-chip active" data-group="epic" data-value="all">All</button>
+                        <button class="filter-chip" data-group="epic" data-value="core">Core Mechanics</button>
+                        <button class="filter-chip" data-group="epic" data-value="level">Level Design</button>
+                        <button class="filter-chip" data-group="epic" data-value="narrative">Narrative</button>
+                        <button class="filter-chip" data-group="epic" data-value="art">Pixel Art</button>
+                        <button class="filter-chip" data-group="epic" data-value="uxui">UI/UX</button>
+                        <button class="filter-chip" data-group="epic" data-value="audio">Audio</button>
+                        <button class="filter-chip" data-group="epic" data-value="tech">Tech Infra</button>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <span class="filter-row-label">Type</span>
+                    <div class="filter-row-chips">
+                        <button class="filter-chip active" data-group="type" data-value="all">All</button>
+                        <button class="filter-chip" data-group="type" data-value="story">User Story</button>
+                        <button class="filter-chip" data-group="type" data-value="task">Task</button>
+                        <button class="filter-chip" data-group="type" data-value="issue">Issue</button>
+                    </div>
+                </div>
+            </div>
+
+            <p class="backlog-count" id="backlogCount">Showing 24 of 24 items</p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Type</th>
+                            <th>Summary</th>
+                            <th>Epic</th>
+                            <th>Sprint</th>
+                            <th>Assignee</th>
+                            <th>SP</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backlogBody">
+                        <!-- Sprint 1 -->
+                        <tr class="backlog-row" data-assignee="charlotte" data-sprint="s1" data-epic="core" data-type="story">
+                            <td>SCRUM-101</td>
+                            <td><span class="type-badge type-story">User Story</span></td>
+                            <td>As a player, I want to navigate the Park Street slope</td>
+                            <td>Core Mechanics</td>
+                            <td>Sprint 1</td>
+                            <td>Charlotte</td>
+                            <td><span class="sp-badge">8</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="charlotte" data-sprint="s1" data-epic="core" data-type="task">
+                            <td>SCRUM-102</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Implement finite state machine core</td>
+                            <td>Core Mechanics</td>
+                            <td>Sprint 1</td>
+                            <td>Charlotte</td>
+                            <td><span class="sp-badge">5</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="kangrui" data-sprint="s1" data-epic="level" data-type="story">
+                            <td>SCRUM-103</td>
+                            <td><span class="type-badge type-story">User Story</span></td>
+                            <td>As a player, I want to explore the Park Street level</td>
+                            <td>Level Design</td>
+                            <td>Sprint 1</td>
+                            <td>Kangrui</td>
+                            <td><span class="sp-badge">5</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="kangrui" data-sprint="s1" data-epic="level" data-type="task">
+                            <td>SCRUM-104</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Design ramp collision geometry and trigger zones</td>
+                            <td>Level Design</td>
+                            <td>Sprint 1</td>
+                            <td>Kangrui</td>
+                            <td><span class="sp-badge">3</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="keyu" data-sprint="s1" data-epic="narrative" data-type="story">
+                            <td>SCRUM-105</td>
+                            <td><span class="type-badge type-story">User Story</span></td>
+                            <td>As a player, I want dialogue to appear at key moments</td>
+                            <td>Narrative</td>
+                            <td>Sprint 1</td>
+                            <td>Keyu</td>
+                            <td><span class="sp-badge">5</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="keyu" data-sprint="s1" data-epic="narrative" data-type="task">
+                            <td>SCRUM-106</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Write first-act dialogue scripts and Dickinson triggers</td>
+                            <td>Narrative</td>
+                            <td>Sprint 1</td>
+                            <td>Keyu</td>
+                            <td><span class="sp-badge">3</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="lucca" data-sprint="s1" data-epic="art" data-type="task">
+                            <td>SCRUM-107</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Create player sprite sheet and walk animation</td>
+                            <td>Pixel Art</td>
+                            <td>Sprint 1</td>
+                            <td>Lucca</td>
+                            <td><span class="sp-badge">3</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="lucca" data-sprint="s1" data-epic="art" data-type="task">
+                            <td>SCRUM-108</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Define colour palette and visual style guide</td>
+                            <td>Pixel Art</td>
+                            <td>Sprint 1</td>
+                            <td>Lucca</td>
+                            <td><span class="sp-badge">2</span></td>
+                        </tr>
+                        <!-- Sprint 2 -->
+                        <tr class="backlog-row" data-assignee="charlotte" data-sprint="s2" data-epic="core" data-type="task">
+                            <td>SCRUM-109</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Refactor collision detection module</td>
+                            <td>Core Mechanics</td>
+                            <td>Sprint 2</td>
+                            <td>Charlotte</td>
+                            <td><span class="sp-badge">3</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="layla" data-sprint="s2" data-epic="audio" data-type="story">
+                            <td>SCRUM-110</td>
+                            <td><span class="type-badge type-story">User Story</span></td>
+                            <td>As a player, I want audio cues to enhance immersion</td>
+                            <td>Audio</td>
+                            <td>Sprint 2</td>
+                            <td>Layla</td>
+                            <td><span class="sp-badge">5</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="layla" data-sprint="s2" data-epic="audio" data-type="task">
+                            <td>SCRUM-111</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Integrate Howler.js audio engine and ambient tracks</td>
+                            <td>Audio</td>
+                            <td>Sprint 2</td>
+                            <td>Layla</td>
+                            <td><span class="sp-badge">3</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="layla" data-sprint="s2" data-epic="uxui" data-type="story">
+                            <td>SCRUM-112</td>
+                            <td><span class="type-badge type-story">User Story</span></td>
+                            <td>As a player, I want a clear and readable HUD</td>
+                            <td>UI/UX</td>
+                            <td>Sprint 2</td>
+                            <td>Layla</td>
+                            <td><span class="sp-badge">5</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="layla" data-sprint="s2" data-epic="uxui" data-type="task">
+                            <td>SCRUM-113</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Redesign HUD layout in Figma and implement on canvas</td>
+                            <td>UI/UX</td>
+                            <td>Sprint 2</td>
+                            <td>Layla</td>
+                            <td><span class="sp-badge">2</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="kangrui" data-sprint="s2" data-epic="level" data-type="task">
+                            <td>SCRUM-114</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Polish ramp layout with user-testing feedback zones</td>
+                            <td>Level Design</td>
+                            <td>Sprint 2</td>
+                            <td>Kangrui</td>
+                            <td><span class="sp-badge">3</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="keyu" data-sprint="s2" data-epic="narrative" data-type="task">
+                            <td>SCRUM-115</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Write second and third act scripts</td>
+                            <td>Narrative</td>
+                            <td>Sprint 2</td>
+                            <td>Keyu</td>
+                            <td><span class="sp-badge">5</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="lucca" data-sprint="s2" data-epic="art" data-type="task">
+                            <td>SCRUM-116</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Apply duotone filter pipeline to all sprite assets</td>
+                            <td>Pixel Art</td>
+                            <td>Sprint 2</td>
+                            <td>Lucca</td>
+                            <td><span class="sp-badge">3</span></td>
+                        </tr>
+                        <!-- Sprint 3 -->
+                        <tr class="backlog-row" data-assignee="keyu" data-sprint="s3" data-epic="narrative" data-type="story">
+                            <td>SCRUM-117</td>
+                            <td><span class="type-badge type-story">User Story</span></td>
+                            <td>As a player, I want to experience the poetic epilogue</td>
+                            <td>Narrative</td>
+                            <td>Sprint 3</td>
+                            <td>Keyu</td>
+                            <td><span class="sp-badge">5</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="keyu" data-sprint="s3" data-epic="narrative" data-type="task">
+                            <td>SCRUM-118</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Integrate poetic epilogue sequence with branching endings</td>
+                            <td>Narrative</td>
+                            <td>Sprint 3</td>
+                            <td>Keyu</td>
+                            <td><span class="sp-badge">3</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="layla" data-sprint="s3" data-epic="uxui" data-type="task">
+                            <td>SCRUM-119</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Implement in-game tutorial overlay</td>
+                            <td>UI/UX</td>
+                            <td>Sprint 3</td>
+                            <td>Layla</td>
+                            <td><span class="sp-badge">3</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="layla" data-sprint="s3" data-epic="audio" data-type="task">
+                            <td>SCRUM-120</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Final audio mixing and ambient loop fix</td>
+                            <td>Audio</td>
+                            <td>Sprint 3</td>
+                            <td>Layla</td>
+                            <td><span class="sp-badge">2</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="charlotte" data-sprint="s3" data-epic="tech" data-type="task">
+                            <td>SCRUM-121</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Build and deploy project website</td>
+                            <td>Tech Infra</td>
+                            <td>Sprint 3</td>
+                            <td>Charlotte</td>
+                            <td><span class="sp-badge">3</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="charlotte" data-sprint="s3" data-epic="tech" data-type="task">
+                            <td>SCRUM-122</td>
+                            <td><span class="type-badge type-task">Task</span></td>
+                            <td>Final QA pass and performance optimisation</td>
+                            <td>Tech Infra</td>
+                            <td>Sprint 3</td>
+                            <td>Charlotte</td>
+                            <td><span class="sp-badge">3</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="charlotte" data-sprint="s3" data-epic="core" data-type="issue">
+                            <td>SCRUM-123</td>
+                            <td><span class="type-badge type-issue">Issue</span></td>
+                            <td>State machine fails to reset cleanly on game restart</td>
+                            <td>Core Mechanics</td>
+                            <td>Sprint 3</td>
+                            <td>Charlotte</td>
+                            <td><span class="sp-badge">2</span></td>
+                        </tr>
+                        <tr class="backlog-row" data-assignee="keyu" data-sprint="s3" data-epic="narrative" data-type="issue">
+                            <td>SCRUM-124</td>
+                            <td><span class="type-badge type-issue">Issue</span></td>
+                            <td>Dialogue text overflows on narrow viewport widths</td>
+                            <td>Narrative</td>
+                            <td>Sprint 3</td>
+                            <td>Keyu</td>
+                            <td><span class="sp-badge">1</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top:22px; text-align:center;">
+                <a href="assets/full-backlog.csv" class="btn-secondary" download>✿ Download Full CSV</a>
+            </div>
+        </div>
+
+    </div><!-- /.container -->
+
+    <footer>
+        <p>Built with ♡ by Group 7 · The Architects · MSc Computer Science @ University of Bristol</p>
+    </footer>
+
+    <script>
+        // Filterable backlog
+        var filters = { assignee: 'all', sprint: 'all', epic: 'all', type: 'all' };
+
+        document.querySelectorAll('.filter-chip').forEach(function(chip) {
+            chip.addEventListener('click', function() {
+                var group = chip.dataset.group;
+                var value = chip.dataset.value;
+                document.querySelectorAll('.filter-chip[data-group="' + group + '"]')
+                    .forEach(function(c) { c.classList.remove('active'); });
+                chip.classList.add('active');
+                filters[group] = value;
+                applyFilters();
+            });
+        });
+
+        function applyFilters() {
+            var rows = document.querySelectorAll('.backlog-row');
+            var visible = 0;
+            rows.forEach(function(row) {
+                var show =
+                    (filters.assignee === 'all' || row.dataset.assignee === filters.assignee) &&
+                    (filters.sprint   === 'all' || row.dataset.sprint   === filters.sprint)   &&
+                    (filters.epic     === 'all' || row.dataset.epic     === filters.epic)     &&
+                    (filters.type     === 'all' || row.dataset.type     === filters.type);
+                row.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            var el = document.getElementById('backlogCount');
+            if (el) el.textContent = 'Showing ' + visible + ' of ' + rows.length + ' items';
+        }
+    </script>
+
+</body>
+</html>

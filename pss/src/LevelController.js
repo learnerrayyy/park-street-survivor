@@ -10,17 +10,17 @@ class LevelController {
     */
    constructor() {
       // Level Instance References
-      this.tutorialLevel = null;
       this.proceduralLevel = null;
       this.currentLevel = null;
 
       // Session tracking
       this.currentDayID = 1;
-      this.levelType = "TUTORIAL"; // TUTORIAL or NORMAL
+      this.levelType = "NORMAL"; // NORMAL level
 
       // Victory Phase Management
       this.levelPhase = "RUNNING"; // RUNNING, VICTORY_TRANSITION, or VICTORY_ZONE
       this.victoryStartScrollPos = 0; // Record scrollPos when victory triggers
+      this.victoryPreRollDistance = 0; // Pixels to finish current run tile before destination enters
       this.victoryZoneFrames = 0; // Frames spent in victory zone (1.5s = 90 frames)
       this.victoryZoneStartY = 0; // Y position of victory bg when entering VICTORY_ZONE
    }
@@ -34,6 +34,7 @@ class LevelController {
       console.log(`[LevelController] Initializing Level - Day ${dayID}`);
 
       this.currentDayID = dayID;
+      this.resetRunPhaseState();
       const levelConfig = DAYS_CONFIG[dayID];
 
       if (!levelConfig) {
@@ -41,10 +42,8 @@ class LevelController {
          return false;
       }
 
-      // Route to appropriate level type
-      if (levelConfig.type === "TUTORIAL" || levelConfig.type === "NORMAL") {
-         this.initializeProceduralLevel(dayID, levelConfig);
-      }
+      // Initialize procedural level
+      this.initializeProceduralLevel(dayID, levelConfig);
 
       // Apply level-specific difficulty parameters to player
       this.applyDifficultyParameters(dayID);
@@ -56,6 +55,23 @@ class LevelController {
    }
 
    /**
+    * SESSION RESET: PREPARE A FRESH RUN
+    * Ensures re-entering a day after WIN/FAIL starts from RUNNING phase.
+    */
+   resetRunPhaseState() {
+      this.levelPhase = "RUNNING";
+      this.victoryStartScrollPos = 0;
+      this.victoryPreRollDistance = 0;
+      this.victoryZoneFrames = 0;
+      this.victoryZoneStartY = 0;
+
+      if (typeof env !== "undefined" && env) {
+         env.scrollPos = 0;
+         env.defaultBgHeadIndex = 0;
+      }
+   }
+
+   /**
     * ASSET LOADING: BACKGROUND IMAGES
     * Dynamically loads default and destination backgrounds for the current day.
     */
@@ -63,15 +79,32 @@ class LevelController {
       console.log(`[LevelController] Loading backgrounds for Day ${dayID}`);
 
       try {
-         // Load default running background
-         const defaultBgPath = `assets/background/day${dayID}_default.png`;
-         env.defaultBg = loadImage(defaultBgPath,
-            () => console.log(`[LevelController] ✓ Loaded default background: ${defaultBgPath}`),
-            () => console.warn(`[LevelController] ✗ Failed to load: ${defaultBgPath}`)
-         );
+         // Load running background cycle (A/B/C). Keep current scroll logic unchanged;
+         // only tile image source varies.
+         const sunnyRunPaths = [
+            "assets/background/bg_sunny/bg_sunny_A.png",
+            "assets/background/bg_sunny/bg_sunny_B.png",
+            "assets/background/bg_sunny/bg_sunny_C.png"
+         ];
+         const shuffledRunPaths = [...sunnyRunPaths].sort(() => Math.random() - 0.5);
+         env.defaultBgCycle = [];
+         env.defaultBgHeadIndex = 0;
+         for (const p of shuffledRunPaths) {
+            const img = loadImage(
+               p,
+               () => console.log(`[LevelController] ✓ Loaded run tile: ${p}`),
+               () => console.warn(`[LevelController] ✗ Failed to load run tile: ${p}`)
+            );
+            env.defaultBgCycle.push(img);
+         }
+         env.defaultBg = env.defaultBgCycle[0] || null;
 
          // Load destination/victory background
-         const destinationBgPath = `assets/background/day${dayID}_destination.png`;
+         let destinationBgPath = `assets/background/day${dayID}_destination.png`;
+         if (dayID >= 1 && dayID <= 3) destinationBgPath = "assets/background/bg_sunny/bg_sunny_destination.png";
+         if (dayID === 4) destinationBgPath = "assets/background/bg_light_rain/bg_light_rain_destination.png";
+         if (dayID === 5) destinationBgPath = "assets/background/bg_heavy_rain/bg_heavy_rain_destination.png";
+
          env.destinationBg = loadImage(destinationBgPath,
             () => console.log(`[LevelController] ✓ Loaded destination background: ${destinationBgPath}`),
             () => console.warn(`[LevelController] ✗ Failed to load: ${destinationBgPath}`)
@@ -82,15 +115,8 @@ class LevelController {
    }
 
    /**
-    * LEVEL ROUTING: TUTORIAL LEVEL
-    * Instantiate and initialize the TutorialLevel for Day 1.
-    */
-   initializeTutorialLevel(dayID, config) {
-   }
-
-   /**
     * LEVEL ROUTING: PROCEDURAL LEVEL
-    * Instantiate and initialize the ProceduralLevel for Days 2-5.
+    * Instantiate and initialize the ProceduralLevel for all days.
     */
    initializeProceduralLevel(dayID, config) {
       console.log(`[LevelController] → Loading Procedural Level (Day ${dayID})`);
@@ -101,6 +127,15 @@ class LevelController {
 
       // Initialize level with session data
       this.proceduralLevel.setup();
+
+      // Set obstacle manager difficulty config
+      if (typeof obstacleManager !== 'undefined' && obstacleManager) {
+         const difficultyConfig = this.proceduralLevel.getDifficultyConfig();
+         console.log(`[LevelController] Setting level config for ObstacleManager:`, difficultyConfig);
+         obstacleManager.setLevelConfig(difficultyConfig);
+      } else {
+         console.warn(`[LevelController] obstacleManager is not defined!`);
+      }
    }
 
    /**
@@ -180,7 +215,7 @@ class LevelController {
 
    /**
     * QUERY: GET CURRENT LEVEL TYPE
-    * Returns the type of level currently active (TUTORIAL or NORMAL).
+    * Returns the type of level currently active (NORMAL).
     */
    getLevelType() {
       return this.levelType;
@@ -215,7 +250,16 @@ class LevelController {
       console.log(`  - Level Phase: ${this.levelPhase}`);
       this.levelPhase = "VICTORY_TRANSITION";
       this.victoryStartScrollPos = env.scrollPos;
+      const runTileHeight = (env && env.defaultBg && env.defaultBg.height) ? env.defaultBg.height : 1080;
+      const normalizedOffset = ((env.scrollPos % runTileHeight) + runTileHeight) % runTileHeight;
+      this.victoryPreRollDistance = normalizedOffset === 0 ? 0 : (runTileHeight - normalizedOffset);
       console.log(`  - Victory Start ScrollPos: ${this.victoryStartScrollPos}`);
+      console.log(`  - Victory Pre-Roll Distance: ${this.victoryPreRollDistance}`);
+
+      // Freeze avatar into forward-running pose when reaching destination.
+      if (player && typeof player.forceForwardRunPose === "function") {
+         player.forceForwardRunPose();
+      }
 
       // Notify ObstacleManager to stop spawning
       if (obstacleManager) {
@@ -229,16 +273,20 @@ class LevelController {
     */
    checkSettlementPoint() {
       if (this.levelPhase === "VICTORY_TRANSITION") {
-         const bgHeight = 1080;
+         const bgHeight = (env && env.destinationBg && env.destinationBg.height)
+            ? env.destinationBg.height
+            : 1080;
+         const preRoll = Math.max(0, Number(this.victoryPreRollDistance) || 0);
          const scrolledSinceVictory = env.scrollPos - this.victoryStartScrollPos;
-         console.log(`[checkSettlementPoint] TRANSITION: scrolled=${scrolledSinceVictory.toFixed(1)}, target=${bgHeight}`);
+         const targetDistance = preRoll + bgHeight;
+         console.log(`[checkSettlementPoint] TRANSITION: scrolled=${scrolledSinceVictory.toFixed(1)}, preRoll=${preRoll.toFixed(1)}, target=${targetDistance}`);
 
-         if (scrolledSinceVictory >= bgHeight) {
+         if (scrolledSinceVictory >= targetDistance) {
             console.log(`[LevelController] 🎉 Victory Background Fully Visible! Entering settlement.`);
             this.levelPhase = "VICTORY_ZONE";
             this.victoryZoneFrames = 0;
-            // 记录胜利背景进入VICTORY_ZONE时的Y位置（此时应该是0，背景顶部对齐屏幕顶部）
-            this.victoryZoneStartY = scrolledSinceVictory - bgHeight;
+            // Record victory bg Y position when entering VICTORY_ZONE (should be 0, bg top aligned with screen top)
+            this.victoryZoneStartY = (scrolledSinceVictory - preRoll) - bgHeight;
             GLOBAL_CONFIG.scrollSpeed = 0;
          }
          // Continue to next check without returning false yet

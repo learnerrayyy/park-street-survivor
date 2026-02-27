@@ -5,6 +5,9 @@
 let gameState, mainMenu, roomScene, inventory, env, player, obstacleManager, levelController;
 let backpackUI;
 let endScreenManager;
+let testingPanel;
+let feedbackLayer;
+let tutorialDialogue;   // global dialogue box for tutorial page explanations
 
 // ─── GAME PROGRESS STATE ─────────────────────────────────────────────────────
 let currentUnlockedDay = 1;
@@ -15,6 +18,12 @@ let assets = {
     menuBg: null,
     otherBg: null,
     warningImg: null,
+    bbg: null,
+    libraryBg: null,
+    irisSuccess: [],
+    celebrateSheet: null,
+    storyShape: null,
+    storyCloud: null,
     keys: {},
     selectClouds: [],
     selectBg: {
@@ -25,12 +34,12 @@ let assets = {
     playerAnim: {
         north: [],
         south: [],
-        west:  [],
-        east:  []
+        west: [],
+        east: []
     }
 };
 let fonts = {};
-let bgm, sfxSelect, sfxClick;
+let bgm, sfxSelect, sfxClick, sfxScold;
 
 // ─── AUDIO VOLUME CONTROLS ───────────────────────────────────────────────────
 let masterVolumeBGM = 0.25;
@@ -131,20 +140,136 @@ let showStoryRecap = false;
 let storyRecapDay = 1;
 let storyScrollOffset = 0;  // scroll offset within current day's text
 
+// ─── STORY RECAP CONTENT ──────────────────────────────────────────────────────
+/**
+ * Story summary text for each day's recap panel.
+ * Each entry has a title (shown above the cloud) and lines[] (scrollable body text).
+ */
+const STORY_RECAPS = {
+    1: {
+        title: "Day 1 — Monday",
+        lines: [
+            "First day of term.",
+            "The alarm went off at 8:15.",
+            "",
+            "You threw on your hoodie, grabbed your",
+            "laptop, and sprinted out the door.",
+            "",
+            "Park Street looked deceptively calm.",
+            "Then the buses came.",
+            "",
+            "You wove between parked scooters,",
+            "ducked past a leaflet-handing promoter,",
+            "and somehow made it to the Arts Complex",
+            "with two minutes to spare.",
+            "",
+            "You rewarded yourself with a coffee.",
+            "It helped. A little."
+        ]
+    },
+    2: {
+        title: "Day 2 — Tuesday",
+        lines: [
+            "Seminar at 9:00.",
+            "You left at 8:48.",
+            "",
+            "The hill felt steeper than yesterday.",
+            "A scooter nearly clipped your shoulder.",
+            "",
+            "You spotted an empty scooter by the kerb",
+            "and hopped on for a short burst —",
+            "probably not legal, definitely worth it.",
+            "",
+            "You arrived breathless but present.",
+            "The lecturer hadn't even started yet.",
+            "",
+            "Small victories."
+        ]
+    },
+    3: {
+        title: "Day 3 — Wednesday",
+        lines: [
+            "Midweek. The city felt busier.",
+            "",
+            "A street vendor was handing out flyers",
+            "right in the middle of the pavement.",
+            "You pressed SPACE ten times and",
+            "launched a paper ball to clear the path.",
+            "",
+            "A homeless man stepped out unexpectedly",
+            "and bumped you into the wrong lane.",
+            "You recovered. Barely.",
+            "",
+            "The coffee from Tuesday was wearing off.",
+            "You found another one on the kerb.",
+            "",
+            "Somehow, you kept moving."
+        ]
+    },
+    4: {
+        title: "Day 4 — Thursday",
+        lines: [
+            "It was raining.",
+            "",
+            "Your rain boots kept your feet dry",
+            "through three separate puddles.",
+            "Your headphones blocked out the noise",
+            "of two separate promoters.",
+            "",
+            "The large car came out of nowhere.",
+            "You felt it before you saw it.",
+            "",
+            "You stumbled. Lost momentum.",
+            "But you kept running.",
+            "",
+            "The library was in sight.",
+            "It always felt further in the rain."
+        ]
+    },
+    5: {
+        title: "Day 5 — Friday",
+        lines: [
+            "Final submission day.",
+            "",
+            "Your laptop was heavy in the bag.",
+            "Your Student ID was clipped to your jacket.",
+            "Everything you needed was with you.",
+            "",
+            "The street threw everything at you.",
+            "Buses. Scooters. Promoters. Rain.",
+            "",
+            "You used every skill you'd picked up",
+            "across the week.",
+            "",
+            "And then — the Arts Complex doors.",
+            "Open. Waiting.",
+            "",
+            "You made it.",
+            "You actually made it."
+        ]
+    }
+};
+
 // ─── TUTORIAL HINT SYSTEM ─────────────────────────────────────────────────────
 /**
  * Tracks which tutorial hints are active.
- *   day1VisuallyUnlocked   — false until the player clicks Day 1's cloud for the first time;
+ *   dayVisuallyUnlocked    — object {dayID: bool}; each day starts gray until player clicks once.
  *                            on that click the background turns color and the warning disappears,
  *                            but the game does NOT start yet (a second click is required).
  *   levelSelectShownForDay — last day whose cloud was clicked to ENTER the game;
  *                            hint icon shows on days above this value.
+ *   dayVisuallyUnlocked    — object {dayID: bool}; each day starts gray until player clicks once.
+ *   levelSelectShownForDay — last day whose cloud was clicked to ENTER the game.
  *   roomPhase              — 'DESK' | 'CLOSE_BP' | 'DOOR' | 'DONE'
  */
+
 let tutorialHints = {
-    day1VisuallyUnlocked: false,
+    dayVisuallyUnlocked: {},   // { 1: true/false, 2: true/false, … } per-day first-click unlock
     levelSelectShownForDay: 0,
-    roomPhase: 'DESK'
+    roomPhase: 'DESK',
+    moveTutorialDone: false,   // true once the player has dismissed the WASD/arrow-key hint
+    uiTutorialDone: false,     // true once the pause/help/settings/story intro is complete
+    uiIntroStep: 0             // current step within UI intro (0 = pause, 1 = help, 2 = settings, 3 = story)
 };
 
 // ─── SPLASH LOGO ANIMATION STATE ─────────────────────────────────────────────
@@ -153,20 +278,20 @@ let titleDrop = { y: -200, vy: 0, landed: false, shake: 0 };
 // ─── ITEM ENCYCLOPEDIA ───────────────────────────────────────────────────────
 const ITEM_WIKI = [
     // BUFFS (Help Page 2)
-    { name: 'COFFEE',      desc: 'INSTANT ENERGY +20', unlockDay: 1, imgKey: 'coffee',                      type: 'BUFF'   },
-    { name: 'MOTORCYCLE',  desc: 'INSTANT ENERGY +20', unlockDay: 1, imgKey: 'motorcycle',                  type: 'BUFF'   },
-    { name: 'HOT COFFEE',  desc: 'INSTANT ENERGY +20', unlockDay: 2, imgKey: 'coffee',                      type: 'BUFF'   },
-    { name: 'HOT COFFEE',  desc: 'INSTANT ENERGY +20', unlockDay: 3, imgKey: 'coffee',                      type: 'BUFF'   },
-    { name: 'HOT COFFEE',  desc: 'INSTANT ENERGY +20', unlockDay: 4, imgKey: 'coffee',                      type: 'BUFF'   },
-    { name: 'HOT COFFEE',  desc: 'INSTANT ENERGY +20', unlockDay: 5, imgKey: 'coffee',                      type: 'BUFF'   },
+    { name: 'COFFEE', desc: 'INSTANT ENERGY +20', unlockDay: 1, imgKey: 'coffee', type: 'BUFF' },
+    { name: 'MOTORCYCLE', desc: 'INSTANT ENERGY +20', unlockDay: 1, imgKey: 'motorcycle', type: 'BUFF' },
+    { name: 'HOT COFFEE', desc: 'INSTANT ENERGY +20', unlockDay: 2, imgKey: 'coffee', type: 'BUFF' },
+    { name: 'HOT COFFEE', desc: 'INSTANT ENERGY +20', unlockDay: 3, imgKey: 'coffee', type: 'BUFF' },
+    { name: 'HOT COFFEE', desc: 'INSTANT ENERGY +20', unlockDay: 4, imgKey: 'coffee', type: 'BUFF' },
+    { name: 'HOT COFFEE', desc: 'INSTANT ENERGY +20', unlockDay: 5, imgKey: 'coffee', type: 'BUFF' },
 
     // HAZARDS (Help Page 3)
-    { name: 'HEAVY TRAFFIC',  desc: 'Immediately fail upon collision.',           unlockDay: 1, imgKey: ['ambulance', 'bus'],       type: 'HAZARD' },
-    { name: 'LIGHT TRAFFIC',  desc: 'Causes player to lose health.',              unlockDay: 1, imgKey: ['car_brown', 'car_red'],   type: 'HAZARD' },
-    { name: 'HOMELESS',       desc: 'Forces immediate lane change.',              unlockDay: 1, imgKey: 'homeless',                type: 'HAZARD' },
-    { name: 'PROMOTER',       desc: 'A flyer that blocks the Iris\'s view.',      unlockDay: 1, imgKey: 'promoter',                type: 'HAZARD' },
-    { name: 'SCOOTER RIDER',  desc: 'Causes temporary stun.',                     unlockDay: 1, imgKey: 'scooter_rider',           type: 'HAZARD' },
-    { name: 'PADDLE',         desc: '...',                                        unlockDay: 4, imgKey: 'scooter_rider',           type: 'HAZARD' }
+    { name: 'HEAVY TRAFFIC', desc: 'DANGER: INSTANT FAIL', unlockDay: 1, imgKey: ['ambulance', 'bus'], type: 'HAZARD' },
+    { name: 'LIGHT TRAFFIC', desc: 'SPACE OBSTACLE: BLOCKS PATH.', unlockDay: 1, imgKey: ['car_brown', 'car_red'], type: 'HAZARD' },
+    { name: 'HOMELESS', desc: 'TRIPS PLAYER: SLOW DOWN', unlockDay: 1, imgKey: 'homeless', type: 'HAZARD' },
+    { name: 'PROMOTER', desc: 'TRIPS PLAYER: SLOW DOWN', unlockDay: 1, imgKey: 'promoter', type: 'HAZARD' },
+    { name: 'SCOOTER RIDER', desc: 'TRIPS PLAYER: SLOW DOWN', unlockDay: 1, imgKey: 'scooter_rider', type: 'HAZARD' },
+    { name: 'PADDLE', desc: 'TRIPS PLAYER: SLOW DOWN', unlockDay: 4, imgKey: 'scooter_rider', type: 'HAZARD' }
 ];
 
 // ─── ASSET LOADING TRACKER ───────────────────────────────────────────────────
@@ -174,7 +299,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 37;
+const totalAssetsToLoad = 48;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -195,27 +320,35 @@ function itemLoaded() {
  */
 function preload() {
     // Visual assets
-    assets.menuBg      = loadImage('assets/cbg.png', itemLoaded);
-    assets.otherBg     = loadImage('assets/other_bg.png', itemLoaded);
-    assets.libraryBg   = loadImage('assets/background/library.jpg', itemLoaded);
-    assets.bbg         = loadImage('assets/bbg.png', itemLoaded);
-    assets.roomBg      = loadImage('assets/room.png', itemLoaded);
-    assets.inventoryBg    = loadImage('assets/inventory/table.png', itemLoaded);
-    assets.backpackImg    = loadImage('assets/inventory/backpack.png', itemLoaded);
+    assets.menuBg = loadImage('assets/background/cbg.png', itemLoaded);
+    assets.otherBg = loadImage('assets/background/other_bg.png', itemLoaded);
+    assets.roomBg = loadImage('assets/background/room.png', itemLoaded);
+    assets.inventoryBg = loadImage('assets/inventory/table.png', itemLoaded);
+    assets.backpackImg = loadImage('assets/inventory/backpack.png', itemLoaded);
     assets.studentCardImg = loadImage('assets/inventory/student_card.png', itemLoaded);
     assets.computerImg    = loadImage('assets/inventory/computer.png', itemLoaded);
+    assets.portraitPlayerNormal = loadImage('assets/characters/portrait/main.png', itemLoaded);
     assets.vitaminImg     = loadImage('assets/inventory/vitamin.png', itemLoaded);
     assets.tangleImg      = loadImage('assets/inventory/tangle.png', itemLoaded);
     assets.headphoneImg   = loadImage('assets/inventory/headphone.png', itemLoaded);
     assets.rainbootImg    = loadImage('assets/inventory/rainboot.png', itemLoaded);
 
+    assets.bbg         = loadImage('assets/background/bbg.png', itemLoaded);
+    assets.libraryBg   = loadImage('assets/background/library.jpg', itemLoaded);
+
+    loadImage('assets/end_screen/spritesheet_celebrate.png', (img) => {
+        let fW = img.width / 5;
+        let fH = img.height;
+        for (let i = 0; i < 5; i++) {
+            assets.irisSuccess.push(img.get(i * fW, 0, fW, fH));
+        }
+    });
+
+    assets.storyShape  = loadImage('assets/story/frame_shape.png', itemLoaded);
+    assets.storyCloud  = loadImage('assets/story/frame_cloud.png', itemLoaded);
+
     assets.selectBg.unlock = loadImage('assets/select_background/day_unlock.jpg', itemLoaded);
-    assets.selectBg.lock   = loadImage('assets/select_background/day_lock.jpg', itemLoaded);
-
-    // Story recap assets
-    assets.storyShape = loadImage('assets/story/frame_shape.png', itemLoaded);
-    assets.storyCloud = loadImage('assets/story/frame_cloud.png', itemLoaded);
-
+    assets.selectBg.lock = loadImage('assets/select_background/day_lock.jpg', itemLoaded);
 
     for (let i = 1; i <= 5; i++) {
         assets.selectClouds.push(loadImage(`assets/select_cloud/Cloud-${i}.png`, itemLoaded));
@@ -223,29 +356,30 @@ function preload() {
 
     // Typography
     fonts.title = loadFont('assets/fonts/PressStart2P-Regular.ttf', itemLoaded);
-    fonts.time  = loadFont('assets/fonts/VT323-Regular.ttf', itemLoaded);
-    fonts.body  = loadFont('assets/fonts/DotGothic16-Regular.ttf', itemLoaded);
-    fonts.logo  = loadFont('assets/fonts/title_1.otf', itemLoaded);
+    fonts.time = loadFont('assets/fonts/VT323-Regular.ttf', itemLoaded);
+    fonts.body = loadFont('assets/fonts/DotGothic16-Regular.ttf', itemLoaded);
+    fonts.logo = loadFont('assets/fonts/title_1.otf', itemLoaded);
 
     // Audio
     soundFormats('mp3', 'wav');
-    bgm       = loadSound('assets/audio/music/MainTheme.mp3', itemLoaded);
+    bgm = loadSound('assets/audio/music/MainTheme.mp3', itemLoaded);
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
-    sfxClick  = loadSound('assets/audio/effects/Click.wav', itemLoaded);
+    sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
+    // sfxScold = loadSound('assets/audio/effects/Scold.wav', itemLoaded); // TODO: add asset later
 
     // Control key sprites
-    assets.keys.w     = loadImage('assets/control_keys/W.png', itemLoaded);
-    assets.keys.a     = loadImage('assets/control_keys/A.png', itemLoaded);
-    assets.keys.s     = loadImage('assets/control_keys/S.png', itemLoaded);
-    assets.keys.d     = loadImage('assets/control_keys/D.png', itemLoaded);
-    assets.keys.up    = loadImage('assets/control_keys/ARROWUP.png', itemLoaded);
-    assets.keys.down  = loadImage('assets/control_keys/ARROWDOWN.png', itemLoaded);
-    assets.keys.left  = loadImage('assets/control_keys/ARROWLEFT.png', itemLoaded);
+    assets.keys.w = loadImage('assets/control_keys/W.png', itemLoaded);
+    assets.keys.a = loadImage('assets/control_keys/A.png', itemLoaded);
+    assets.keys.s = loadImage('assets/control_keys/S.png', itemLoaded);
+    assets.keys.d = loadImage('assets/control_keys/D.png', itemLoaded);
+    assets.keys.up = loadImage('assets/control_keys/ARROWUP.png', itemLoaded);
+    assets.keys.down = loadImage('assets/control_keys/ARROWDOWN.png', itemLoaded);
+    assets.keys.left = loadImage('assets/control_keys/ARROWLEFT.png', itemLoaded);
     assets.keys.right = loadImage('assets/control_keys/ARROWRIGHT.png', itemLoaded);
     assets.keys.enter = loadImage('assets/control_keys/ENTER.png', itemLoaded);
     assets.keys.space = loadImage('assets/control_keys/SPACE.png', itemLoaded);
-    assets.keys.e     = loadImage('assets/control_keys/E.png', itemLoaded);
-    assets.keys.p     = loadImage('assets/control_keys/P.png', itemLoaded);
+    assets.keys.e = loadImage('assets/control_keys/E.png', itemLoaded);
+    assets.keys.p = loadImage('assets/control_keys/P.png', itemLoaded);
 
     // Logo frames
     assets.logoImgs = [
@@ -257,45 +391,67 @@ function preload() {
     ];
 
     assets.uobLogo = loadImage('assets/logo/uob_logo.png', itemLoaded);
-
-    // UI button sprites
-    assets.btnImg   = loadImage('assets/buttons/button.png', itemLoaded);
-    assets.backImg  = loadImage('assets/buttons/back.png', itemLoaded);
+    assets.warningImg = loadImage('assets/buttons/warning.png', itemLoaded);
+    assets.btnImg = loadImage('assets/buttons/button.png', itemLoaded);
+    assets.backImg = loadImage('assets/buttons/back.png', itemLoaded);
     assets.pauseImg = loadImage('assets/buttons/pause.png', itemLoaded);
+    assets.musicOn  = loadImage('assets/buttons/music_on.png',  itemLoaded);
+    assets.musicOff = loadImage('assets/buttons/music_off.png', itemLoaded);
 
     // Entity preview sprites (no progress tracking — non-critical)
     if (!assets.previews) assets.previews = {};
-    assets.previews['player']        = loadImage('assets/characters/wiki/Iris.png');
-    assets.previews['npc_1']         = loadImage('assets/characters/wiki/Wiola.png');
-    assets.previews['ambulance']     = loadImage('assets/obstacles/ambulance.png');
-    assets.previews['bus']           = loadImage('assets/obstacles/bus.png');
-    assets.previews['car_brown']     = loadImage('assets/obstacles/car_brown.png');
-    assets.previews['car_red']       = loadImage('assets/obstacles/car_red.png');
-    assets.previews['homeless']      = loadImage('assets/obstacles/homeless.png');
-    assets.previews['promoter']      = loadImage('assets/obstacles/promoter.png');
-    assets.previews['scooter_rider'] = loadImage('assets/obstacles/scooter_rider.png');
-    assets.previews['coffee']        = loadImage('assets/power_up/coffee.png');
-    assets.previews['motorcycle']    = loadImage('assets/power_up/motorcycle.png');
+    assets.previews['player'] = loadImage('assets/characters/wiki/Iris.png');
+    assets.previews['npc_1'] = loadImage('assets/characters/wiki/Wiola.png');
+    assets.previews['ambulance'] = loadImage('assets/obstacles/obstacle_ambulance.png');
+    assets.previews['bus'] = loadImage('assets/obstacles/obstacle_bus.png');
+    assets.previews['car_brown'] = loadImage('assets/obstacles/obstacle_car_brown.png');
+    assets.previews['car_red'] = loadImage('assets/obstacles/obstacle_car_red.png');
+    assets.previews['homeless'] = loadImage('assets/obstacles/obstacle_homeless.png');
+    assets.previews['promoter'] = loadImage('assets/obstacles/obstacle_promoter.png');
+    assets.previews['scooter_rider'] = loadImage('assets/obstacles/obstacle_scooter.png');
+    assets.previews['coffee'] = loadImage('assets/power_up/powerup_coffee.png');
+    assets.previews['motorcycle'] = loadImage('assets/power_up/powerup_motorcycle.png');
+    assets.previews['empty_scooter'] = loadImage('assets/power_up/powerup_scooter.png');
+    assets.previews['powerup_scooter'] = assets.previews['empty_scooter'];
 
-    // Player directional animation spritesheets
+    // Player directional frame animation (uses authored frame PNGs directly)
     assets.playerAnim = {};
     const dirs = ['north', 'south', 'west', 'east'];
+    const frameFilesByDir = {
+        north: ['frame_1.png', 'frame_2.png', 'frame_3.png', 'frame_4.png', 'frame_5.png'],
+        south: ['frame_1.png', 'frame_2.png', 'frame_3.png', 'frame_4.png', 'frame_5.png'],
+        west: ['frame_001.png', 'frame_002.png', 'frame_003.png', 'frame_004.png', 'frame_005.png'],
+        east: ['frame_001.png', 'frame_002.png', 'frame_003.png', 'frame_004.png', 'frame_005.png']
+    };
+
     dirs.forEach(d => {
         assets.playerAnim[d] = { walk: [], idle: null };
-        assets.playerAnim[d].idle = loadImage(`assets/characters/spritesheet/${d}.png`);
-        loadImage(`assets/characters/spritesheet/spritesheet_${d}.png`, (img) => {
-            let fw = img.width / 5;
-            let fh = img.height;
-            for (let i = 0; i < 5; i++) {
-                assets.playerAnim[d].walk.push(img.get(i * fw, 0, fw, fh));
-            }
-        });
-    });
 
-    // Sound effects & Background music mute buttons
-    assets.musicOn    = loadImage('assets/buttons/music_on.png', itemLoaded);
-    assets.musicOff   = loadImage('assets/buttons/music_off.png', itemLoaded);
-    assets.warningImg = loadImage('assets/buttons/warning.png', itemLoaded);
+        if (d === 'north') {
+            // Back-running animation uses the dedicated run spritesheet.
+            loadImage('assets/characters/sprite_frames/sprite_sheets/spritesheet_run.png', (img) => {
+                const fw = img.height;
+                const fh = img.height;
+                const totalFrames = max(1, floor(img.width / fw));
+                for (let i = 0; i < totalFrames; i++) {
+                    assets.playerAnim[d].walk.push(img.get(i * fw, 0, fw, fh));
+                }
+            });
+        } else {
+            frameFilesByDir[d].forEach((fileName) => {
+                const path = `assets/characters/sprite_frames/${d}/${fileName}`;
+                const frameImg = loadImage(path);
+                assets.playerAnim[d].walk.push(frameImg);
+            });
+        }
+
+        // Keep dedicated idle if present; fallback to first run frame.
+        assets.playerAnim[d].idle = loadImage(
+            `assets/characters/spritesheet/${d}.png`,
+            () => { },
+            () => { assets.playerAnim[d].idle = assets.playerAnim[d].walk[0]; }
+        );
+    });
 }
 
 
@@ -311,16 +467,20 @@ function setup() {
     cvs.parent('canvas-container');
     noSmooth();
 
-    gameState       = new GameState();
-    mainMenu        = new MainMenu();
-    roomScene       = new RoomScene();
-    inventory       = new InventorySystem();
-    env             = new Environment();
-    player          = new Player();
+    gameState = new GameState();
+    mainMenu = new MainMenu();
+    roomScene = new RoomScene();
+    inventory = new InventorySystem();
+    env = new Environment();
+    player = new Player();
     obstacleManager = new ObstacleManager();
-    backpackUI      = new BackpackVisual(inventory, roomScene);
-    levelController  = new LevelController();
+    backpackUI = new BackpackVisual(inventory, roomScene);
+    levelController = new LevelController();
     endScreenManager = new EndScreenManager();
+    testingPanel = new TestingPanel();
+    feedbackLayer = new FeedbackLayer();
+    tutorialDialogue = new DialogueBox();
+    tutorialDialogue.timerMax = 300;   // 5 s — long enough to read tutorial page explanations
 
     textFont(fonts.body);
     gameState.currentState = STATE_LOADING;
@@ -340,6 +500,14 @@ function draw() {
                 drawLoadingScreen();
                 break;
 
+            case STATE_WARNING:
+                drawWarningScreen();
+                break;
+
+            case STATE_CREDITS:
+                drawCreditsScreen();
+                break;
+
             case STATE_SPLASH:
                 drawSplashScreen();
                 break;
@@ -350,14 +518,28 @@ function draw() {
             case STATE_HELP:
                 if (mainMenu) {
                     mainMenu.menuState = gameState.currentState;
+                    // Auto-colorize once the entrance animation finishes — keeps visible gray period
+                    if (gameState.currentState === STATE_LEVEL_SELECT &&
+                        typeof tutorialHints !== 'undefined' && mainMenu.timeWheel &&
+                        !mainMenu.timeWheel.isEntering) {
+                        let sel = mainMenu.timeWheel.selectedDay;
+                        if (sel <= currentUnlockedDay) {
+                            tutorialHints.dayVisuallyUnlocked[sel] = true;
+                        }
+                    }
                     mainMenu.display();
                 }
+                // Show tutorial page explanation overlay on SETTINGS and HELP pages
+                if (tutorialDialogue) tutorialDialogue.display();
                 break;
 
             case STATE_ROOM:
                 if (roomScene) roomScene.display();
                 if (player) {
-                    player.update();
+                    // Block movement while the UI intro tutorial is showing
+                    if (typeof tutorialHints === 'undefined' || tutorialHints.roomPhase !== 'UI_INTRO') {
+                        player.update();
+                    }
                     player.display();
                 }
                 drawPauseButton();
@@ -365,18 +547,6 @@ function draw() {
 
             case STATE_INVENTORY:
                 if (backpackUI) backpackUI.display();
-                // Tutorial: show close-backpack hint when required items are packed
-                if (tutorialHints.roomPhase === 'CLOSE_BP' && backpackUI && backpackUI.hasRequiredItems()) {
-                    drawWarningIcon(width / 2, height - 75, 48);
-                    push();
-                    textFont(fonts.body);
-                    textSize(20);
-                    textAlign(CENTER, CENTER);
-                    fill(255, 215, 0, 200 + sin(frameCount * 0.1) * 55);
-                    noStroke();
-                    text("PACK COMPLETE! PRESS ESC TO CLOSE BACKPACK", width / 2, height - 45);
-                    pop();
-                }
                 break;
 
             case STATE_DAY_RUN:
@@ -392,41 +562,104 @@ function draw() {
                     if (env) env.display();
                     if (obstacleManager) obstacleManager.display();
                     if (player) player.display();
+                    if (obstacleManager && typeof obstacleManager.renderPromoterEffects === 'function') {
+                        obstacleManager.renderPromoterEffects();
+                    }
                 }
                 renderPauseOverlay();
+                // Show tutorial dialogue on top of pause overlay (e.g. STORY explanation)
+                if (tutorialDialogue) tutorialDialogue.display();
                 break;
 
             case STATE_FAIL:
-                // Draw frozen gameplay behind the overlay
-                if (env) env.display();
-                if (obstacleManager) obstacleManager.display();
-                if (player) player.display();
-                if (endScreenManager) endScreenManager.display();
+                // Draw frozen gameplay behind the overlay.
+                // If env is null (e.g. jumped here via dev shortcut), render a static
+                // fallback so the screen is never just a blank dark rectangle.
+                if (env) {
+                    env.display();
+                    if (obstacleManager) obstacleManager.display();
+                    if (player) player.display();
+                } else {
+                    // Fallback: fill with the shared other-screen background
+                    if (assets.otherBg) {
+                        let s = max(width / assets.otherBg.width, height / assets.otherBg.height);
+                        imageMode(CENTER);
+                        image(assets.otherBg, width / 2, height / 2,
+                              assets.otherBg.width * s, assets.otherBg.height * s);
+                    }
+                }
+                if (endScreenManager) {
+                    if (!endScreenManager._activeScreen) {
+                        endScreenManager.activateFail(gameState.failReason || "EXHAUSTED");
+                    }
+                    endScreenManager.display();
+                }
                 break;
 
             case STATE_WIN:
-                if (endScreenManager) endScreenManager.display();
+                if (endScreenManager) {
+                    if (!endScreenManager._activeScreen) {
+                        // Unlock next day immediately so its warning icon appears on level select
+                        if (currentDayID < 5) {
+                            currentUnlockedDay = Math.max(currentUnlockedDay, currentDayID + 1);
+                        }
+                        endScreenManager.activateSuccess();
+                    }
+                    endScreenManager.display();
+                }
+
                 break;
         }
     } catch (e) {
         console.error("[Core Systems] Runtime Exception:", e);
     }
 
+    if (feedbackLayer) {
+        feedbackLayer.update();
+        feedbackLayer.display();
+    }
+
     renderGlobalFade();
+
+    // TestingPanel always draws on top of everything (dev overlay)
+    if (testingPanel) testingPanel.draw();
 }
 
 /**
  * Updates all game-world systems for a single frame during the run state.
  */
 function runGameLoop() {
-    if (levelController) { levelController.update(); }
-    if (env)             { env.update(GLOBAL_CONFIG.scrollSpeed); env.display(); }
-    if (obstacleManager) { obstacleManager.update(GLOBAL_CONFIG.scrollSpeed, player); obstacleManager.display(); }
-    if (player)          { player.update(); player.display(); }
+    const levelPhase = levelController ? levelController.getLevelPhase() : "RUNNING";
+    const freezeGameplay = feedbackLayer && typeof feedbackLayer.isHitStopActive === "function"
+        ? feedbackLayer.isHitStopActive()
+        : false;
+
+    if (!freezeGameplay) {
+        if (levelController) { levelController.update(); }
+        if (env) { env.update(GLOBAL_CONFIG.scrollSpeed); }
+        if (obstacleManager) { obstacleManager.update(GLOBAL_CONFIG.scrollSpeed, player, levelPhase); }
+        if (player) { player.update(); }
+    }
+
+    let cameraOffset = { x: 0, y: 0 };
+    if (feedbackLayer && typeof feedbackLayer.getCameraOffset === "function") {
+        cameraOffset = feedbackLayer.getCameraOffset();
+    }
+
+    push();
+    translate(cameraOffset.x, cameraOffset.y);
+    if (env) env.display();
+    if (obstacleManager) obstacleManager.display();
+    if (player) player.display();
+    if (obstacleManager && typeof obstacleManager.renderPromoterEffects === 'function') {
+        obstacleManager.renderPromoterEffects();
+    }
+    pop();
+
     if (levelController) { levelController.display(); }
 
     // Win condition: settlement point reached
-    if (levelController && levelController.checkSettlementPoint()) {
+    if (!freezeGameplay && levelController && levelController.checkSettlementPoint()) {
         console.log("[runGameLoop] STATE_WIN triggered!");
         gameState.setState(STATE_WIN);
     }
@@ -459,8 +692,8 @@ function playSFX(sound) {
 function triggerTransition(onBlackout) {
     if (globalFade.isFading) return;
     globalFade.isFading = true;
-    globalFade.dir      = 1;
-    globalFade.alpha    = 0;
+    globalFade.dir = 1;
+    globalFade.alpha = 0;
     globalFade.callback = onBlackout;
 }
 
@@ -479,7 +712,7 @@ function renderGlobalFade() {
         globalFade.dir = -1;
     }
     if (globalFade.dir === -1 && globalFade.alpha <= 0) {
-        globalFade.alpha    = 0;
+        globalFade.alpha = 0;
         globalFade.isFading = false;
         globalFade.callback = null;
     }
@@ -500,11 +733,42 @@ function renderGlobalFade() {
  * Dispatches keyboard events to the appropriate scene or system handler.
  */
 function keyPressed() {
+    // Testing panel hotkey is always available, even during transitions/end screens.
+    if ((keyCode === 113 || keyCode === 192 || key === 'F2' || key === '`' || key === '~') && testingPanel) {
+        testingPanel.toggle();
+        return false;
+    }
+
     if (globalFade.isFading) return;
     let state = gameState.currentState;
 
+    // Credits screen: any key skips scroll/pause → poem, or exits poem → menu
+    if (state === STATE_CREDITS) {
+        if (_creditPhase === 'poem' && _creditPoemAlpha >= 255) {
+            triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+        } else if (_creditPhase !== 'poem') {
+            _creditPhase = 'poem'; _creditPoemAlpha = 0; // skip to epilogue
+        }
+        return;
+    }
+
     // Toggle developer mode
     if (key === '0') devToggle();
+
+    // Toggle TestingPanel with backtick (`) or F2
+    if (key === '`' || keyCode === 113) {
+        if (testingPanel) testingPanel.toggle();
+        return;
+    }
+
+    // If TestingPanel is open, route all keys to it and block everything else
+    if (testingPanel && testingPanel.isVisible()) {
+        if (testingPanel.handleKeyPressed(key, keyCode)) return false;
+    }
+
+    // Lock all input while the level-select entrance animation plays
+    if (state === STATE_LEVEL_SELECT &&
+        mainMenu && mainMenu.timeWheel && mainMenu.timeWheel.isEntering) return;
 
     // Dev shortcuts: 8 = instant WIN, 9 = instant FAIL
     if (developerMode) {
@@ -512,12 +776,14 @@ function keyPressed() {
         if (key === '9') { devGoToFail("EXHAUSTED"); return; }
     }
 
-    // Pause / unpause — available in most gameplay states (but NOT while already paused)
-    if ((key === 'p' || key === 'P' || keyCode === ESCAPE) && state !== STATE_PAUSED) {
+    // Pause / unpause — available in most gameplay states
+    if (key === 'p' || key === 'P' || keyCode === ESCAPE) {
         if (state !== STATE_MENU && state !== STATE_LEVEL_SELECT &&
             state !== STATE_SETTINGS && state !== STATE_HELP &&
             state !== STATE_SPLASH && state !== STATE_INVENTORY &&
-            state !== STATE_FAIL && state !== STATE_WIN) {
+            state !== STATE_WARNING &&
+            state !== STATE_CREDITS) {
+            playSFX(sfxClick);
             playSFX(sfxClick);
             togglePause();
             pauseIndex = -1;
@@ -530,44 +796,9 @@ function keyPressed() {
     // Pause menu navigation
     if (state === STATE_PAUSED) {
         if (showStoryRecap) {
-            // ── Dev adjust mode: intercept arrow keys for layer positioning ──
-            if (showStoryDebugControls) {
-                // Layer selection: 1=shape, 2=cloud, 3=content, 4=title
-                if (key === '1') { storyDebugActiveLayer = 1; return; }
-                if (key === '2') { storyDebugActiveLayer = 2; return; }
-                if (key === '3') { storyDebugActiveLayer = 3; return; }
-                if (key === '4') { storyDebugActiveLayer = 4; return; }
-                if (key === 'p' || key === 'P') { printStoryDebugData(); return; }
-
-                let layerKey = storyDebugActiveLayer === 1 ? 'shape'
-                             : storyDebugActiveLayer === 2 ? 'cloud'
-                             : storyDebugActiveLayer === 3 ? 'textArea'
-                             : 'titleArea';
-                let target = storyDebugData[layerKey];
-                let resize = keyIsDown(SHIFT);
-
-                if (keyCode === UP_ARROW) {
-                    resize ? target.h -= 5 : target.y -= 5;
-                    printStoryDebugData(); return;
-                }
-                if (keyCode === DOWN_ARROW) {
-                    resize ? target.h += 5 : target.y += 5;
-                    printStoryDebugData(); return;
-                }
-                if (keyCode === LEFT_ARROW) {
-                    resize ? target.w -= 5 : target.x -= 5;
-                    printStoryDebugData(); return;
-                }
-                if (keyCode === RIGHT_ARROW) {
-                    resize ? target.w += 5 : target.x += 5;
-                    printStoryDebugData(); return;
-                }
-            }
-
-            // Story recap: UP/DOWN or W/S scroll content within the day
+            // story recap arrow keys / ESC handled in story recap section
             if (keyCode === UP_ARROW || keyCode === 87) {
                 if (storyScrollOffset <= 0 && storyRecapDay > 1) {
-                    // Auto-retreat to previous day
                     storyRecapDay--;
                     let prevRecap = STORY_RECAPS[storyRecapDay];
                     storyScrollOffset = max(0, prevRecap.lines.length - 10);
@@ -579,48 +810,23 @@ function keyPressed() {
                 let recap = STORY_RECAPS[storyRecapDay];
                 if (recap) {
                     let maxScroll = max(0, recap.lines.length - 10);
-                    if (storyScrollOffset >= maxScroll) {
-                        // Auto-advance to next day
-                        let nextDay = storyRecapDay + 1;
-                        if (nextDay <= 5) {
-                            storyRecapDay = nextDay;
-                            storyScrollOffset = 0;
-                        }
+                    if (storyScrollOffset >= maxScroll && storyRecapDay + 1 <= 5) {
+                        storyRecapDay++;
+                        storyScrollOffset = 0;
                     } else {
                         storyScrollOffset = min(maxScroll, storyScrollOffset + 1);
                     }
                 }
                 if (typeof playSFX === 'function') playSFX(sfxSelect);
-            } else if (keyCode === LEFT_ARROW || keyCode === 65) {
-                // Change to previous day
-                if (storyRecapDay > 1) {
-                    storyRecapDay--;
-                    storyScrollOffset = 0;
-                    if (typeof playSFX === 'function') playSFX(sfxSelect);
-                }
-            } else if (keyCode === RIGHT_ARROW || keyCode === 68) {
-                // Change to next day
-                let nextDay = storyRecapDay + 1;
-                let isNextUnlocked = (nextDay <= currentUnlockedDay) || (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-                if (nextDay <= 5 && isNextUnlocked) {
-                    storyRecapDay = nextDay;
-                    storyScrollOffset = 0;
-                    if (typeof playSFX === 'function') playSFX(sfxSelect);
-                }
             } else if (keyCode === ESCAPE) {
                 showStoryRecap = false;
                 pauseIndex = -1;
             }
             return;
         } else if (showRestartChoice) {
-            // Restart sub-menu navigation
             if (keyCode === UP_ARROW || keyCode === 87 || keyCode === DOWN_ARROW || keyCode === 83) {
                 if (typeof playSFX === 'function') playSFX(sfxSelect);
-                if (restartChoiceIndex < 0) {
-                    restartChoiceIndex = 0;
-                } else {
-                    restartChoiceIndex = (restartChoiceIndex + 1) % RESTART_OPTIONS.length;
-                }
+                restartChoiceIndex = (restartChoiceIndex < 0) ? 0 : (restartChoiceIndex + 1) % RESTART_OPTIONS.length;
             } else if ((keyCode === ENTER || keyCode === 13) && restartChoiceIndex >= 0) {
                 if (typeof playSFX === 'function') playSFX(sfxClick);
                 handleRestartChoice();
@@ -628,33 +834,35 @@ function keyPressed() {
                 showRestartChoice = false;
                 pauseIndex = -1;
             }
+            return;
         } else {
             let options = getPauseOptions();
             if (keyCode === UP_ARROW || keyCode === 87 || keyCode === DOWN_ARROW || keyCode === 83) {
                 if (typeof playSFX === 'function') playSFX(sfxSelect);
-                
                 if (pauseIndex < 0) {
-                    if (keyCode === UP_ARROW || keyCode === 87) {
-                        pauseIndex = options.length - 1;
-                    } else {
-                        pauseIndex = 0;
-                    }
+                    pauseIndex = (keyCode === UP_ARROW || keyCode === 87) ? options.length - 1 : 0;
                 } else if (keyCode === UP_ARROW || keyCode === 87) {
                     pauseIndex = (pauseIndex - 1 + options.length) % options.length;
                 } else {
                     pauseIndex = (pauseIndex + 1) % options.length;
                 }
             } else if ((keyCode === ENTER || keyCode === 13) && pauseIndex >= 0) {
-                if (typeof playSFX === 'function') playSFX(sfxClick);
+                playSFX(sfxClick);
                 handlePauseSelection();
             } else if (keyCode === ESCAPE) {
-                // Back arrow behavior: resume from pause
                 togglePause();
                 pauseFromState = null;
                 showStoryRecap = false;
             }
         }
         return;
+    }
+
+    // Promoter leaflet interaction: SPACE is consumed by obstacle system while active.
+    if (state === STATE_DAY_RUN && obstacleManager &&
+        typeof obstacleManager.handlePromoterSpacePress === 'function' &&
+        (keyCode === 32 || key === ' ')) {
+        if (obstacleManager.handlePromoterSpacePress(player)) return false;
     }
 
     // Menu navigation
@@ -666,15 +874,24 @@ function keyPressed() {
     else if (state === STATE_ROOM) {
         if (roomScene) roomScene.handleKeyPress(keyCode);
     }
-    // End screen navigation (fail / win)
+    // Retry from end screen
     else if (state === STATE_FAIL || state === STATE_WIN) {
         if (endScreenManager) endScreenManager.handleKeyPress(keyCode);
+        else if (keyCode === ENTER || keyCode === 13) {
+            playSFX(sfxClick);
+            setupRun(currentDayID);
+        }
     }
 
-    // Close inventory with ESC — advance tutorial hint from CLOSE_BP
+    // Close inventory with ESC
     if (gameState.currentState === STATE_INVENTORY && keyCode === ESCAPE) {
         if (tutorialHints.roomPhase === 'CLOSE_BP') {
-            tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
+            if (backpackUI && backpackUI.hasRequiredItems()) {
+                tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
+            } else {
+                // Required items not yet packed — keep desk hint active
+                tutorialHints.roomPhase = 'DESK';
+            }
         }
         gameState.currentState = STATE_ROOM;
         return false;
@@ -690,40 +907,56 @@ function handlePauseSelection() {
 
     if (selected === "RESUME") {
         togglePause();
+        pauseFromState = null;
     } else if (selected === "STORY") {
+        // Tutorial first-pause: mark done then open story
+        if (typeof tutorialHints !== 'undefined' &&
+            tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
+            tutorialHints.uiTutorialDone = true;
+            tutorialHints.uiIntroStep    = 0;
+            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+        }
         showStoryRecap = true;
         storyRecapDay = 1;
         storyScrollOffset = 0;
     } else if (selected === "SETTINGS") {
+        // Tutorial first-pause: mark done then open settings
+        if (typeof tutorialHints !== 'undefined' &&
+            tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
+            tutorialHints.uiTutorialDone = true;
+            tutorialHints.uiIntroStep    = 0;
+            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+        }
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
-        mainMenu.diffToastTimer = 0;   // clear any stale difficulty toast
+        mainMenu.diffToastTimer = 0;
         gameState.currentState = STATE_SETTINGS;
         mainMenu.menuState     = STATE_SETTINGS;
     } else if (selected === "HELP") {
-        pauseFromState         = gameState.previousState;
+        // Tutorial first-pause: mark done then open help
+        if (typeof tutorialHints !== 'undefined' &&
+            tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
+            tutorialHints.uiTutorialDone = true;
+            tutorialHints.uiIntroStep    = 0;
+            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+        }
+        pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         gameState.currentState = STATE_HELP;
         mainMenu.menuState     = STATE_HELP;
         mainMenu.helpPage      = 0;
-    } else if (selected === "QUIT TO MENU") {
-        triggerTransition(() => {
-            gameState.setState(STATE_MENU);
-            mainMenu.menuState = STATE_MENU;
-            pauseFromState     = null;
-            if (typeof showRestartChoice !== 'undefined') showRestartChoice = false;
-            if (typeof showStoryRecap !== 'undefined') showStoryRecap = false;
-        });
-    } else if (selected === "RESTART") {
-        if (typeof showRestartChoice !== 'undefined') {
-            showRestartChoice   = true;
-            restartChoiceIndex  = -1;
-        } else {
-            triggerTransition(() => {
-                gameState.resetFlags();
-                setupRun(currentDayID);
-            });
+    } else if (selected === "EXPLORE ON MY OWN") {
+        // Tutorial first-pause: player skips guidance, mark done and resume
+        if (typeof tutorialHints !== 'undefined') {
+            tutorialHints.uiTutorialDone = true;
+            tutorialHints.uiIntroStep    = 0;
+            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
+        togglePause();
+        pauseFromState = null;
+    } else if (selected === "RESTART") {
+        showRestartChoice  = true;
+        restartChoiceIndex = -1;
     } else if (selected === "EXIT") {
         triggerTransition(() => {
             gameState.setState(STATE_MENU);
@@ -751,7 +984,9 @@ function handleRestartChoice() {
             player.y = height / 2;
             obstacleManager = new ObstacleManager();
             levelController.initializeLevel(currentDayID);
+            if (endScreenManager) endScreenManager._activeScreen = null;
             gameState.setState(STATE_DAY_RUN);
+
             pauseFromState = null;
         });
     }
@@ -761,8 +996,43 @@ function handleRestartChoice() {
  * Dispatches mouse press events; also unlocks the Web Audio context on first click.
  */
 function mousePressed() {
-    if (globalFade.isFading) return;
+    if (globalFade.isFading || !gameState) return;
+
+    // Dev corner-drag: intercept before everything else
+    if (developerMode && gameState.currentState === STATE_MENU && mainMenu) {
+        for (let btn of mainMenu.buttons) {
+            let corner = btn.checkResizeCorner(mouseX, mouseY);
+            if (corner) {
+                devResizeState = {
+                    startMX: mouseX, startMY: mouseY,
+                    startW: devMenuBtnW, startH: devMenuBtnH,
+                    signX: corner.signX, signY: corner.signY
+                };
+                return false;
+            }
+        }
+    }
+
+    // TestingPanel intercepts all clicks when visible
+    if (testingPanel && testingPanel.isVisible()) {
+        if (testingPanel.handleMousePressed(mouseX, mouseY)) return false;
+    }
+
+    // Lock all input while the level-select entrance animation plays
+    if (gameState.currentState === STATE_LEVEL_SELECT &&
+        mainMenu && mainMenu.timeWheel && mainMenu.timeWheel.isEntering) return;
+
     let state = gameState.currentState;
+
+    // Credits screen: click skips scroll/pause → poem, or exits poem → menu
+    if (state === STATE_CREDITS) {
+        if (_creditPhase === 'poem' && _creditPoemAlpha >= 255) {
+            triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+        } else if (_creditPhase !== 'poem') {
+            _creditPhase = 'poem'; _creditPoemAlpha = 0;
+        }
+        return;
+    }
 
     // Splash screen: unlock audio and transition to main menu
     if (state === STATE_SPLASH) {
@@ -777,71 +1047,57 @@ function mousePressed() {
     }
 
     if (state === STATE_PAUSED) {
-        if (assets.backImg) {
-            let bx = 70, by = 65;
-            if (dist(mouseX, mouseY, bx, by) < 40) {
-                if (typeof playSFX === 'function') playSFX(sfxClick);
-                
-                if (typeof showStoryRecap !== 'undefined' && showStoryRecap) {
-                    showStoryRecap = false;
-                    pauseIndex = -1;
-                } else if (typeof showRestartChoice !== 'undefined' && showRestartChoice) {
-                    showRestartChoice = false;
-                    pauseIndex = -1;
-                } else {
-                    togglePause();
-                }
+        // Back arrow (top-left) — resume
+        if (assets.backImg && dist(mouseX, mouseY, 70, 65) < 40) {
+            if (typeof playSFX === 'function') playSFX(sfxClick);
+            if (showStoryRecap) {
+                showStoryRecap = false;
+                pauseIndex = -1;
+            } else if (showRestartChoice) {
+                showRestartChoice = false;
+                pauseIndex = -1;
+            } else {
+                togglePause();
+            }
+            return;
+        }
+        if (showRestartChoice && restartChoiceIndex >= 0) {
+            if (typeof playSFX === 'function') playSFX(sfxClick);
+            handleRestartChoice();
+        } else if (showStoryRecap) {
+            // Right-side up/down arrow clicks
+            let arrowX   = width - 90;
+            let centerY  = height / 2;
+            let arrowGap = 90;
+            if (storyRecapDay >= 1 && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35) {
+                storyRecapDay--;
+                storyScrollOffset = 0;
+                if (typeof playSFX === 'function') playSFX(sfxSelect);
                 return;
             }
-        }
-        
-        if (typeof showRestartChoice !== 'undefined' && showRestartChoice) {
-            if (typeof restartChoiceIndex !== 'undefined' && restartChoiceIndex >= 0) {
-                if (typeof playSFX === 'function') playSFX(sfxClick);
-                handleRestartChoice();
+            if (storyRecapDay <= 5 && dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35) {
+                storyRecapDay++;
+                storyScrollOffset = 0;
+                if (typeof playSFX === 'function') playSFX(sfxSelect);
+                return;
             }
-        } else if (showStoryRecap) {
-            // Story recap: day sidebar clicks (anchor matches render at width * 0.16)
-            let sidebarAnchorX = width * 0.16;
-            let sidebarBaseY   = height * 0.45;
+            // story recap sidebar clicks
+            let sidebarX = width * 0.16;
+            let sidebarBaseY = height * 0.45;
             for (let i = 0; i < 5; i++) {
-                let diff  = i - (storyRecapDay - 1);
+                let diff = i - (storyRecapDay - 1);
                 let cardY = sidebarBaseY + diff * 130;
-                if (mouseX > sidebarAnchorX - 120 && mouseX < sidebarAnchorX + 120 &&
-                    mouseY > cardY - 40           && mouseY < cardY + 40) {
-                    let day        = i + 1;
-                        storyRecapDay     = day;
-                        storyScrollOffset = 0;
-                        if (typeof playSFX === 'function') playSFX(sfxSelect);
+                if (mouseX > sidebarX - 120 && mouseX < sidebarX + 120 &&
+                    mouseY > cardY - 40 && mouseY < cardY + 40) {
+                    storyRecapDay = i + 1;
+                    storyScrollOffset = 0;
+                    if (typeof playSFX === 'function') playSFX(sfxSelect);
                     return;
                 }
             }
-            // Story recap: up/down arrow clicks — same coords as render (arrowX=width-90, gap=90)
-            let arrowX  = width - 90;
-            let centerY = height / 2;
-            let arrowGap = 90;
-            if (dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35) {
-                if (storyRecapDay > 1) {
-                    storyRecapDay--;
-                    storyScrollOffset = 0;
-                    if (typeof playSFX === 'function') playSFX(sfxSelect);
-                }
-                return;
-            }
-            if (dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35) {
-                let nextDay        = storyRecapDay + 1;
-                if (nextDay <= 5) {
-                    storyRecapDay     = nextDay;
-                    storyScrollOffset = 0;
-                    if (typeof playSFX === 'function') playSFX(sfxSelect);
-                }
-                return;
-            }
-        } else {
-            if (pauseIndex >= 0) {
-                if (typeof playSFX === 'function') playSFX(sfxClick);
-                handlePauseSelection();
-            }
+        } else if (pauseIndex >= 0) {
+            if (typeof playSFX === 'function') playSFX(sfxClick);
+            handlePauseSelection();
         }
         return;
     }
@@ -849,33 +1105,20 @@ function mousePressed() {
     if (state === STATE_MENU || state === STATE_LEVEL_SELECT ||
         state === STATE_SETTINGS || state === STATE_HELP) {
         if (mainMenu) mainMenu.handleClick(mouseX, mouseY);
-    } else if (state === STATE_ROOM) {
-        // Room back arrow click
-        if (roomScene && roomScene.backButton.checkMouse(mouseX, mouseY)) {
-            roomScene.backButton.handleClick();
-            return;
-        }
-        // Pause button hit-test
-        let pbx = width - 70, pby = 65;
-        if (dist(mouseX, mouseY, pbx, pby) < 60) {
-            playSFX(sfxClick);
-            togglePause();
-            pauseIndex = -1;
-            showRestartChoice = false;
-            showStoryRecap = false;
-        }
-    } else if (state === STATE_DAY_RUN) {
-        // Pause button hit-test
-        let pbx = width - 70, pby = 65;
-        if (dist(mouseX, mouseY, pbx, pby) < 60) {
-            playSFX(sfxClick);
-            togglePause();
-            pauseIndex = -1;
-            showRestartChoice = false;
-            showStoryRecap = false;
-        }
     } else if (state === STATE_FAIL || state === STATE_WIN) {
         if (endScreenManager) endScreenManager.handleClick(mouseX, mouseY);
+    } else if (state === STATE_ROOM || state === STATE_DAY_RUN) {
+        if (state === STATE_ROOM && roomScene && roomScene.handleMousePressed(mouseX, mouseY)) {
+            return false;
+        }
+        // Pause button hit-test
+        if (dist(mouseX, mouseY, width - 95, 65) < 80) {
+            playSFX(sfxClick);
+            togglePause();
+            pauseIndex = -1;
+            showRestartChoice = false;
+            showStoryRecap = false;
+        }
     }
 
     if (gameState.currentState === STATE_INVENTORY) {
@@ -887,6 +1130,8 @@ function mousePressed() {
  * Dispatches mouse release events to the active UI systems.
  */
 function mouseReleased() {
+    if (!gameState) return;
+    if (devResizeState) { devResizeState = null; return; }
     if (mainMenu) mainMenu.handleRelease();
     if (gameState.currentState === STATE_INVENTORY) {
         if (backpackUI) backpackUI.handleMouseReleased(mouseX, mouseY);
@@ -897,6 +1142,15 @@ function mouseReleased() {
  * Dispatches mouse drag events to the active UI systems.
  */
 function mouseDragged() {
+    if (!gameState) return;
+    // Dev corner-drag resize
+    if (devResizeState) {
+        let dx = mouseX - devResizeState.startMX;
+        let dy = mouseY - devResizeState.startMY;
+        devMenuBtnW = Math.max(40, Math.round(devResizeState.startW + 2 * devResizeState.signX * dx));
+        devMenuBtnH = Math.max(10, Math.round(devResizeState.startH + 2 * devResizeState.signY * dy));
+        return;
+    }
     if (gameState.currentState === STATE_INVENTORY) {
         if (backpackUI) backpackUI.handleMouseDragged(mouseX, mouseY);
     }
@@ -905,23 +1159,8 @@ function mouseDragged() {
 /**
  * Dispatches mouse move events to the active UI systems.
  */
-function mouseWheel(event) {
-    if (gameState.currentState === STATE_PAUSED && showStoryRecap) {
-        let recap = STORY_RECAPS[storyRecapDay];
-        if (!recap) return false;
-        let maxScroll = max(0, recap.lines.length - 10);
-        if (event.delta > 0) {
-            // Scroll down
-            storyScrollOffset = min(maxScroll, storyScrollOffset + 2);
-        } else {
-            // Scroll up
-            storyScrollOffset = max(0, storyScrollOffset - 2);
-        }
-        return false; // prevent page scroll
-    }
-}
-
 function mouseMoved() {
+    if (!gameState) return;
     if (gameState.currentState === STATE_FAIL || gameState.currentState === STATE_WIN) {
         if (endScreenManager) endScreenManager.handleMouseMove(mouseX, mouseY);
     }
@@ -939,8 +1178,11 @@ function mouseMoved() {
  * Toggles between the paused state and the previous active state.
  */
 function togglePause() {
-    if (gameState.currentState === STATE_PAUSED) gameState.setState(gameState.previousState);
-    else gameState.setState(STATE_PAUSED);
+    if (gameState.currentState === STATE_PAUSED) {
+        gameState.setState(gameState.previousState);
+    } else {
+        gameState.setState(STATE_PAUSED);
+    }
 }
 
 /**
@@ -949,28 +1191,44 @@ function togglePause() {
 function setupRun(dayID) {
     currentDayID = dayID;
     player.applyLevelStats(dayID);
-    player.x = 500;
-    player.y = height / 2;
+    player.x = GLOBAL_CONFIG.lanes.lane1;
+    player.y = PLAYER_RUN_FOOT_Y;  // Player foot anchor for day run
     roomScene.reset();
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
-    tutorialHints.roomPhase = 'DESK';
+    if (typeof tutorialHints !== 'undefined') {
+        if (dayID === 1 && !tutorialHints.uiTutorialDone) {
+            tutorialHints.roomPhase  = 'UI_INTRO';
+            tutorialHints.uiIntroStep = 0;
+        } else if (dayID === 1 && !tutorialHints.moveTutorialDone) {
+            tutorialHints.roomPhase = 'MOVE';
+        } else {
+            tutorialHints.roomPhase = 'DESK';
+        }
+    }
+    if (backpackUI) backpackUI.resetForNewDay();
+    if (endScreenManager) endScreenManager._activeScreen = null;
+
     gameState.setState(STATE_ROOM);
 }
 
 /**
- * [Role: Core Systems Developer]
- * LEVEL BOOTSTRAP: Starts a specific day directly into the RUN state, skipping the room.
+ * Starts a run directly on the street, skipping the room scene.
  */
 function setupRunDirectly(dayID) {
     currentDayID = dayID;
     player.applyLevelStats(dayID);
-    
-    // Set position matching the "Exit Door" logic in RoomScene
-    player.x = width / 2; 
-    player.y = height - 200; 
-    
+
+    // Set position at lane 1 matching standard run spawn
+    player.x = GLOBAL_CONFIG.lanes.lane1;
+    player.y = PLAYER_RUN_FOOT_Y;
+
     obstacleManager = new ObstacleManager();
+    levelController.initializeLevel(dayID);
+    if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DONE';
+    if (backpackUI) backpackUI.resetForNewDay();
+    if (endScreenManager) endScreenManager._activeScreen = null;
+
     gameState.setState(STATE_DAY_RUN);
 }
 
@@ -991,8 +1249,8 @@ function drawLoadingScreen() {
     if (assets.uobLogo) {
         push();
         imageMode(CENTER);
-        let wave       = sin(frameCount * 0.05);
-        let imgScale   = 1.0 + wave * 0.05;
+        let wave = sin(frameCount * 0.05);
+        let imgScale = 1.0 + wave * 0.05;
         let alphaValue = 180 + wave * 75;
         tint(255, alphaValue);
         image(assets.uobLogo, cx, cy - 80, 120 * imgScale, 120 * imgScale);
@@ -1010,10 +1268,390 @@ function drawLoadingScreen() {
     if (smoothProgress >= 1.0) {
         setTimeout(() => {
             if (gameState.currentState === STATE_LOADING) {
-                gameState.setState(STATE_SPLASH);
+                gameState.setState(STATE_WARNING);
             }
-        }, 150);
+        }, 800);
     }
+}
+
+// ─── WARNING / SPLASH TRANSITION ─────────────────────────────────────────────
+let _splashFadeAlpha = 0;   // black overlay fading out on splash entry [0..255]
+let _warnFrame = 0;         // counts up each draw call while in STATE_WARNING
+const _WARN_FADE_IN  = 90;  // frames for fade-in  (~1.5 s)
+const _WARN_HOLD     = 540; // frames to hold at full opacity  (~9 s)
+const _WARN_FADE_OUT = 90;  // frames for fade-out (~1.5 s)
+const _WARN_TOTAL    = _WARN_FADE_IN + _WARN_HOLD + _WARN_FADE_OUT; // 600 ≈ 10 s
+
+/**
+ * Full-screen mental-health content warning.
+ * Auto-advances to STATE_SPLASH after ~10 seconds; no player interaction needed.
+ */
+function drawWarningScreen() {
+    _warnFrame++;
+
+    // Compute master opacity [0..255]
+    let alpha;
+    if (_warnFrame <= _WARN_FADE_IN) {
+        alpha = map(_warnFrame, 0, _WARN_FADE_IN, 0, 255);
+    } else if (_warnFrame <= _WARN_FADE_IN + _WARN_HOLD) {
+        alpha = 255;
+    } else {
+        alpha = map(_warnFrame, _WARN_FADE_IN + _WARN_HOLD, _WARN_TOTAL, 255, 0);
+    }
+    alpha = constrain(alpha, 0, 255);
+
+    // Advance to splash once animation completes
+    if (_warnFrame > _WARN_TOTAL) {
+        _warnFrame = 0;
+        _splashFadeAlpha = 255;             // splash will fade in from black
+        titleDrop.y = -200; titleDrop.vy = 0; titleDrop.landed = false; titleDrop.shake = 0;
+        gameState.setState(STATE_SPLASH);
+        return;
+    }
+
+    let s = min(width / 1920, height / 1080);
+    let cx = width / 2;
+    let cy = height / 2;
+
+    // ── Background ────────────────────────────────────────────────────────────
+    push();
+    colorMode(RGB, 255);
+    background(0);
+
+    // Faded background image (otherBg) for atmosphere
+    if (assets && assets.otherBg) {
+        let bgS = max(width / assets.otherBg.width, height / assets.otherBg.height);
+        imageMode(CENTER);
+        tint(255, alpha * 0.3);
+        image(assets.otherBg, cx, cy, assets.otherBg.width * bgS, assets.otherBg.height * bgS);
+        noTint();
+        imageMode(CORNER);
+    }
+
+    // Dark overlay
+    fill(0, 0, 0, alpha * 0.80);
+    noStroke();
+    rectMode(CORNER);
+    rect(0, 0, width, height);
+
+    // ── Panel ─────────────────────────────────────────────────────────────────
+    let panelW = 1200 * s;
+    let panelH = 640 * s;
+    let panelX = cx;
+    let panelY = cy;
+
+    // Shadow
+    fill(0, 0, 0, alpha * 0.5);
+    noStroke();
+    rectMode(CENTER);
+    rect(panelX + 10 * s, panelY + 10 * s, panelW, panelH, 22 * s);
+
+    // Panel body
+    fill(14, 14, 22, alpha * 0.95);
+    stroke(200, 170, 100, alpha);
+    strokeWeight(2.5 * s);
+    rect(panelX, panelY, panelW, panelH, 22 * s);
+
+    // Inner border
+    stroke(200, 170, 100, alpha * 0.35);
+    strokeWeight(1 * s);
+    rect(panelX, panelY, panelW - 24 * s, panelH - 24 * s, 16 * s);
+    noStroke();
+
+    // ── Title ─────────────────────────────────────────────────────────────────
+    let titleY = panelY - panelH / 2 + 80 * s;
+    textFont(fonts.title || fonts.body);
+    textSize(52 * s);
+    textAlign(CENTER, CENTER);
+    fill(220, 190, 110, alpha);
+    text("A Quiet Note to You", panelX, titleY);
+
+    // Divider line
+    stroke(200, 170, 100, alpha * 0.45);
+    strokeWeight(1.5 * s);
+    let divY = titleY + 44 * s;
+    line(panelX - panelW / 2 + 60 * s, divY, panelX + panelW / 2 - 60 * s, divY);
+    noStroke();
+
+    // ── Body text (centred, warm) ──────────────────────────────────────────────
+    textFont(fonts.body);
+    textAlign(CENTER, TOP);
+    let bodyLines = [
+    { txt: "Please note: This experience explores stress, burnout,", size: 28, col: [230, 220, 205] },
+    { txt: "and the psychological impact of self-doubt.", size: 28, col: [230, 220, 205] },
+    { txt: "", size: 28, col: [230, 220, 205] },
+    
+    { txt: "If you find these themes distressing, we encourage you", size: 28, col: [230, 220, 205] },
+    { txt: "to prioritise your well-being while playing.", size: 28, col: [230, 220, 205] },
+    { txt: "Support is available if the climb feels too steep.", size: 28, col: [230, 220, 205] },
+    { txt: "", size: 24, col: [230, 220, 205] },
+
+    { txt: "— Resources for Support —", size: 24, col: [210, 185, 120] },
+    { txt: "Bristol Nightline | 01179 266 266 (Nightly, Term-time)", size: 26, col: [210, 185, 120] },
+    { txt: "Samaritans | 116 123 (Free, 24/7 Support)", size: 26, col: [210, 185, 120] },
+    { txt: "Shout Crisis | Text 'SHOUT' to 85258", size: 26, col: [210, 185, 120] },
+    ];
+
+    let ty = divY + 32 * s;
+    for (let i = 0; i < bodyLines.length; i++) {
+        let entry = bodyLines[i];
+        // Compute cumulative y by summing previous line heights
+        let prevH = 0;
+        for (let j = 0; j < i; j++) {
+            prevH += (bodyLines[j].size + 10) * s;
+        }
+        textSize(entry.size * s);
+        fill(entry.col[0], entry.col[1], entry.col[2], alpha);
+        text(entry.txt, panelX, ty + prevH);
+    }
+
+    // ── Footer ────────────────────────────────────────────────────────────────
+    textFont(fonts.body);
+    textSize(21 * s);
+    textAlign(CENTER, CENTER);
+    fill(160, 150, 130, alpha * 0.65);
+    text("This screen will continue automatically.", panelX, panelY + panelH / 2 - 35 * s);
+
+    pop();
+}
+
+// ─── CREDITS SCREEN ───────────────────────────────────────────────────────────
+let _creditPhase     = 'scroll'; // 'scroll' | 'pause' | 'poem'
+let _creditScrollY   = 0;
+let _creditPauseF    = 0;
+let _creditPoemAlpha = 0;
+
+const _CREDIT_SCROLL_SPEED = 2.0; // design-space px per frame (~30 s total scroll)
+
+// Raw credit data — sizes in 1920×1080 design-space pixels
+const _CREDIT_DATA = [
+    { type: 'space',    h: 120 },
+    { type: 'header',   h: 80,  text: '\u2014 PARK STREET SURVIVOR \u2014' },
+    { type: 'sub',      h: 50,  text: 'A University of Bristol Group Project' },
+    { type: 'space',    h: 70 },
+    { type: 'divider',  h: 40 },
+    { type: 'space',    h: 55 },
+    { type: 'section',  h: 58,  text: 'THE TEAM' },
+    { type: 'space',    h: 45 },
+    { type: 'name',     h: 50,  text: 'Charlotte Yu' },
+    { type: 'role',     h: 36,  text: 'Core Mechanism & Systems Architect' },
+    { type: 'desc',     h: 32,  text: 'System Integration  \xb7  State Machine Logic  \xb7  Physics Pipeline' },
+    { type: 'space',    h: 44 },
+    { type: 'name',     h: 50,  text: 'Kangrui Wang' },
+    { type: 'role',     h: 36,  text: 'Level Designer' },
+    { type: 'desc',     h: 32,  text: 'Level Geometry  \xb7  Environmental Storytelling  \xb7  Obstacle Choreography' },
+    { type: 'space',    h: 44 },
+    { type: 'name',     h: 50,  text: 'Layla Pei' },
+    { type: 'role',     h: 36,  text: 'UI/UX & Audio Designer' },
+    { type: 'desc',     h: 32,  text: 'Interface Ergonomics  \xb7  Interaction Flows  \xb7  Soundscape Design' },
+    { type: 'space',    h: 44 },
+    { type: 'name',     h: 50,  text: 'Lucca Zhou' },
+    { type: 'role',     h: 36,  text: 'Aesthetic Designer' },
+    { type: 'desc',     h: 32,  text: 'Visual Style Guide  \xb7  Pixel Asset Creation  \xb7  Colour Palette' },
+    { type: 'space',    h: 44 },
+    { type: 'name',     h: 50,  text: 'Keyu Zhou' },
+    { type: 'role',     h: 36,  text: 'Script Designer' },
+    { type: 'desc',     h: 32,  text: 'Narrative Scripting  \xb7  Dialogue Design  \xb7  Emotional Arc' },
+    { type: 'space',    h: 75 },
+    { type: 'divider',  h: 40 },
+    { type: 'space',    h: 55 },
+    { type: 'section',  h: 58,  text: 'SOUNDS & MUSIC' },
+    { type: 'space',    h: 40 },
+    { type: 'label',    h: 40,  text: 'Original Soundscapes' },
+    { type: 'desc',     h: 32,  text: '\u201cPark Street Echoes\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
+    { type: 'desc',     h: 32,  text: '\u201cFeathers in the Rain\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
+    { type: 'space',    h: 55 },
+    { type: 'section',  h: 58,  text: 'VISUAL DESIGN' },
+    { type: 'space',    h: 40 },
+    { type: 'label',    h: 40,  text: 'Pixel Art & Palettes' },
+    { type: 'desc',     h: 32,  text: 'Lucca Zhou  &  Group 7' },
+    { type: 'space',    h: 28 },
+    { type: 'label',    h: 40,  text: 'Typography' },
+    { type: 'desc',     h: 32,  text: 'DotGothic16  \xb7  VT323  (Google Fonts, Open Licence)' },
+    { type: 'space',    h: 75 },
+    { type: 'divider',  h: 40 },
+    { type: 'space',    h: 55 },
+    { type: 'section',  h: 58,  text: 'GOVERNANCE' },
+    { type: 'space',    h: 40 },
+    { type: 'label',    h: 40,  text: 'Academic Programme' },
+    { type: 'desc',     h: 32,  text: 'MSc Computer Science  \xb7  Group 7' },
+    { type: 'desc',     h: 32,  text: 'University of Bristol  \xb7  Faculty of Engineering' },
+    { type: 'space',    h: 28 },
+    { type: 'label',    h: 40,  text: 'Technical Traceability' },
+    { type: 'desc',     h: 32,  text: 'Agile Development  \xb7  Jira Workflow' },
+    { type: 'desc',     h: 32,  text: 'Version Control  \xb7  GitHub' },
+    { type: 'space',    h: 160 },
+];
+
+/** Resets all credits state; call this before transitioning to STATE_CREDITS. */
+function resetCredits() {
+    _creditPhase     = 'scroll';
+    _creditScrollY   = height;   // block enters from bottom of screen
+    _creditPauseF    = 0;
+    _creditPoemAlpha = 0;
+}
+
+/** Main credits draw dispatcher. */
+function drawCreditsScreen() {
+    push();
+    background(0);
+
+    let s  = min(width / 1920, height / 1080);
+    let cx = width / 2;
+
+    if (_creditPhase === 'scroll') {
+        _creditScrollY -= _CREDIT_SCROLL_SPEED * s;
+
+        let totalH = 0;
+        for (let d of _CREDIT_DATA) totalH += d.h * s;
+
+        let cumH = 0;
+        for (let i = 0; i < _CREDIT_DATA.length; i++) {
+            let d     = _CREDIT_DATA[i];
+            let lineH = d.h * s;
+            let lineY = _creditScrollY + cumH;
+            if (lineY + lineH > 0 && lineY < height) {
+                _renderCreditLine(d, cx, lineY + lineH / 2, s);
+            }
+            cumH += lineH;
+        }
+        _drawCreditsFade();
+
+        if (_creditScrollY + totalH < 0) {
+            _creditPhase = 'pause';
+            _creditPauseF = 0;
+        }
+
+    } else if (_creditPhase === 'pause') {
+        _creditPauseF++;
+        if (_creditPauseF >= 10) {           // ~0.25s black pause before poem
+            _creditPhase     = 'poem';
+            _creditPoemAlpha = 0;
+        }
+
+    } else if (_creditPhase === 'poem') {
+        _drawCreditsPoem(s, cx);
+    }
+
+    pop();
+}
+
+/** Renders a single line entry based on its type. */
+function _renderCreditLine(d, cx, midY, s) {
+    push();
+    textAlign(CENTER, CENTER);
+    noStroke();
+
+    switch (d.type) {
+        case 'header':
+            textFont(fonts.title || fonts.body);
+            textSize(50 * s);
+            fill(220, 190, 110);
+            text(d.text, cx, midY);
+            break;
+        case 'sub':
+            textFont(fonts.body);
+            textSize(22 * s);
+            fill(165, 150, 115);
+            text(d.text, cx, midY);
+            break;
+        case 'section':
+            textFont(fonts.body);
+            textSize(28 * s);
+            fill(200, 170, 100);
+            text(d.text, cx, midY);
+            break;
+        case 'name':
+            textFont(fonts.title || fonts.body);
+            textSize(34 * s);
+            fill(245, 235, 215);
+            text(d.text, cx, midY);
+            break;
+        case 'role':
+            textFont(fonts.body);
+            textSize(19 * s);
+            fill(165, 195, 220);
+            text(d.text, cx, midY);
+            break;
+        case 'desc':
+            textFont(fonts.body);
+            textSize(16 * s);
+            fill(135, 130, 120);
+            text(d.text, cx, midY);
+            break;
+        case 'label':
+            textFont(fonts.body);
+            textSize(22 * s);
+            fill(195, 180, 140);
+            text(d.text, cx, midY);
+            break;
+        case 'divider':
+            stroke(200, 170, 100, 90);
+            strokeWeight(1.2 * s);
+            line(cx - 380 * s, midY, cx + 380 * s, midY);
+            break;
+        // 'space': nothing to render
+    }
+    pop();
+}
+
+/** Top & bottom gradient veil so text fades in/out at screen edges. */
+function _drawCreditsFade() {
+    noStroke();
+    let steps = 14;
+    let fadeH = 110;
+    for (let i = 0; i < steps; i++) {
+        let t  = i / (steps - 1);
+        let y0 = (i / steps) * fadeH;
+        let yH = fadeH / steps + 1;
+        fill(0, 0, 0, lerp(230, 0, t));
+        rect(0, y0, width, yH);
+        fill(0, 0, 0, lerp(0, 230, t));
+        rect(0, height - fadeH + y0, width, yH);
+    }
+}
+
+/** Poem epilogue: fades in centred, waits for player to dismiss. */
+function _drawCreditsPoem(s, cx) {
+    _creditPoemAlpha = min(255, _creditPoemAlpha + 6);
+    let alpha = _creditPoemAlpha;
+    let cy    = height / 2;
+
+    push();
+    textAlign(CENTER, CENTER);
+    noStroke();
+    textFont(fonts.body);
+
+    let poem = [
+        { text: '\u201cHope is the thing with feathers \u2014', ts: 30 * s, col: [240, 228, 200] },
+        { text: 'That perches in the soul \u2014',              ts: 30 * s, col: [240, 228, 200] },
+        { text: 'And sings the tune without the words \u2014',  ts: 30 * s, col: [240, 228, 200] },
+        { text: 'And never stops \u2014 at all.\u201d',         ts: 30 * s, col: [240, 228, 200] },
+        { text: '',                                              ts: 18 * s, col: [0, 0, 0]       },
+        { text: '\u2014 Emily Dickinson (1830\u20131886)',       ts: 22 * s, col: [175, 160, 125] },
+        { text: '',                                              ts: 22 * s, col: [0, 0, 0]       },
+        { text: '',                                              ts: 18 * s, col: [0, 0, 0]       },
+        { text: 'THANK YOU FOR SURVIVING THE SLOPE.',           ts: 28 * s, col: [215, 185, 105] },
+    ];
+
+    let lineH  = 44 * s;
+    let startY = cy - (poem.length * lineH) / 2 + lineH / 2;
+
+    for (let i = 0; i < poem.length; i++) {
+        let p = poem[i];
+        textSize(p.ts);
+        fill(p.col[0], p.col[1], p.col[2], alpha);
+        text(p.text, cx, startY + i * lineH);
+    }
+
+    // Dismiss hint — only appears once fully faded in
+    if (alpha >= 252) {
+        textSize(17 * s);
+        fill(105, 100, 92, 170);
+        text('Press any key to return to the main menu', cx, height - 48 * s);
+    }
+
+    pop();
 }
 
 /**
@@ -1024,7 +1662,7 @@ function drawLoadingScreen() {
  */
 function drawLoadingProgressBar(x, y, progress) {
     let totalSegments = 10;
-    let gap    = 8;
+    let gap = 8;
     let blockW = 24;
     let blockH = 16;
     let totalW = (blockW * totalSegments) + (gap * (totalSegments - 1));
@@ -1038,8 +1676,8 @@ function drawLoadingProgressBar(x, y, progress) {
 
     rectMode(CORNER);
     for (let i = 0; i < totalSegments; i++) {
-        let bx        = (x - totalW / 2) + i * (blockW + gap);
-        let by        = y - blockH / 2;
+        let bx = (x - totalW / 2) + i * (blockW + gap);
+        let by = y - blockH / 2;
         let threshold = (i + 1) / totalSegments;
 
         if (progress >= threshold) {
@@ -1079,6 +1717,15 @@ function drawSplashScreen() {
 
     drawLogoPlaceholder(width / 2, 320);
     drawInteractionPrompts();
+
+    // Fade-in overlay: covers splash with a receding black veil on entry
+    if (_splashFadeAlpha > 0) {
+        noStroke();
+        fill(0, 0, 0, _splashFadeAlpha);
+        rect(0, 0, width, height);
+        _splashFadeAlpha = max(0, _splashFadeAlpha - 4); // ~64 frames = ~1 s
+    }
+
     pop();
 }
 
@@ -1089,22 +1736,26 @@ function drawSplashScreen() {
  */
 function drawLogoPlaceholder(x, y) {
     let isSplash = (gameState.currentState === STATE_SPLASH);
-    let t        = frameCount * 0.02;
-    let targetY  = isSplash ? (y + 160) : (y + 10);
+    let t = frameCount * 0.02;
+    let targetY = isSplash ? (y + 160) : (y + 10);
 
-    // Drop-in physics (gravity 1.2 → 3.0 for a snappier drop)
-    if (!titleDrop.landed) {
+    // Drop-in physics — wait until the splash fade-in overlay has cleared
+    if (_splashFadeAlpha > 0) {
+        // Hold position off-screen while fading in; shake decays harmlessly
+        titleDrop.shake *= 0.7;
+    } else if (!titleDrop.landed) {
         titleDrop.vy += 2.0;
-        titleDrop.y  += titleDrop.vy;
+        titleDrop.y += titleDrop.vy;
         if (titleDrop.y >= y + 160) {
-            titleDrop.y      = y + 160;
+            titleDrop.y = y + 160;
             titleDrop.landed = true;
-            titleDrop.shake  = 6;
+            titleDrop.shake = 6;
         }
+        titleDrop.shake *= 0.7;
     } else {
         titleDrop.y = lerp(titleDrop.y, targetY, 0.15);
+        titleDrop.shake *= 0.7;
     }
-    titleDrop.shake *= 0.7;
 
     // Full-screen logo background
     if (isSplash && assets.logoImgs && assets.logoImgs[4]) {
@@ -1119,9 +1770,9 @@ function drawLogoPlaceholder(x, y) {
         push();
         imageMode(CENTER);
         tint(255, 255, 255, 200);
-        image(assets.selectClouds[1], width * 0.1,  height * 0.9  + cos(t) * 10,  800, 480);
-        image(assets.selectClouds[2], width * 0.1,  height * 0.2  + sin(t) * 10,  700, 420);
-        image(assets.selectClouds[4], width * 1.0,  height * 0.09 + sin(t) * 10,  700, 420);
+        image(assets.selectClouds[1], width * 0.1, height * 0.9 + cos(t) * 10, 800, 480);
+        image(assets.selectClouds[2], width * 0.1, height * 0.2 + sin(t) * 10, 700, 420);
+        image(assets.selectClouds[4], width * 1.0, height * 0.09 + sin(t) * 10, 700, 420);
         pop();
     }
 
@@ -1203,21 +1854,31 @@ function drawInteractionPrompts() {
  */
 function drawPauseButton() {
     push();
-    let sz = 120;
-    let bx = width - 70;
+    let bx = width - 65;
     let by = 65;
-    let isHover = dist(mouseX, mouseY, bx, by) < sz / 2;
+    let isHover = dist(mouseX, mouseY, bx, by) < 80;
 
-    // Smooth breathing scale: hover targets 1.15, otherwise gentle pulse
-    let breathe = 1.0 + sin(frameCount * 0.06) * 0.03;
-    let targetScale = isHover ? 1.15 : breathe;
-    pauseBtnScale = lerp(pauseBtnScale, targetScale, 0.12);
-
-    imageMode(CENTER);
-    translate(bx, by);
-    scale(pauseBtnScale);
     if (assets.pauseImg) {
-        image(assets.pauseImg, 0, 0, sz, sz);
+        push();
+        translate(bx, by);
+        if (isHover) scale(1.15);
+        imageMode(CENTER);
+        image(assets.pauseImg, 0, 0,);
+        pop();
+    } else {
+        push();
+        translate(bx, by);
+        if (isHover) scale(1.15);
+        noFill();
+        stroke(255, 150);
+        strokeWeight(3);
+        ellipse(0, 0, 80, 80);
+        fill(255, 150);
+        noStroke();
+        rectMode(CENTER);
+        rect(-10, 0, 8, 28);
+        rect(10, 0, 8, 28);
+        pop();
     }
     pop();
 }
@@ -1229,7 +1890,7 @@ function renderPauseOverlay() {
     push();
     drawOtherBgWithOverlay();
 
-    // Back arrow (top-left) — replaces RESUME, click to go back
+    // Back arrow (top-left) — click to resume
     if (assets.backImg) {
         let bx = 70, by = 65;
         let isBackHover = dist(mouseX, mouseY, bx, by) < 40;
@@ -1242,11 +1903,15 @@ function renderPauseOverlay() {
     }
 
     if (showStoryRecap) {
-        // ── Story Recap page ──
         renderStoryRecap();
     } else if (showRestartChoice) {
-        // ── Restart sub-menu ──
-        let titleY = height / 2 - 280;
+        let btnW = (assets.btnImg ? assets.btnImg.width  : 240) * 1.5;
+        let btnH = (assets.btnImg ? assets.btnImg.height : 60)  * 1.5;
+        let spacing = 145;
+        let totalH = (RESTART_OPTIONS.length - 1) * spacing;
+        let startY = (height / 2) - (totalH / 2) + 20;
+        let titleY = startY - btnH / 2 - 110;
+
         textAlign(CENTER, CENTER);
         textFont(fonts.title);
         textSize(48);
@@ -1255,18 +1920,12 @@ function renderPauseOverlay() {
         noStroke(); fill(255, 215, 0);
         text("RESTART?", width / 2, titleY);
 
-        let optW = 280, optH = 80;  
-        let spacing = 95;
-        let totalH = (RESTART_OPTIONS.length - 1) * spacing;
-        let startY = (height / 2) - (totalH / 2) + 20;
-
         let anyRestartHover = false;
         for (let i = 0; i < RESTART_OPTIONS.length; i++) {
             let ox = width / 2;
             let oy = startY + i * spacing;
-            
-            let isHover = (mouseX > ox - optW / 2 && mouseX < ox + optW / 2 &&
-                           mouseY > oy - optH / 2 && mouseY < oy + optH / 2);
+            let isHover = (mouseX > ox - btnW / 2 && mouseX < ox + btnW / 2 &&
+                           mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
             if (isHover) { restartChoiceIndex = i; anyRestartHover = true; }
             let isSelected = (i === restartChoiceIndex) && restartChoiceIndex >= 0;
 
@@ -1274,9 +1933,8 @@ function renderPauseOverlay() {
             translate(ox, oy);
             if (isSelected) scale(1.15);
             imageMode(CENTER);
-            if (assets.btnImg) image(assets.btnImg, 0, 0, optW * 2, optH * 2);
-
-            textFont(fonts.body); textSize(24); textAlign(CENTER, CENTER);
+            if (assets.btnImg) image(assets.btnImg, 0, 0, btnW, btnH);
+            textFont(fonts.body); textSize(36); textAlign(CENTER, CENTER);
             stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
             text(RESTART_OPTIONS[i], 0, -6);
             noStroke(); fill(255, 215, 0);
@@ -1284,12 +1942,16 @@ function renderPauseOverlay() {
             pop();
         }
         if (!anyRestartHover && !keyIsPressed) restartChoiceIndex = -1;
-        
     } else {
-        // ── Normal pause menu ──
         let options = getPauseOptions();
+        let btnW = (assets.btnImg ? assets.btnImg.width  : 240) * 1.5;
+        let btnH = (assets.btnImg ? assets.btnImg.height : 60)  * 1.5;
+        let spacing = 145;
+        let totalH = (options.length - 1) * spacing;
+        let startY = (height / 2) - (totalH / 2) + 30;
 
-        let titleY = height / 2 - 320;
+        let titleY = startY - btnH / 2 - 110;
+
         textAlign(CENTER, CENTER);
         textFont(fonts.title);
         textSize(60);
@@ -1298,18 +1960,12 @@ function renderPauseOverlay() {
         noStroke(); fill(255, 215, 0);
         text("PAUSED", width / 2, titleY);
 
-        let optW = 280, optH = 80;  
-        let spacing = 95;
-        let totalH = (options.length - 1) * spacing;
-        let startY = (height / 2) - (totalH / 2) + 30;
-
         let anyPauseHover = false;
         for (let i = 0; i < options.length; i++) {
             let ox = width / 2;
             let oy = startY + i * spacing;
-            
-            let isHover = (mouseX > ox - optW / 2 && mouseX < ox + optW / 2 &&
-                           mouseY > oy - optH / 2 && mouseY < oy + optH / 2);
+            let isHover = (mouseX > ox - btnW / 2 && mouseX < ox + btnW / 2 &&
+                           mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
             if (isHover) { pauseIndex = i; anyPauseHover = true; }
             let isSelected = (i === pauseIndex) && pauseIndex >= 0;
 
@@ -1317,9 +1973,8 @@ function renderPauseOverlay() {
             translate(ox, oy);
             if (isSelected) scale(1.15);
             imageMode(CENTER);
-            if (assets.btnImg) image(assets.btnImg, 0, 0, optW * 2, optH * 2);
-
-            textFont(fonts.body); textSize(24); textAlign(CENTER, CENTER);
+            if (assets.btnImg) image(assets.btnImg, 0, 0, btnW, btnH);
+            textFont(fonts.body); textSize(36); textAlign(CENTER, CENTER);
             stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
             text(options[i], 0, -6);
             noStroke(); fill(255, 215, 0);
@@ -1327,6 +1982,27 @@ function renderPauseOverlay() {
             pop();
         }
         if (!anyPauseHover && !keyIsPressed) pauseIndex = -1;
+    }
+    pop();
+}
+
+/**
+ * Renders the win or fail end screen with a contextual message and retry prompt.
+ */
+function drawEndScreen() {
+    if (assets.menuBg) image(assets.menuBg, 0, 0, width, height);
+    else background(20);
+
+    textAlign(CENTER, CENTER);
+    textFont(fonts.title);
+    if (gameState.currentState === STATE_WIN) {
+        fill(100, 255, 100);
+        textSize(80);
+        text("SUCCESS", width / 2, height / 2 - 50);
+    } else {
+        fill(255, 50, 50);
+        textSize(80);
+        text("FAILED", width / 2, height / 2 - 50);
     }
     pop();
 }
@@ -1397,6 +2073,7 @@ function renderStoryRecap() {
             fill(180, 60, 60, alpha); textSize(14);
             text("LOCKED", -10, 8);
         }
+
         pop();
     }
     pop();
@@ -1610,4 +2287,5 @@ function drawStoryDebugOverlay() {
 function printStoryDebugData() {
     console.log("[DEV] Current storyDebugData:");
     console.log(JSON.stringify(storyDebugData, null, 2));
+
 }

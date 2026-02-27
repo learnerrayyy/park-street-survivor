@@ -27,32 +27,35 @@ class RoomScene {
         };
 
         // Desk interaction zone
-        this.deskX         = 1085;
-        this.deskY         = 430;
+        this.deskX = 1085;
+        this.deskY = 430;
         this.deskThreshold = 80;
-        this.deskBoxW      = 115;
-        this.deskBoxH      = 50;
+        this.deskBoxW = 115;
+        this.deskBoxH = 50;
 
         // Door interaction zone
-        this.doorX         = 955;
-        this.doorY         = 760;
+        this.doorX = 955;
+        this.doorY = 760;
         this.doorThreshold = 80;
-        this.doorBoxW      = 60;
-        this.doorBoxH      = 45;
+        this.doorBoxW = 60;
+        this.doorBoxH = 45;
 
         // Proximity flags used by the renderer and input handler
         this.isPlayerNearDesk = false;
         this.isPlayerNearDoor = false;
 
         // Timer for the "missing items" warning prompt (frames)
-        this.doorBlockTimer   = 0;
+        this.doorBlockTimer = 0;
         this.doorBlockMessage = "";
+
+        // Reusable dialogue box (typewriter-style bottom bar)
+        this.dialogueBox = new DialogueBox();
 
         // ── PERFORMANCE: Lazy-cached scale values for background images ──
         // Computed once on first render so we avoid per-frame division.
         this._otherBgScale = null;
-        this._roomBgScale  = null;
-        this._roomTopY     = null; // derived from roomBg scale, also cached
+        this._roomBgScale = null;
+        this._roomTopY = null; // derived from roomBg scale, also cached
 
         // Back arrow button — returns to level select
         this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => {
@@ -78,8 +81,9 @@ class RoomScene {
         }
         this.isPlayerNearDesk = false;
         this.isPlayerNearDoor = false;
-        this.doorBlockTimer   = 0;
+        this.doorBlockTimer = 0;
         this.doorBlockMessage = "";
+        this.dialogueBox.reset();
     }
 
     // ─── COLLISION ───────────────────────────────────────────────────────────
@@ -105,9 +109,9 @@ class RoomScene {
      */
     getValidPosition(newX, newY, oldX, oldY) {
         let playerRadius = 20;
-        if (this.isWalkable(newX, newY, playerRadius))  return { x: newX, y: newY  };
-        if (this.isWalkable(newX, oldY, playerRadius))  return { x: newX, y: oldY  };
-        if (this.isWalkable(oldX, newY, playerRadius))  return { x: oldX, y: newY  };
+        if (this.isWalkable(newX, newY, playerRadius)) return { x: newX, y: newY };
+        if (this.isWalkable(newX, oldY, playerRadius)) return { x: newX, y: oldY };
+        if (this.isWalkable(oldX, newY, playerRadius)) return { x: oldX, y: newY };
         return { x: oldX, y: oldY };
     }
 
@@ -154,19 +158,24 @@ class RoomScene {
         }
 
         if (this.isPlayerNearDoor && (keyCode === ENTER || keyCode === 13)) {
+            // Tutorial gate: door is locked until the backpack phase is fully done
+            if (typeof tutorialHints !== 'undefined' &&
+                tutorialHints.roomPhase !== 'DOOR' &&
+                tutorialHints.roomPhase !== 'DONE') {
+                this.triggerDialog("I should finish getting ready first.");
+                return;
+            }
             // Check required items before leaving
             if (typeof backpackUI !== 'undefined' && backpackUI && !backpackUI.hasRequiredItems()) {
                 let missing = backpackUI.getMissingRequiredItems();
-                this.doorBlockMessage = "Pack your " + missing.join(" & ") + " before heading out!";
-                this.doorBlockTimer = 180; // show for 3 seconds
+                this.triggerDialog("I haven't packed my bag yet.");
                 console.log("[RoomScene] Exit blocked — missing: " + missing.join(", "));
                 return;
             }
             console.log("[RoomScene] Leaving room");
-            if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DONE';
             if (typeof player !== 'undefined') {
-                player.x = width / 2;
-                player.y = height - 200;
+                player.x = GLOBAL_CONFIG.lanes.lane1;
+                player.y = PLAYER_RUN_FOOT_Y;  // Player foot anchor for day run
             }
             gameState.currentState = STATE_DAY_RUN;
             if (typeof playSFX !== 'undefined' && typeof sfxClick !== 'undefined') {
@@ -174,6 +183,16 @@ class RoomScene {
             }
         }
     }
+
+    /**
+     * Triggers the dialogue box with the given text using the default player portrait.
+     * To use a different portrait, call this.dialogueBox.trigger(text, portraitImg) directly.
+     * @param {string} text - The message to display.
+     */
+    triggerDialog(text) {
+        this.dialogueBox.trigger(text);
+    }
+
 
     // ─── RENDERING ───────────────────────────────────────────────────────────
 
@@ -215,88 +234,385 @@ class RoomScene {
 
         // 3. Update and draw interaction indicators
         this.checkInteraction();
+
+        // Dismiss the movement tutorial once the player has walked 50px from spawn
+        if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'MOVE' &&
+            typeof player !== 'undefined') {
+            let dx = player.x - this.playerSpawnX;
+            let dy = player.y - this.playerSpawnY;
+            if (dx * dx + dy * dy > 50 * 50) {
+                tutorialHints.roomPhase = 'DESK';
+                tutorialHints.moveTutorialDone = true;
+            }
+        }
+
         this.drawInteractionIndicators();
 
-        // 4. Tutorial hint icons (warning.png breathing icons)
+        // 4. Door-blocked dialogue box
+        this.dialogueBox.display();
         this.drawTutorialHints();
 
-        // 5. Door-blocked warning prompt
-        this.drawDoorBlockedPrompt();
-
-        // 6. Back arrow button (top-left)
+        // 5. Back button
         this.backButton.isFocused = this.backButton.checkMouse(mouseX, mouseY);
         this.backButton.update();
         this.backButton.display();
 
-        // 7. Developer overlay
+        // 6. Developer overlay
         this.drawRoomDevTools();
 
         pop();
     }
 
     /**
-     * Draws a pulsing highlight box and prompt label for the nearest interactable object.
+     * Handles room-specific mouse clicks.
+     * @returns {boolean} True if the click was consumed.
+     */
+    handleMousePressed(mx, my) {
+        // ── UI intro: click anywhere (except the pause button) to advance pages ──
+        if (typeof tutorialHints !== 'undefined' &&
+            tutorialHints.roomPhase === 'UI_INTRO') {
+            // Let pause-button clicks pass through
+            if (dist(mx, my, width - 65, 65) >= 80) {
+                if (typeof playSFX === 'function') playSFX(sfxClick);
+                if (tutorialHints.uiIntroStep === 0) {
+                    tutorialHints.uiIntroStep = 1;
+                } else {
+                    tutorialHints.uiTutorialDone = true;
+                    tutorialHints.uiIntroStep    = 0;
+                    tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+                }
+                return true;
+            }
+        }
+
+        if (this.backButton.checkMouse(mx, my)) {
+            this.backButton.handleClick();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Draws interaction indicators.
+     * Yellow outline box: always visible when the tutorial phase matches (synced with ! icon).
+     * Prompt text + key icon: only when the player is close enough to interact.
+
      */
     drawInteractionIndicators() {
-        if (!this.isPlayerNearDesk && !this.isPlayerNearDoor) return;
+        let phase = (typeof tutorialHints !== 'undefined') ? tutorialHints.roomPhase : 'DONE';
+
+        let showDeskBox = this.isPlayerNearDesk || (phase === 'DESK');
+        // Door is only interactive once the tutorial reaches the DOOR or DONE phase
+        let doorUnlocked = (phase === 'DOOR' || phase === 'DONE');
+        let showDoorBox = doorUnlocked && (this.isPlayerNearDoor || (phase === 'DOOR'));
+        if (!showDeskBox && !showDoorBox) return;
 
         push();
 
-        let target = this.isPlayerNearDesk
-            ? { label: "CHECK DESK", key: 'e',     x: this.deskX, y: this.deskY, w: this.deskBoxW, h: this.deskBoxH }
-            : { label: "LEAVE ROOM", key: 'enter', x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
-
-        // Use cached roomTopY (computed once on first render)
         let roomTopY = (this._roomTopY !== null) ? this._roomTopY : 100;
-
         let pulse = (sin(frameCount * 0.1) + 1) * 0.5;
 
-        // Pulsing outline box around the interactable object
+        // ── Outline box: tracks the tutorial's current phase target ──
+        // Drawn regardless of player proximity so the tutorial goal is always visible.
+        let boxTarget;
+        if (phase === 'DOOR') {
+            boxTarget = { x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
+        } else if (showDeskBox) {
+            boxTarget = { x: this.deskX, y: this.deskY, w: this.deskBoxW, h: this.deskBoxH };
+        } else {
+            boxTarget = { x: this.doorX, y: this.doorY, w: this.doorBoxW, h: this.doorBoxH };
+        }
         noFill();
         stroke(255, 216, 0, 150 + pulse * 105);
         strokeWeight(2);
         rectMode(CENTER);
-        rect(target.x, target.y, target.w, target.h, 8);
+        rect(boxTarget.x, boxTarget.y, boxTarget.w, boxTarget.h, 8);
 
-        // Prompt text centred above the room
-        textAlign(CENTER, CENTER);
-        textFont(fonts.title);
-        textSize(22);
-        fill(255, 216, 0, 180 + pulse * 75);
-        noStroke();
-        text(`PRESS [${target.key.toUpperCase()}] TO ${target.label}`, width / 2, roomTopY);
+        // ── Proximity prompt: tracks what the player is actually near ──
+        // Door takes priority over desk so the correct prompt always shows.
+        let promptTarget = null;
+        if (doorUnlocked && this.isPlayerNearDoor) {
+            promptTarget = { label: "LEAVE ROOM", key: 'enter' };
+        } else if (this.isPlayerNearDesk) {
+            promptTarget = { label: "CHECK DESK", key: 'e' };
+        }
 
-        // Animated key icon above the prompt text
-        if (assets.keys && assets.keys[target.key]) {
-            let sheet = assets.keys[target.key];
-            let frame = floor(frameCount / 15) % 3;
-            let sw    = sheet.width / 3;
-            imageMode(CENTER);
-            tint(255, 200 + pulse * 55);
-            image(sheet, width / 2, roomTopY - 60, 50, 40, frame * sw, 0, sw, sheet.height);
-            noTint();
+        if (promptTarget) {
+            textAlign(CENTER, CENTER);
+            textFont(fonts.title);
+            textSize(22);
+            fill(255, 216, 0, 180 + pulse * 75);
+            noStroke();
+            text(`PRESS [${promptTarget.key.toUpperCase()}] TO ${promptTarget.label}`, width / 2, roomTopY);
+
+            if (assets.keys && assets.keys[promptTarget.key]) {
+                let sheet = assets.keys[promptTarget.key];
+                let frame = floor(frameCount / 15) % 3;
+                let sw    = sheet.width / 3;
+                imageMode(CENTER);
+                tint(255, 200 + pulse * 55);
+                image(sheet, width / 2, roomTopY - 60, 50, 40, frame * sw, 0, sw, sheet.height);
+                noTint();
+            }
         }
 
         pop();
     }
 
     /**
-     * Draws breathing warning icons to guide the player through the tutorial sequence.
-     * Phase 'DESK'  — icon near the desk, prompting to open the backpack.
-     * Phase 'DOOR'  — icon near the door (Day 1 only), prompting to leave the room.
+     * Draws the warning icon alongside the interactable object.
+     * Always visible when the tutorial phase matches — not proximity-gated.
+     * Pulses at the same frequency as the yellow outline box so they flash in sync.
      */
     drawTutorialHints() {
-        if (typeof tutorialHints === 'undefined' || !assets.warningImg) return;
+        if (typeof tutorialHints === 'undefined') return;
         let phase = tutorialHints.roomPhase;
+
+        if (phase === 'UI_INTRO') {
+            this.drawUIIntroTutorial();
+            return;
+        }
+
+        if (phase === 'MOVE') {
+            this.drawMoveTutorial();
+            return;
+        }
+
+        if (!assets.warningImg) return;
         if (phase !== 'DESK' && phase !== 'DOOR') return;
 
-        // Use the global drawWarningIcon() which preserves the image's natural
-        // aspect ratio and applies the breathing animation — no manual stretching.
+        // Same pulse as the yellow box in drawInteractionIndicators()
+        let pulse   = (sin(frameCount * 0.1) + 1) * 0.5;
+        let breathe = 0.85 + pulse * 0.15;
+        let size    = 52;
+        let img     = assets.warningImg;
+        let renderW = size * (img.width / img.height) * breathe;
+        let renderH = size * breathe;
+
+        push();
+        imageMode(CENTER);
         if (phase === 'DESK') {
-            drawWarningIcon(this.deskX + 55, this.deskY - 45, 52);
-        } else if (phase === 'DOOR') {
-            drawWarningIcon(this.doorX + 35, this.doorY - 55, 52);
+            image(img, this.deskX + 55, this.deskY - 45, renderW, renderH);
+        } else {
+            image(img, this.doorX + 35, this.doorY - 55, renderW, renderH);
         }
+        pop();
+    }
+
+    /**
+     * Draws the UI intro tutorial overlay (phase 'UI_INTRO').
+     * Phase chain: UI_INTRO → MOVE → DESK → CLOSE_BP → DOOR → DONE
+     *
+     * Renders:
+     *  • Pulsing glow rings + pointing arrow toward the pause button (top-right)
+     *  • Bottom bar with player portrait, step-message text, step dots, and SPACE prompt
+     *
+     * Player movement is blocked externally (sketch.js draw loop) while this phase is active.
+     * Advance by pressing SPACE/ENTER or clicking anywhere (except the back button).
+     */
+    drawUIIntroTutorial() {
+        if (typeof tutorialHints === 'undefined') return;
+
+        let step = tutorialHints.uiIntroStep;
+
+        // ── Breathing yellow outline frame around the pause button ──
+        push();
+        let bx     = width - 65;
+        let by     = 65;
+        let breathe = sin(frameCount * 0.05);
+        let frameS  = 105 + breathe * 8;
+        noFill();
+        stroke(255, 215, 0, 130 + breathe * 70);
+        strokeWeight(4);
+        rectMode(CENTER);
+        rect(bx, by, frameS, frameS, 10);
+        pop();
+
+        // ── VN-style tutorial panel (橙光 visual novel format) ──
+        const DESIGN_W = 1920;
+        const DESIGN_H = 1080;
+        const s = min(width / DESIGN_W, height / DESIGN_H);
+
+        const panelW = 1440 * s;
+        const panelH = 280  * s;
+        const panelX = width  / 2;
+        const panelY = height - (panelH / 2) - (30 * s);
+
+        push();
+        rectMode(CENTER);
+
+        // Panel shadow
+        noStroke();
+        fill(0, 0, 0, 80);
+        rect(panelX + 4 * s, panelY + 6 * s, panelW, panelH, 18 * s);
+
+        // Panel background
+        fill(18, 8, 42, 220);
+        rect(panelX, panelY, panelW, panelH, 18 * s);
+
+        // Gold outer border
+        noFill();
+        stroke(255, 200, 60, 180);
+        strokeWeight(2.5);
+        rect(panelX, panelY, panelW, panelH, 18 * s);
+
+        // Inner border (decorative inset)
+        stroke(255, 200, 60, 60);
+        strokeWeight(1);
+        rect(panelX, panelY, panelW - 14 * s, panelH - 14 * s, 13 * s);
+
+        // ── Page indicator (1/2 · 2/2) ──
+        if (typeof fonts !== 'undefined' && fonts.body) textFont(fonts.body);
+        textSize(22 * s);
+        textAlign(RIGHT, TOP);
+        noStroke();
+        fill(255, 200, 80, 170);
+        text((step + 1) + " / 2",
+            panelX + panelW / 2 - 26 * s,
+            panelY - panelH / 2 + 16 * s);
+
+        // ── Main text (line-by-line to guarantee text stays inside the panel) ──
+        textSize(28 * s);
+        fill(235, 230, 255);
+        noStroke();
+        textAlign(LEFT, TOP);
+
+        const MSGS = [
+            [
+                "There's a PAUSE button in the top-right corner of the screen.",
+                "Click it — or press [P] on your keyboard — anytime during gameplay."
+            ],
+            [
+                "From the pause menu you can access:",
+                "HELP — Controls guide, character wiki & item list",
+                "SETTINGS — BGM and sound effects volume",
+                "STORY — Day recap and narrative journal",
+                "EXIT — Return to the main menu"
+            ]
+        ];
+
+        const lineH = 42 * s;
+        let tx = panelX - panelW / 2 + 50 * s;
+        let ty = panelY - panelH / 2 + 30 * s;
+        let maxY = panelY + panelH / 2 - 30 * s;   // keep above the hint text
+        let lines = MSGS[step];
+        for (let i = 0; i < lines.length; i++) {
+            let lineY = ty + i * lineH;
+            if (lineY + lineH > maxY) break;        // safety: stop before overflow
+            text(lines[i], tx, lineY);
+        }
+
+        // ── "Click to continue" indicator ──
+        let pulse = (sin(frameCount * 0.1) + 1) * 0.5;
+        textSize(21 * s);
+        fill(255, 215, 0, 130 + pulse * 125);
+        textAlign(RIGHT, BOTTOM);
+        let hint = (step === 0) ? "click anywhere to continue" : "click anywhere to start";
+        text(hint,
+            panelX + panelW / 2 - 26 * s,
+            panelY + panelH / 2 - 14 * s);
+
+        pop();
+    }
+
+    /**
+     * Draws the bottom-bar movement key guide shown on Day 1 (first entry only).
+     * Dismissed automatically when the player moves 50 px from spawn.
+     */
+    drawMoveTutorial() {
+        const DESIGN_W = 1920;
+        const DESIGN_H = 1080;
+        const s = min(width / DESIGN_W, height / DESIGN_H);
+
+        const panelW = 1440 * s;
+        const panelH = 280  * s;
+        const panelX = width  / 2;
+        const panelY = height - (panelH / 2) - (30 * s);
+
+        let pulse    = (sin(frameCount * 0.08) + 1) * 0.5;
+        let keyAlpha = 180 + pulse * 75;
+
+        push();
+        rectMode(CENTER);
+
+        // Panel shadow
+        noStroke();
+        fill(0, 0, 0, 80);
+        rect(panelX + 4 * s, panelY + 6 * s, panelW, panelH, 18 * s);
+
+        // Panel background
+        fill(18, 8, 42, 220);
+        rect(panelX, panelY, panelW, panelH, 18 * s);
+
+        // Gold outer border
+        noFill();
+        stroke(255, 200, 60, 180);
+        strokeWeight(2.5);
+        rect(panelX, panelY, panelW, panelH, 18 * s);
+
+        // Inner border (decorative inset)
+        stroke(255, 200, 60, 60);
+        strokeWeight(1);
+        rect(panelX, panelY, panelW - 14 * s, panelH - 14 * s, 13 * s);
+
+        // ── Keys rendered at their natural aspect ratio ──
+        let targetH = 75 * s;
+
+        let drawKey = (sheet, x, y) => {
+            if (!sheet) return;
+            let frame   = floor(frameCount / 20) % 3;
+            let sw      = sheet.width / 3;
+            let sh      = sheet.height;
+            let renderH = targetH;
+            let renderW = (sw / sh) * renderH;
+            imageMode(CENTER);
+            tint(255, keyAlpha);
+            image(sheet, x, y, renderW, renderH, frame * sw, 0, sw, sh);
+            noTint();
+        };
+
+        let refSheet   = assets.keys.w;
+        let keyRenderW = refSheet ? (refSheet.width / 3 / refSheet.height) * targetH : targetH * 1.1;
+        let colGap = keyRenderW + 12 * s;
+        let rowOff = targetH + 12 * s;
+
+        let keyCY   = panelY + 14 * s;
+        let topRowY = keyCY - rowOff / 2;
+        let botRowY = keyCY + rowOff / 2;
+
+        // ── WASD group (left of panel centre) ──
+        let wasdX = panelX - 380 * s;
+        drawKey(assets.keys.w, wasdX,           topRowY);
+        drawKey(assets.keys.a, wasdX - colGap,  botRowY);
+        drawKey(assets.keys.s, wasdX,           botRowY);
+        drawKey(assets.keys.d, wasdX + colGap,  botRowY);
+
+        // ── Arrow keys group (right of panel centre) ──
+        let arrX = panelX + 380 * s;
+        drawKey(assets.keys.up,    arrX,           topRowY);
+        drawKey(assets.keys.left,  arrX - colGap,  botRowY);
+        drawKey(assets.keys.down,  arrX,           botRowY);
+        drawKey(assets.keys.right, arrX + colGap,  botRowY);
+
+        // ── Labels ──
+        textAlign(CENTER, CENTER);
+        textFont(fonts.body);
+
+        let labelY = panelY - panelH / 2 + 36 * s;
+        textSize(28 * s);
+        stroke(0, 0, 0, 160);
+        strokeWeight(4);
+        fill(255, 220, 80, keyAlpha);
+        text("USE WASD OR ARROW KEYS TO MOVE", panelX, labelY);
+        noStroke();
+        fill(255, 220, 80, keyAlpha);
+        text("USE WASD OR ARROW KEYS TO MOVE", panelX, labelY);
+
+        textSize(20 * s);
+        fill(200, 175, 255, keyAlpha * 0.75);
+        text("MOVE TO DISMISS", panelX, panelY + panelH / 2 - 20 * s);
+
+        pop();
     }
 
     /**
@@ -325,37 +641,7 @@ class RoomScene {
         strokeWeight(2);
         rectMode(CORNERS);
         rect(this.walkableArea.minX, this.walkableArea.minY, this.walkableArea.maxX, this.walkableArea.maxY);
-        rect(this.carpetArea.minX,   this.carpetArea.minY,   this.carpetArea.maxX,   this.carpetArea.maxY);
-        pop();
-    }
-
-    /**
-     * Shows a timed warning when the player tries to leave without required items.
-     */
-    drawDoorBlockedPrompt() {
-        if (this.doorBlockTimer <= 0) return;
-        this.doorBlockTimer--;
-
-        push();
-        let alpha = min(this.doorBlockTimer * 4, 220);
-
-        // Pill-shaped red banner centred at the bottom third of the screen
-        let bx = width / 2;
-        let by = height - 160;
-        let bw = 820;
-        let bh = 64;
-
-        rectMode(CENTER);
-        noStroke();
-        fill(180, 30, 30, alpha);
-        rect(bx, by, bw, bh, 12);
-
-        // Warning text
-        textAlign(CENTER, CENTER);
-        textFont(fonts.body);
-        textSize(22);
-        fill(255, 240, 100, alpha);
-        text(this.doorBlockMessage, bx, by);
+        rect(this.carpetArea.minX, this.carpetArea.minY, this.carpetArea.maxX, this.carpetArea.maxY);
         pop();
     }
 

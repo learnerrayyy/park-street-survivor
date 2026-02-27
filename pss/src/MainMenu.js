@@ -11,17 +11,17 @@ class MainMenu {
         this.currentIndex = -1;  // no default selection
 
         this.timeWheel = new TimeWheel(DAYS_CONFIG);
-        this.buttons   = [];
+        this.buttons = [];
         this.setupButtons();
 
         this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => this.handleBackAction());
-        this.bgmSlider  = new UISlider(width / 2, height / 2 - 80,  400, 0, 1, masterVolumeBGM, "BGM VOLUME");
-        this.sfxSlider  = new UISlider(width / 2, height / 2 + 50, 400, 0, 1, masterVolumeSFX, "SFX VOLUME");
+        this.bgmSlider = new UISlider(width / 2, height / 2 - 80, 400, 0, 1, masterVolumeBGM, "BGM VOLUME");
+        this.sfxSlider = new UISlider(width / 2, height / 2 + 50, 400, 0, 1, masterVolumeSFX, "SFX VOLUME");
 
         // Difficulty selector state
         this.difficultyIndex = gameDifficulty;  // 0=EASY, 1=NORMAL, 2=HARD
-        this.diffToastText   = "";
-        this.diffToastTimer  = 0;
+        this.diffToastText = "";
+        this.diffToastTimer = 0;
 
         // Mute state tracking for settings menu
         this.isBGMMuted = false;
@@ -32,21 +32,21 @@ class MainMenu {
         // ── PERFORMANCE: Cache help-page data to avoid per-frame allocation ──
         this._helpControls = [
             { id: 'move_combo', a: "MOVEMENT", d: "WASD or Arrows to navigate." },
-            { id: 'enter',      a: "NEXT PAGE", d: "Cycle through system intel." },
-            { id: 'space',      a: "PARKOUR",   d: "Interact during the run."    },
-            { id: 'e',          a: "INTERACT",  d: "Talk to NPCs or use items."  },
-            { id: 'p',          a: "PAUSE",     d: "Freeze time & system menu."  }
+            { id: 'enter', a: "NEXT PAGE", d: "Cycle through system intel." },
+            { id: 'space', a: "PARKOUR", d: "Interact during the run." },
+            { id: 'e', a: "INTERACT", d: "Talk to NPCs or use items." },
+            { id: 'p', a: "PAUSE", d: "Freeze time & system menu." }
         ];
         this._helpCharacters = [
-            { name: "IRIS",      desc: "UoB student rushing to class.",  imgKey: "player",       unlockDay: 1 },
-            { name: "WIOLA",     desc: "Always prepared. Always calm.",  imgKey: "npc_1",        unlockDay: 1 },
-            { name: "LAYLA",     desc: "Lived on coffee and questions.", imgKey: "bus_driver",   unlockDay: 2 },
-            { name: "YUKI",      desc: "Quiet. Observant.",              imgKey: "npc_promoter", unlockDay: 3 },
-            { name: "RAYMOND",   desc: "Steady and practical.",          imgKey: "npc_promoter", unlockDay: 4 },
-            { name: "CHARLOTTE", desc: "Thoughtful. Direct.",            imgKey: "npc_promoter", unlockDay: 5 }
+            { name: "IRIS", desc: "UoB student rushing to class.", imgKey: "player", unlockDay: 1 },
+            { name: "WIOLA", desc: "Always prepared. Always calm.", imgKey: "npc_1", unlockDay: 1 },
+            { name: "LAYLA", desc: "Lived on coffee and questions.", imgKey: "bus_driver", unlockDay: 2 },
+            { name: "YUKI", desc: "Quiet. Observant.", imgKey: "npc_promoter", unlockDay: 3 },
+            { name: "RAYMOND", desc: "Steady and practical.", imgKey: "npc_promoter", unlockDay: 4 },
+            { name: "CHARLOTTE", desc: "Thoughtful. Direct.", imgKey: "npc_promoter", unlockDay: 5 }
         ];
         // Pre-filter ITEM_WIKI once — avoids Array.filter() on every draw frame
-        this._helpBuffs   = ITEM_WIKI.filter(item => item.type === 'BUFF');
+        this._helpBuffs = ITEM_WIKI.filter(item => item.type === 'BUFF');
         this._helpHazards = ITEM_WIKI.filter(item => item.type === 'HAZARD');
     }
 
@@ -55,7 +55,7 @@ class MainMenu {
      */
     setupButtons() {
         let centerY = height - 250;
-        let spacing = 320;
+        let spacing = 420;
         this.buttons.push(new UIButton(width / 2 - spacing, centerY, 256, 96, "START", () => {
             triggerTransition(() => {
                 this.menuState = STATE_LEVEL_SELECT;
@@ -96,10 +96,10 @@ class MainMenu {
         }
 
         switch (this.menuState) {
-            case STATE_MENU:         this.drawHomeScreen();     break;
-            case STATE_LEVEL_SELECT: this.drawSelectScreen();   break;
-            case STATE_SETTINGS:     this.drawSettingsScreen(); break;
-            case STATE_HELP:         this.drawHelpScreen();     break;
+            case STATE_MENU: this.drawHomeScreen(); break;
+            case STATE_LEVEL_SELECT: this.drawSelectScreen(); break;
+            case STATE_SETTINGS: this.drawSettingsScreen(); break;
+            case STATE_HELP: this.drawHelpScreen(); break;
         }
 
         if (this.menuState !== STATE_MENU) {
@@ -139,11 +139,19 @@ class MainMenu {
     drawSelectScreen() {
         this.timeWheel.display();
         push();
+        let pulse = (sin(frameCount * 0.07) + 1) * 0.5;
+        let alpha = 180 + pulse * 75;
+        // Text
         textFont(fonts.body);
         textAlign(CENTER, CENTER);
-        fill(255, 150);
-        textSize(20);
-        text("PRESS ENTER TO START  /  ESC TO BACK", width / 2, height - 80);
+        textSize(26);
+        stroke(0, 0, 0, 160);
+        strokeWeight(5);
+        fill(255, 215, 0, alpha);
+        text("CLICK OR PRESS [ENTER] TO START  ·  [ESC] TO BACK", width / 2, height - 58);
+        noStroke();
+        fill(255, 215, 0, alpha);
+        text("CLICK OR PRESS [ENTER] TO START  ·  [ESC] TO BACK", width / 2, height - 58);
         pop();
     }
 
@@ -330,8 +338,8 @@ class MainMenu {
             let animFrame15 = floor(frameCount / 15) % 3;
 
             controls.forEach((c, i) => {
-                let x       = sx + (i % 2) * (cw + gap);
-                let y       = sy + floor(i / 2) * (ch + gap);
+                let x = sx + (i % 2) * (cw + gap);
+                let y = sy + floor(i / 2) * (ch + gap);
                 let isHover = (mouseX > x && mouseX < x + cw && mouseY > y && mouseY < y + ch);
 
                 noStroke();
@@ -340,9 +348,9 @@ class MainMenu {
 
                 if (c.id === 'move_combo') {
                     // Cycle through all 8 directional keys — use pre-computed index
-                    const _seq  = ['w', 'up', 'a', 'left', 's', 'down', 'd', 'right'];
+                    const _seq = ['w', 'up', 'a', 'left', 's', 'down', 'd', 'right'];
                     let activeKey = _seq[moveSeqIdx];
-                    let sheet     = assets.keys[activeKey];
+                    let sheet = assets.keys[activeKey];
 
                     if (sheet) {
                         let sw = sheet.width / 3;
@@ -365,7 +373,7 @@ class MainMenu {
 
                 textAlign(LEFT, TOP);
                 textFont(fonts.title); fill(20); textSize(20); text(c.a, x + 145, y + 35);
-                textFont(fonts.body);  fill(80); textSize(16); text(c.d, x + 145, y + 70, cw - 165);
+                textFont(fonts.body); fill(80); textSize(16); text(c.d, x + 145, y + 70, cw - 165);
             });
         }
         // PAGE 1: Character wiki with per-day unlock states
@@ -375,8 +383,8 @@ class MainMenu {
             let pulse = sin(frameCount * 0.1) * 30 + 80; // calculate once for all locked cards
 
             characters.forEach((char, i) => {
-                let x          = sx + (i % 2) * (cw + gap);
-                let y          = sy + floor(i / 2) * (ch + gap);
+                let x = sx + (i % 2) * (cw + gap);
+                let y = sy + floor(i / 2) * (ch + gap);
                 let isUnlocked = char.unlockDay <= currentUnlockedDay;
 
                 if (isUnlocked) {
@@ -390,7 +398,7 @@ class MainMenu {
 
                     textAlign(LEFT, TOP);
                     textFont(fonts.title); fill(20); textSize(18); text(char.name, x + 145, y + 35);
-                    textFont(fonts.body);  fill(80); textSize(16); text(char.desc, x + 145, y + 70, cw - 165);
+                    textFont(fonts.body); fill(80); textSize(16); text(char.desc, x + 145, y + 70, cw - 165);
                 } else {
                     // Locked state: dark card — use pre-computed pulse value
                     fill(30); noStroke(); rect(x, y, cw, ch, 12);
@@ -409,8 +417,8 @@ class MainMenu {
             let animIdx30 = floor(frameCount / 30); // base index for animated multi-sprite items
 
             items.forEach((item, i) => {
-                let x          = sx + (i % 2) * (cw + gap);
-                let y          = sy + floor(i / 2) * (ch + gap);
+                let x = sx + (i % 2) * (cw + gap);
+                let y = sy + floor(i / 2) * (ch + gap);
                 let isUnlocked = item.unlockDay <= currentUnlockedDay;
 
                 if (isUnlocked) {
@@ -435,7 +443,7 @@ class MainMenu {
 
                     textAlign(LEFT, TOP);
                     textFont(fonts.title); fill(20); textSize(18); text(item.name, x + 145, y + 40);
-                    textFont(fonts.body);  fill(80); textSize(16); text(item.desc, x + 145, y + 75, cw - 165);
+                    textFont(fonts.body); fill(80); textSize(16); text(item.desc, x + 145, y + 75, cw - 165);
                 } else {
                     // Locked state: dark card — use pre-computed pulse value
                     fill(30); noStroke(); rect(x, y, cw, ch, 12);
@@ -541,15 +549,6 @@ class MainMenu {
 
             if (keyCode === ENTER || keyCode === 13) {
                 let selectedDay = this.timeWheel.selectedDay;
-                // Day 1 first press: unlock visually, don't enter yet (skipped in dev mode)
-                if (!developerMode &&
-                    selectedDay === 1 &&
-                    typeof tutorialHints !== 'undefined' &&
-                    !tutorialHints.day1VisuallyUnlocked) {
-                    tutorialHints.day1VisuallyUnlocked = true;
-                    playSFX(sfxClick);
-                    return;
-                }
                 if (DEBUG_UNLOCK_ALL || selectedDay <= currentUnlockedDay) {
                     if (typeof tutorialHints !== 'undefined') {
                         tutorialHints.levelSelectShownForDay = selectedDay;
@@ -604,12 +603,16 @@ class MainMenu {
             // Level select: click on cloud to start the selected day, or arrows to change day
             if (this.menuState === STATE_LEVEL_SELECT) {
                 // Right-side up/down arrows
-                let arrowX  = width - 90;
+                let arrowX = width - 90;
                 let centerY = height / 2;
                 let arrowGap = 90;
                 if (!this.timeWheel.isEntering) {
                     if (this.timeWheel.selectedDay > 1 &&
                         dist(mx, my, arrowX, centerY - arrowGap) < 35) {
+                        let newDay = this.timeWheel.selectedDay - 1;
+                        if (typeof tutorialHints !== 'undefined' && !tutorialHints.dayVisuallyUnlocked[newDay]) {
+                            this.timeWheel.bgAlpha = 0;
+                        }
                         this.timeWheel.selectedDay--;
                         this.timeWheel.targetIndex--;
                         playSFX(sfxSelect);
@@ -617,28 +620,22 @@ class MainMenu {
                     }
                     if (this.timeWheel.selectedDay < 5 &&
                         dist(mx, my, arrowX, centerY + arrowGap) < 35) {
+                        let newDay = this.timeWheel.selectedDay + 1;
+                        if (typeof tutorialHints !== 'undefined' && !tutorialHints.dayVisuallyUnlocked[newDay]) {
+                            this.timeWheel.bgAlpha = 0;
+                        }
                         this.timeWheel.selectedDay++;
                         this.timeWheel.targetIndex++;
                         playSFX(sfxSelect);
                         return;
                     }
                 }
-                // Cloud click to start (or to visually unlock Day 1 on first click)
+                // Cloud click to start
                 let cloudX = width * 0.65, cloudY = height * 0.5;
                 let cloudW = 700, cloudH = 450;
                 if (mx > cloudX - cloudW / 2 && mx < cloudX + cloudW / 2 &&
                     my > cloudY - cloudH / 2 && my < cloudY + cloudH / 2) {
                     let selectedDay = this.timeWheel.selectedDay;
-                    // Day 1 first click: unlock visually, don't enter the game yet (skipped in dev mode)
-                    if (!developerMode &&
-                        selectedDay === 1 &&
-                        typeof tutorialHints !== 'undefined' &&
-                        !tutorialHints.day1VisuallyUnlocked) {
-                        tutorialHints.day1VisuallyUnlocked = true;
-                        playSFX(sfxClick);
-                        return;
-                    }
-                    // Normal entry (Day 1 already unlocked, or Days 2-5)
                     if (DEBUG_UNLOCK_ALL || selectedDay <= currentUnlockedDay) {
                         if (typeof tutorialHints !== 'undefined') {
                             tutorialHints.levelSelectShownForDay = selectedDay;
@@ -723,9 +720,9 @@ class MainMenu {
             this.helpPage = 0;
         } else {
             triggerTransition(() => {
-                this.menuState         = STATE_MENU;
+                this.menuState = STATE_MENU;
                 gameState.currentState = STATE_MENU;
-                this.helpPage          = 0;
+                this.helpPage = 0;
             });
         }
     }

@@ -9,10 +9,10 @@ class GameState {
     constructor() {
         // Defines the starting point of the game application
         this.currentState = STATE_MENU;
-        
+
         // Narrative & Logic tracking: Stores strings to determine specific Game Over scenarios
         this.failReason = ""; // Valid types: "HIT_BUS", "EXHAUSTED", "LATE"
-        
+
         // Tracks progression to trigger specific tutorial or dialogue events in the Room
         this.isFirstTimeInRoom = true;
     }
@@ -24,14 +24,28 @@ class GameState {
     setState(newState) {
         // Logic: Backup current state before pausing to allow for later resumption
         if (newState === STATE_PAUSED) {
-            this.previousState = this.currentState; 
+            this.previousState = this.currentState;
         }
-        
+
+        // Reset end screen when leaving WIN/FAIL so it re-activates correctly next visit
+        if ((this.currentState === STATE_WIN || this.currentState === STATE_FAIL) &&
+            newState !== STATE_WIN && newState !== STATE_FAIL) {
+            if (typeof endScreenManager !== "undefined" && endScreenManager) {
+                endScreenManager._activeScreen = null;
+            }
+        }
+
         // Debugging: Log transition for developer console tracking
         console.log(`[GameState] Switch: ${this.currentState} -> ${newState}`);
-        
+
         // Finalize state update
         this.currentState = newState;
+
+        // End-screen input should not be blocked by an open debug panel.
+        if ((newState === STATE_FAIL || newState === STATE_WIN) &&
+            typeof testingPanel !== 'undefined' && testingPanel) {
+            testingPanel.visible = false;
+        }
 
         // Activate end screen overlays on transition
         if (typeof endScreenManager !== 'undefined' && endScreenManager) {
