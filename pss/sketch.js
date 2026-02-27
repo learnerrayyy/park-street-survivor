@@ -1524,7 +1524,7 @@ function drawCreditsScreen() {
 
     } else if (_creditPhase === 'pause') {
         _creditPauseF++;
-        if (_creditPauseF >= 70) {           // ~1s black pause before poem
+        if (_creditPauseF >= 10) {           // ~0.25s black pause before poem
             _creditPhase     = 'poem';
             _creditPoemAlpha = 0;
         }

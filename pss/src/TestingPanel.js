@@ -265,6 +265,12 @@ class TestingPanel {
         this.modeConfigHitboxes = [];
         this.buffControlHitboxes = [];
         this.selectedModeId = 1;
+        this.uiTunerHitboxes = [];
+        this.uiTunerDefs = [
+            { key: "devMenuBtnW",     label: "Btn Width"  },
+            { key: "devMenuBtnH",     label: "Btn Height" },
+            { key: "devMenuTextSize", label: "Text Size"  }
+        ];
 
         const preferredObstacleOrder = [
             "LARGE_CAR",
@@ -613,6 +619,16 @@ class TestingPanel {
             this.editTarget.fieldKey === fieldKey;
     }
 
+    isEditingUITuner(key) {
+        return this.editTarget && this.editTarget.kind === "uiTuner" && this.editTarget.key === key;
+    }
+
+    beginUITunerEdit(key) {
+        const map = { devMenuBtnW, devMenuBtnH, devMenuTextSize };
+        this.editTarget = { kind: "uiTuner", key };
+        this.inputBuffer = String(map[key] ?? 0);
+    }
+
     beginWeightEdit(obstacleType) {
         const cfg = this.getCurrentDifficultyConfig();
         if (!cfg || !this.isObstacleEnabled(obstacleType)) return;
@@ -770,6 +786,14 @@ class TestingPanel {
                 }
                 this.applyLiveConfigIfActiveDay();
             }
+        }
+
+        if (this.editTarget.kind === "uiTuner") {
+            let num = parseFloat(this.inputBuffer);
+            if (!Number.isFinite(num)) num = 0;
+            if (this.editTarget.key === "devMenuBtnW")     devMenuBtnW     = Math.max(40,  Math.round(num));
+            if (this.editTarget.key === "devMenuBtnH")     devMenuBtnH     = Math.max(10,  Math.round(num));
+            if (this.editTarget.key === "devMenuTextSize") devMenuTextSize = Math.max(8,   Math.round(num));
         }
 
         this.cancelEditing();
