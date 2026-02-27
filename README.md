@@ -7,12 +7,9 @@
 # Park Street Survivor
 
 <p>
-  <img src="https://img.shields.io/badge/University%20of%20Bristol-CS%202026-c4b5fd?style=flat-square&labelColor=7c3aed" alt="Bristol" />
-  &nbsp;
-  <img src="https://img.shields.io/badge/SEDP%202026-Group%207-c4b5fd?style=flat-square&labelColor=7c3aed" alt="Group 7" />
-  &nbsp;
-  <img src="https://img.shields.io/badge/Platform-WebGL-c4b5fd?style=flat-square&labelColor=7c3aed" alt="WebGL" />
-</p>
+  <img src="https://img.shields.io/badge/Language-JavaScript-b8c1ec?style=for-the-badge&logo=javascript&logoColor=white" />
+  <img src="https://img.shields.io/badge/Library-p5.js-eebbc3?style=for-the-badge&logo=p5.js&logoColor=ed538b" />
+  <img src="https://img.shields.io/badge/Host-GitHub_Pages-b8c1ec?style=for-the-badge&logo=github&logoColor=white" />
 
 <br>
 
@@ -24,9 +21,13 @@
 
 <br>
 
-[![Play Game](https://img.shields.io/badge/Play%20Game-7c3aed?style=for-the-badge&logoColor=white)](#)
+<div align="center">
+
+[![Project Site](https://img.shields.io/badge/Project%20Site-eebbc3?style=for-the-badge&logoColor=white)](https://uob-comsm0166.github.io/2026-group-7/)
+[![Play Game](https://img.shields.io/badge/Play%20Game-7c3aed?style=for-the-badge&logoColor=white)](https://uob-comsm0166.github.io/2026-group-7/pss/)
 &nbsp;&nbsp;
-[![Demo Video](https://img.shields.io/badge/Demo%20Video-7c3aed?style=for-the-badge&logoColor=white)](#)
+
+</div>
 
 <br>
 
