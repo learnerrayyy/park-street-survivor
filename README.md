@@ -1,94 +1,209 @@
-# 2026-group-7
-2026 COMSM0166 group 7
+<div align="center">
 
-# COMSM0166 Project Template
-A project template for the Software Engineering Discipline and Practice module (COMSM0166).
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
 
-## Info
+<br>
 
-This is the template for your group project repo/report. We'll be setting up your repo and assigning you to it after the group forming activity. You can delete this info section, but please keep the rest of the repo structure intact.
+# Park Street Survivor
 
-You will be developing your game using [P5.js](https://p5js.org) a javascript library that provides you will all the tools you need to make your game. However, we won't be teaching you javascript, this is a chance for you and your team to learn a (friendly) new language and framework quickly, something you will almost certainly have to do with your summer project and in future. There is a lot of documentation online, you can start with:
+<p>
+  <img src="https://img.shields.io/badge/Language-JavaScript-b8c1ec?style=for-the-badge&logo=javascript&logoColor=white" />
+  <img src="https://img.shields.io/badge/Library-p5.js-eebbc3?style=for-the-badge&logo=p5.js&logoColor=ed538b" />
+  <img src="https://img.shields.io/badge/Host-GitHub_Pages-b8c1ec?style=for-the-badge&logo=github&logoColor=white" />
 
-- [P5.js tutorials](https://p5js.org/tutorials/) 
-- [Coding Train P5.js](https://thecodingtrain.com/tracks/code-programming-with-p5-js) course - go here for enthusiastic video tutorials from Dan Shiffman (recommended!)
+<br>
 
-## Park Street Survivor
+<img src="ArtAsset/ReadMe/game_screenshot.png" width="860" style="border-radius: 16px; border: 3px solid #b8c1ec;" alt="Park Street Survivor – Game Screenshot" />
 
-STRAPLINE. Add an exciting one sentence description of your game here.
+<br><br>
 
-IMAGE. Add an image of your game here, keep this updated with a snapshot of your latest development.
+> *"Sprint through the fragmented memories of a Bristol CS graduate: A 5-day surrealist journey on Park Street where every gift from the past shapes your ultimate choice — to wake up or to fade away."*
 
-LINK. Add a link here to your deployed game, you can also make the image above link to your game if you wish. Your game lives in the [/docs](/docs) folder, and is published using Github pages. 
+<br>
 
-VIDEO. Include a demo video of your game here (you don't have to wait until the end, you can insert a work in progress video)
+<div align="center">
 
-## Your Group
+[![Project Site](https://img.shields.io/badge/Project%20Site-eebbc3?style=for-the-badge&logoColor=white)](https://uob-comsm0166.github.io/2026-group-7/)
+[![Play Game](https://img.shields.io/badge/Play%20Game-7c3aed?style=for-the-badge&logoColor=white)](https://uob-comsm0166.github.io/2026-group-7/pss/)
+&nbsp;&nbsp;
 
-<img width="1162" height="769" alt="image" src="https://github.com/user-attachments/assets/c46a5bdd-5a72-4abc-b05c-2b2a8cf12e63" />
+</div>
 
+<br>
 
-- Charlotte Yu, fe22207@bristol.ac.uk, Core Mechanism Designer
-- Lucca Zhou, pn25381@bristol.ac.uk, Aesthetic Designer
-- Ray Wang, nz25771@briatol.ac.uk, Level Designer
-- Layla Pei, jj25661@bristol.ac.uk, UI/UX & Audio Designer
-- Keyu Zhou,nq25289@brsitol.ac.uk, Scripts Designer
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
 
-## Project Report
+</div>
 
-### Introduction
+<br>
 
-- 5% ~250 words 
-- Describe your game, what is based on, what makes it novel? (what's the "twist"?) 
+<a name="group-members"></a>
+<h2 align="center">Group Members</h2>
 
-### Requirements 
+<div align="center">
 
-- 15% ~750 words
-- Early stages design. Ideation process. How did you decide as a team what to develop? Use case diagrams, user stories. 
+<img src="ArtAsset/ReadMe/member_pic.png" width="860" style="border-radius: 16px; border: 3px solid #b8c1ec;" alt="Group Members" />
 
-### Design
+<br><br>
 
-- 15% ~750 words 
-- System architecture. Class diagrams, behavioural diagrams. 
+| Role | Name | Email |
+|:---:|:---:|:---:|
+| **Core Mechanism Designer** | Charlotte Yu | fe22207@bristol.ac.uk |
+| **Aesthetic Designer** | Lucca Zhou | pn25381@bristol.ac.uk |
+| **Level Designer** | Ray Wang | nz25771@bristol.ac.uk |
+| **UI/UX & Audio Designer** | Layla Pei | jj25661@bristol.ac.uk |
+| **Scripts Designer** | Keyu Zhou | nq25289@bristol.ac.uk |
 
-### Implementation
+</div>
 
-- 15% ~750 words
+<br>
 
-- Describe implementation of your game, in particular highlighting the TWO areas of *technical challenge* in developing your game. 
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
 
-### Evaluation
+<br>
 
-- 15% ~750 words
+<a name="table-of-contents"></a>
+<h2 align="center">Table of Contents</h2>
 
-- One qualitative evaluation (of your choice) 
+<div align="center">
 
-- One quantitative evaluation (of your choice) 
+| # | Section | Description |
+|:---:|:---:|:---|
+| 01 | [Introduction](#introduction) | Game overview & what makes it novel |
+| 02 | [Requirements](#requirements) | Ideation, use cases & user stories |
+| 03 | [Design](#design) | System architecture & class diagrams |
+| 04 | [Implementation](#implementation) | Key technical challenges |
+| 05 | [Evaluation](#evaluation) | Qualitative & quantitative testing |
+| 06 | [Process](#process) | Team workflow & reflection |
+| 07 | [Conclusion](#conclusion) | Lessons learnt & future work |
+| 08 | [Contribution](#contribution) | Individual contributions |
 
-- Description of how code was tested. 
+</div>
 
-### Process 
+<br>
 
-- 15% ~750 words
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
 
-- Teamwork. How did you work together, what tools and methods did you use? Did you define team roles? Reflection on how you worked together. Be honest, we want to hear about what didn't work as well as what did work, and importantly how your team adapted throughout the project.
+<br>
 
-### Conclusion
+<a name="introduction"></a>
+<h2 align="center">Introduction</h2>
 
-- 10% ~500 words
+<p align="center"><i>5% &nbsp;·&nbsp; ~250 words</i></p>
 
-- Reflect on the project as a whole. Lessons learnt. Reflect on challenges. Future work, describe both immediate next steps for your current game and also what you would potentially do if you had chance to develop a sequel.
+Describe your game, what is it based on, what makes it novel? (What's the "twist"?)
 
-### Contribution Statement
+<br>
 
-- Provide a table of everyone's contribution, which *may* be used to weight individual grades. We expect that the contribution will be split evenly across team-members in most cases. Please let us know as soon as possible if there are any issues with teamwork as soon as they are apparent and we will do our best to help your team work harmoniously together.
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
 
-### Additional Marks
+<br>
 
-You can delete this section in your own repo, it's just here for information. in addition to the marks above, we will be marking you on the following two points:
+<a name="requirements"></a>
+<h2 align="center">Requirements</h2>
 
-- **Quality** of report writing, presentation, use of figures and visual material (5% of report grade) 
-  - Please write in a clear concise manner suitable for an interested layperson. Write as if this repo was publicly available.
-- **Documentation** of code (5% of report grade)
-  - Organise your code so that it could easily be picked up by another team in the future and developed further.
-  - Is your repo clearly organised? Is code well commented throughout?
+<p align="center"><i>15% &nbsp;·&nbsp; ~750 words</i></p>
+
+Early stages design. Ideation process. How did you decide as a team what to develop? Use case diagrams, user stories.
+
+<br>
+
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
+
+<br>
+
+<a name="design"></a>
+<h2 align="center">Design</h2>
+
+<p align="center"><i>15% &nbsp;·&nbsp; ~750 words</i></p>
+
+System architecture. Class diagrams, behavioural diagrams.
+
+<br>
+
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
+
+<br>
+
+<a name="implementation"></a>
+<h2 align="center">Implementation</h2>
+
+<p align="center"><i>15% &nbsp;·&nbsp; ~750 words</i></p>
+
+Describe implementation of your game, in particular highlighting the **TWO** areas of *technical challenge* in developing your game.
+
+<br>
+
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
+
+<br>
+
+<a name="evaluation"></a>
+<h2 align="center">Evaluation</h2>
+
+<p align="center"><i>15% &nbsp;·&nbsp; ~750 words</i></p>
+
+- One **qualitative** evaluation (of your choice)
+- One **quantitative** evaluation (of your choice)
+- Description of how code was tested
+
+<br>
+
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
+
+<br>
+
+<a name="process"></a>
+<h2 align="center">Process</h2>
+
+<p align="center"><i>15% &nbsp;·&nbsp; ~750 words</i></p>
+
+Teamwork. How did you work together, what tools and methods did you use? Did you define team roles? Reflection on how you worked together. Be honest — we want to hear about what didn't work as well as what did, and importantly how your team adapted throughout the project.
+
+<br>
+
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
+
+<br>
+
+<a name="conclusion"></a>
+<h2 align="center">Conclusion</h2>
+
+<p align="center"><i>10% &nbsp;·&nbsp; ~500 words</i></p>
+
+Reflect on the project as a whole. Lessons learnt. Reflect on challenges. Future work — describe both immediate next steps for your current game and what you would potentially do if you had the chance to develop a sequel.
+
+<br>
+
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
+
+<br>
+
+<a name="contribution"></a>
+<h2 align="center">Contribution Statement</h2>
+
+<div align="center">
+
+| Team Member | Primary Role | Contribution |
+|:---:|:---|:---:|
+| Charlotte Yu | Core Mechanism Design | 20% |
+| Lucca Zhou | Aesthetic Design | 20% |
+| Ray Wang | Level Design | 20% |
+| Layla Pei | UI/UX & Audio | 20% |
+| Keyu Zhou | Scripts Design | 20% |
+
+</div>
+
+<br>
+
+<img src="ArtAsset/ReadMe/divider.png" width="100%" />
+
+<div align="center">
+
+<br>
+
+<img src="https://img.shields.io/badge/Made%20with%20%E2%99%A5%20at-University%20of%20Bristol-c4b5fd?style=flat-square&labelColor=7c3aed" alt="Made at Bristol" />
+&nbsp;
+<img src="https://img.shields.io/badge/SEDP%202026-Group%207-c4b5fd?style=flat-square&labelColor=7c3aed" alt="Group 7" />
+
+</div>
