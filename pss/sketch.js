@@ -500,6 +500,14 @@ function draw() {
                 drawLoadingScreen();
                 break;
 
+            case STATE_WARNING:
+                drawWarningScreen();
+                break;
+
+            case STATE_CREDITS:
+                drawCreditsScreen();
+                break;
+
             case STATE_SPLASH:
                 drawSplashScreen();
                 break;
@@ -734,6 +742,16 @@ function keyPressed() {
     if (globalFade.isFading) return;
     let state = gameState.currentState;
 
+    // Credits screen: any key skips scroll/pause → poem, or exits poem → menu
+    if (state === STATE_CREDITS) {
+        if (_creditPhase === 'poem' && _creditPoemAlpha >= 255) {
+            triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+        } else if (_creditPhase !== 'poem') {
+            _creditPhase = 'poem'; _creditPoemAlpha = 0; // skip to epilogue
+        }
+        return;
+    }
+
     // Toggle developer mode
     if (key === '0') devToggle();
 
@@ -762,7 +780,9 @@ function keyPressed() {
     if (key === 'p' || key === 'P' || keyCode === ESCAPE) {
         if (state !== STATE_MENU && state !== STATE_LEVEL_SELECT &&
             state !== STATE_SETTINGS && state !== STATE_HELP &&
-            state !== STATE_SPLASH && state !== STATE_INVENTORY) {
+            state !== STATE_SPLASH && state !== STATE_INVENTORY &&
+            state !== STATE_WARNING &&
+            state !== STATE_CREDITS) {
             playSFX(sfxClick);
             playSFX(sfxClick);
             togglePause();
@@ -1004,6 +1024,16 @@ function mousePressed() {
 
     let state = gameState.currentState;
 
+    // Credits screen: click skips scroll/pause → poem, or exits poem → menu
+    if (state === STATE_CREDITS) {
+        if (_creditPhase === 'poem' && _creditPoemAlpha >= 255) {
+            triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+        } else if (_creditPhase !== 'poem') {
+            _creditPhase = 'poem'; _creditPoemAlpha = 0;
+        }
+        return;
+    }
+
     // Splash screen: unlock audio and transition to main menu
     if (state === STATE_SPLASH) {
         if (getAudioContext().state !== 'running') getAudioContext().resume();
@@ -1238,10 +1268,390 @@ function drawLoadingScreen() {
     if (smoothProgress >= 1.0) {
         setTimeout(() => {
             if (gameState.currentState === STATE_LOADING) {
-                gameState.setState(STATE_SPLASH);
+                gameState.setState(STATE_WARNING);
             }
-        }, 150);
+        }, 800);
     }
+}
+
+// ─── WARNING / SPLASH TRANSITION ─────────────────────────────────────────────
+let _splashFadeAlpha = 0;   // black overlay fading out on splash entry [0..255]
+let _warnFrame = 0;         // counts up each draw call while in STATE_WARNING
+const _WARN_FADE_IN  = 90;  // frames for fade-in  (~1.5 s)
+const _WARN_HOLD     = 540; // frames to hold at full opacity  (~9 s)
+const _WARN_FADE_OUT = 90;  // frames for fade-out (~1.5 s)
+const _WARN_TOTAL    = _WARN_FADE_IN + _WARN_HOLD + _WARN_FADE_OUT; // 600 ≈ 10 s
+
+/**
+ * Full-screen mental-health content warning.
+ * Auto-advances to STATE_SPLASH after ~10 seconds; no player interaction needed.
+ */
+function drawWarningScreen() {
+    _warnFrame++;
+
+    // Compute master opacity [0..255]
+    let alpha;
+    if (_warnFrame <= _WARN_FADE_IN) {
+        alpha = map(_warnFrame, 0, _WARN_FADE_IN, 0, 255);
+    } else if (_warnFrame <= _WARN_FADE_IN + _WARN_HOLD) {
+        alpha = 255;
+    } else {
+        alpha = map(_warnFrame, _WARN_FADE_IN + _WARN_HOLD, _WARN_TOTAL, 255, 0);
+    }
+    alpha = constrain(alpha, 0, 255);
+
+    // Advance to splash once animation completes
+    if (_warnFrame > _WARN_TOTAL) {
+        _warnFrame = 0;
+        _splashFadeAlpha = 255;             // splash will fade in from black
+        titleDrop.y = -200; titleDrop.vy = 0; titleDrop.landed = false; titleDrop.shake = 0;
+        gameState.setState(STATE_SPLASH);
+        return;
+    }
+
+    let s = min(width / 1920, height / 1080);
+    let cx = width / 2;
+    let cy = height / 2;
+
+    // ── Background ────────────────────────────────────────────────────────────
+    push();
+    colorMode(RGB, 255);
+    background(0);
+
+    // Faded background image (otherBg) for atmosphere
+    if (assets && assets.otherBg) {
+        let bgS = max(width / assets.otherBg.width, height / assets.otherBg.height);
+        imageMode(CENTER);
+        tint(255, alpha * 0.3);
+        image(assets.otherBg, cx, cy, assets.otherBg.width * bgS, assets.otherBg.height * bgS);
+        noTint();
+        imageMode(CORNER);
+    }
+
+    // Dark overlay
+    fill(0, 0, 0, alpha * 0.80);
+    noStroke();
+    rectMode(CORNER);
+    rect(0, 0, width, height);
+
+    // ── Panel ─────────────────────────────────────────────────────────────────
+    let panelW = 1200 * s;
+    let panelH = 640 * s;
+    let panelX = cx;
+    let panelY = cy;
+
+    // Shadow
+    fill(0, 0, 0, alpha * 0.5);
+    noStroke();
+    rectMode(CENTER);
+    rect(panelX + 10 * s, panelY + 10 * s, panelW, panelH, 22 * s);
+
+    // Panel body
+    fill(14, 14, 22, alpha * 0.95);
+    stroke(200, 170, 100, alpha);
+    strokeWeight(2.5 * s);
+    rect(panelX, panelY, panelW, panelH, 22 * s);
+
+    // Inner border
+    stroke(200, 170, 100, alpha * 0.35);
+    strokeWeight(1 * s);
+    rect(panelX, panelY, panelW - 24 * s, panelH - 24 * s, 16 * s);
+    noStroke();
+
+    // ── Title ─────────────────────────────────────────────────────────────────
+    let titleY = panelY - panelH / 2 + 80 * s;
+    textFont(fonts.title || fonts.body);
+    textSize(52 * s);
+    textAlign(CENTER, CENTER);
+    fill(220, 190, 110, alpha);
+    text("A Quiet Note to You", panelX, titleY);
+
+    // Divider line
+    stroke(200, 170, 100, alpha * 0.45);
+    strokeWeight(1.5 * s);
+    let divY = titleY + 44 * s;
+    line(panelX - panelW / 2 + 60 * s, divY, panelX + panelW / 2 - 60 * s, divY);
+    noStroke();
+
+    // ── Body text (centred, warm) ──────────────────────────────────────────────
+    textFont(fonts.body);
+    textAlign(CENTER, TOP);
+    let bodyLines = [
+    { txt: "Please note: This experience explores stress, burnout,", size: 28, col: [230, 220, 205] },
+    { txt: "and the psychological impact of self-doubt.", size: 28, col: [230, 220, 205] },
+    { txt: "", size: 28, col: [230, 220, 205] },
+    
+    { txt: "If you find these themes distressing, we encourage you", size: 28, col: [230, 220, 205] },
+    { txt: "to prioritise your well-being while playing.", size: 28, col: [230, 220, 205] },
+    { txt: "Support is available if the climb feels too steep.", size: 28, col: [230, 220, 205] },
+    { txt: "", size: 24, col: [230, 220, 205] },
+
+    { txt: "— Resources for Support —", size: 24, col: [210, 185, 120] },
+    { txt: "Bristol Nightline | 01179 266 266 (Nightly, Term-time)", size: 26, col: [210, 185, 120] },
+    { txt: "Samaritans | 116 123 (Free, 24/7 Support)", size: 26, col: [210, 185, 120] },
+    { txt: "Shout Crisis | Text 'SHOUT' to 85258", size: 26, col: [210, 185, 120] },
+    ];
+
+    let ty = divY + 32 * s;
+    for (let i = 0; i < bodyLines.length; i++) {
+        let entry = bodyLines[i];
+        // Compute cumulative y by summing previous line heights
+        let prevH = 0;
+        for (let j = 0; j < i; j++) {
+            prevH += (bodyLines[j].size + 10) * s;
+        }
+        textSize(entry.size * s);
+        fill(entry.col[0], entry.col[1], entry.col[2], alpha);
+        text(entry.txt, panelX, ty + prevH);
+    }
+
+    // ── Footer ────────────────────────────────────────────────────────────────
+    textFont(fonts.body);
+    textSize(21 * s);
+    textAlign(CENTER, CENTER);
+    fill(160, 150, 130, alpha * 0.65);
+    text("This screen will continue automatically.", panelX, panelY + panelH / 2 - 35 * s);
+
+    pop();
+}
+
+// ─── CREDITS SCREEN ───────────────────────────────────────────────────────────
+let _creditPhase     = 'scroll'; // 'scroll' | 'pause' | 'poem'
+let _creditScrollY   = 0;
+let _creditPauseF    = 0;
+let _creditPoemAlpha = 0;
+
+const _CREDIT_SCROLL_SPEED = 2.0; // design-space px per frame (~30 s total scroll)
+
+// Raw credit data — sizes in 1920×1080 design-space pixels
+const _CREDIT_DATA = [
+    { type: 'space',    h: 120 },
+    { type: 'header',   h: 80,  text: '\u2014 PARK STREET SURVIVOR \u2014' },
+    { type: 'sub',      h: 50,  text: 'A University of Bristol Group Project' },
+    { type: 'space',    h: 70 },
+    { type: 'divider',  h: 40 },
+    { type: 'space',    h: 55 },
+    { type: 'section',  h: 58,  text: 'THE TEAM' },
+    { type: 'space',    h: 45 },
+    { type: 'name',     h: 50,  text: 'Charlotte Yu' },
+    { type: 'role',     h: 36,  text: 'Core Mechanism & Systems Architect' },
+    { type: 'desc',     h: 32,  text: 'System Integration  \xb7  State Machine Logic  \xb7  Physics Pipeline' },
+    { type: 'space',    h: 44 },
+    { type: 'name',     h: 50,  text: 'Kangrui Wang' },
+    { type: 'role',     h: 36,  text: 'Level Designer' },
+    { type: 'desc',     h: 32,  text: 'Level Geometry  \xb7  Environmental Storytelling  \xb7  Obstacle Choreography' },
+    { type: 'space',    h: 44 },
+    { type: 'name',     h: 50,  text: 'Layla Pei' },
+    { type: 'role',     h: 36,  text: 'UI/UX & Audio Designer' },
+    { type: 'desc',     h: 32,  text: 'Interface Ergonomics  \xb7  Interaction Flows  \xb7  Soundscape Design' },
+    { type: 'space',    h: 44 },
+    { type: 'name',     h: 50,  text: 'Lucca Zhou' },
+    { type: 'role',     h: 36,  text: 'Aesthetic Designer' },
+    { type: 'desc',     h: 32,  text: 'Visual Style Guide  \xb7  Pixel Asset Creation  \xb7  Colour Palette' },
+    { type: 'space',    h: 44 },
+    { type: 'name',     h: 50,  text: 'Keyu Zhou' },
+    { type: 'role',     h: 36,  text: 'Script Designer' },
+    { type: 'desc',     h: 32,  text: 'Narrative Scripting  \xb7  Dialogue Design  \xb7  Emotional Arc' },
+    { type: 'space',    h: 75 },
+    { type: 'divider',  h: 40 },
+    { type: 'space',    h: 55 },
+    { type: 'section',  h: 58,  text: 'SOUNDS & MUSIC' },
+    { type: 'space',    h: 40 },
+    { type: 'label',    h: 40,  text: 'Original Soundscapes' },
+    { type: 'desc',     h: 32,  text: '\u201cPark Street Echoes\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
+    { type: 'desc',     h: 32,  text: '\u201cFeathers in the Rain\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
+    { type: 'space',    h: 55 },
+    { type: 'section',  h: 58,  text: 'VISUAL DESIGN' },
+    { type: 'space',    h: 40 },
+    { type: 'label',    h: 40,  text: 'Pixel Art & Palettes' },
+    { type: 'desc',     h: 32,  text: 'Lucca Zhou  &  Group 7' },
+    { type: 'space',    h: 28 },
+    { type: 'label',    h: 40,  text: 'Typography' },
+    { type: 'desc',     h: 32,  text: 'DotGothic16  \xb7  VT323  (Google Fonts, Open Licence)' },
+    { type: 'space',    h: 75 },
+    { type: 'divider',  h: 40 },
+    { type: 'space',    h: 55 },
+    { type: 'section',  h: 58,  text: 'GOVERNANCE' },
+    { type: 'space',    h: 40 },
+    { type: 'label',    h: 40,  text: 'Academic Programme' },
+    { type: 'desc',     h: 32,  text: 'MSc Computer Science  \xb7  Group 7' },
+    { type: 'desc',     h: 32,  text: 'University of Bristol  \xb7  Faculty of Engineering' },
+    { type: 'space',    h: 28 },
+    { type: 'label',    h: 40,  text: 'Technical Traceability' },
+    { type: 'desc',     h: 32,  text: 'Agile Development  \xb7  Jira Workflow' },
+    { type: 'desc',     h: 32,  text: 'Version Control  \xb7  GitHub' },
+    { type: 'space',    h: 160 },
+];
+
+/** Resets all credits state; call this before transitioning to STATE_CREDITS. */
+function resetCredits() {
+    _creditPhase     = 'scroll';
+    _creditScrollY   = height;   // block enters from bottom of screen
+    _creditPauseF    = 0;
+    _creditPoemAlpha = 0;
+}
+
+/** Main credits draw dispatcher. */
+function drawCreditsScreen() {
+    push();
+    background(0);
+
+    let s  = min(width / 1920, height / 1080);
+    let cx = width / 2;
+
+    if (_creditPhase === 'scroll') {
+        _creditScrollY -= _CREDIT_SCROLL_SPEED * s;
+
+        let totalH = 0;
+        for (let d of _CREDIT_DATA) totalH += d.h * s;
+
+        let cumH = 0;
+        for (let i = 0; i < _CREDIT_DATA.length; i++) {
+            let d     = _CREDIT_DATA[i];
+            let lineH = d.h * s;
+            let lineY = _creditScrollY + cumH;
+            if (lineY + lineH > 0 && lineY < height) {
+                _renderCreditLine(d, cx, lineY + lineH / 2, s);
+            }
+            cumH += lineH;
+        }
+        _drawCreditsFade();
+
+        if (_creditScrollY + totalH < 0) {
+            _creditPhase = 'pause';
+            _creditPauseF = 0;
+        }
+
+    } else if (_creditPhase === 'pause') {
+        _creditPauseF++;
+        if (_creditPauseF >= 70) {           // ~1s black pause before poem
+            _creditPhase     = 'poem';
+            _creditPoemAlpha = 0;
+        }
+
+    } else if (_creditPhase === 'poem') {
+        _drawCreditsPoem(s, cx);
+    }
+
+    pop();
+}
+
+/** Renders a single line entry based on its type. */
+function _renderCreditLine(d, cx, midY, s) {
+    push();
+    textAlign(CENTER, CENTER);
+    noStroke();
+
+    switch (d.type) {
+        case 'header':
+            textFont(fonts.title || fonts.body);
+            textSize(50 * s);
+            fill(220, 190, 110);
+            text(d.text, cx, midY);
+            break;
+        case 'sub':
+            textFont(fonts.body);
+            textSize(22 * s);
+            fill(165, 150, 115);
+            text(d.text, cx, midY);
+            break;
+        case 'section':
+            textFont(fonts.body);
+            textSize(28 * s);
+            fill(200, 170, 100);
+            text(d.text, cx, midY);
+            break;
+        case 'name':
+            textFont(fonts.title || fonts.body);
+            textSize(34 * s);
+            fill(245, 235, 215);
+            text(d.text, cx, midY);
+            break;
+        case 'role':
+            textFont(fonts.body);
+            textSize(19 * s);
+            fill(165, 195, 220);
+            text(d.text, cx, midY);
+            break;
+        case 'desc':
+            textFont(fonts.body);
+            textSize(16 * s);
+            fill(135, 130, 120);
+            text(d.text, cx, midY);
+            break;
+        case 'label':
+            textFont(fonts.body);
+            textSize(22 * s);
+            fill(195, 180, 140);
+            text(d.text, cx, midY);
+            break;
+        case 'divider':
+            stroke(200, 170, 100, 90);
+            strokeWeight(1.2 * s);
+            line(cx - 380 * s, midY, cx + 380 * s, midY);
+            break;
+        // 'space': nothing to render
+    }
+    pop();
+}
+
+/** Top & bottom gradient veil so text fades in/out at screen edges. */
+function _drawCreditsFade() {
+    noStroke();
+    let steps = 14;
+    let fadeH = 110;
+    for (let i = 0; i < steps; i++) {
+        let t  = i / (steps - 1);
+        let y0 = (i / steps) * fadeH;
+        let yH = fadeH / steps + 1;
+        fill(0, 0, 0, lerp(230, 0, t));
+        rect(0, y0, width, yH);
+        fill(0, 0, 0, lerp(0, 230, t));
+        rect(0, height - fadeH + y0, width, yH);
+    }
+}
+
+/** Poem epilogue: fades in centred, waits for player to dismiss. */
+function _drawCreditsPoem(s, cx) {
+    _creditPoemAlpha = min(255, _creditPoemAlpha + 6);
+    let alpha = _creditPoemAlpha;
+    let cy    = height / 2;
+
+    push();
+    textAlign(CENTER, CENTER);
+    noStroke();
+    textFont(fonts.body);
+
+    let poem = [
+        { text: '\u201cHope is the thing with feathers \u2014', ts: 30 * s, col: [240, 228, 200] },
+        { text: 'That perches in the soul \u2014',              ts: 30 * s, col: [240, 228, 200] },
+        { text: 'And sings the tune without the words \u2014',  ts: 30 * s, col: [240, 228, 200] },
+        { text: 'And never stops \u2014 at all.\u201d',         ts: 30 * s, col: [240, 228, 200] },
+        { text: '',                                              ts: 18 * s, col: [0, 0, 0]       },
+        { text: '\u2014 Emily Dickinson (1830\u20131886)',       ts: 22 * s, col: [175, 160, 125] },
+        { text: '',                                              ts: 22 * s, col: [0, 0, 0]       },
+        { text: '',                                              ts: 18 * s, col: [0, 0, 0]       },
+        { text: 'THANK YOU FOR SURVIVING THE SLOPE.',           ts: 28 * s, col: [215, 185, 105] },
+    ];
+
+    let lineH  = 44 * s;
+    let startY = cy - (poem.length * lineH) / 2 + lineH / 2;
+
+    for (let i = 0; i < poem.length; i++) {
+        let p = poem[i];
+        textSize(p.ts);
+        fill(p.col[0], p.col[1], p.col[2], alpha);
+        text(p.text, cx, startY + i * lineH);
+    }
+
+    // Dismiss hint — only appears once fully faded in
+    if (alpha >= 252) {
+        textSize(17 * s);
+        fill(105, 100, 92, 170);
+        text('Press any key to return to the main menu', cx, height - 48 * s);
+    }
+
+    pop();
 }
 
 /**
@@ -1307,6 +1717,15 @@ function drawSplashScreen() {
 
     drawLogoPlaceholder(width / 2, 320);
     drawInteractionPrompts();
+
+    // Fade-in overlay: covers splash with a receding black veil on entry
+    if (_splashFadeAlpha > 0) {
+        noStroke();
+        fill(0, 0, 0, _splashFadeAlpha);
+        rect(0, 0, width, height);
+        _splashFadeAlpha = max(0, _splashFadeAlpha - 4); // ~64 frames = ~1 s
+    }
+
     pop();
 }
 
@@ -1320,8 +1739,11 @@ function drawLogoPlaceholder(x, y) {
     let t = frameCount * 0.02;
     let targetY = isSplash ? (y + 160) : (y + 10);
 
-    // Drop-in physics (gravity 1.2 → 3.0 for a snappier drop)
-    if (!titleDrop.landed) {
+    // Drop-in physics — wait until the splash fade-in overlay has cleared
+    if (_splashFadeAlpha > 0) {
+        // Hold position off-screen while fading in; shake decays harmlessly
+        titleDrop.shake *= 0.7;
+    } else if (!titleDrop.landed) {
         titleDrop.vy += 2.0;
         titleDrop.y += titleDrop.vy;
         if (titleDrop.y >= y + 160) {
@@ -1329,10 +1751,11 @@ function drawLogoPlaceholder(x, y) {
             titleDrop.landed = true;
             titleDrop.shake = 6;
         }
+        titleDrop.shake *= 0.7;
     } else {
         titleDrop.y = lerp(titleDrop.y, targetY, 0.15);
+        titleDrop.shake *= 0.7;
     }
-    titleDrop.shake *= 0.7;
 
     // Full-screen logo background
     if (isSplash && assets.logoImgs && assets.logoImgs[4]) {

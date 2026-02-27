@@ -689,6 +689,13 @@ class TestingPanel {
             return;
         }
 
+        if (actionId === "credits") {
+            if (typeof resetCredits === "function") resetCredits();
+            if (gameState) gameState.setState(STATE_CREDITS);
+            this.visible = false;
+            return;
+        }
+
         if (actionId === "goto_pause") {
             if (gameState) {
                 gameState.previousState = gameState.currentState;
@@ -1058,7 +1065,8 @@ class TestingPanel {
             { id: "win", label: "Force Win" },
             { id: "fail_hit_bus", label: "Fail HIT_BUS" },
             { id: "fail_late", label: "Fail LATE" },
-            { id: "story_recap", label: "Story Recap" }
+            { id: "story_recap", label: "Story Recap" },
+            { id: "credits",     label: "Credits" }
         ];
 
         const btnGap = 8;

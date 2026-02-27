@@ -469,18 +469,20 @@ class SuccessScreen extends EndScreenBase {
             if (option === "CONTINUE") {
                 triggerTransition(() => {
                     gameState.resetFlags();
-                    if (currentDayID < 5) currentUnlockedDay = Math.max(currentUnlockedDay, currentDayID + 1);
-                    gameState.setState(STATE_LEVEL_SELECT);
-                    if (mainMenu && mainMenu.timeWheel) {
-                        // Auto-select the next day so the level select opens on it
-                        if (currentDayID < 5) {
+                    if (currentDayID === 5) {
+                        // All five days complete — roll credits
+                        if (typeof resetCredits === 'function') resetCredits();
+                        gameState.setState(STATE_CREDITS);
+                    } else {
+                        currentUnlockedDay = Math.max(currentUnlockedDay, currentDayID + 1);
+                        gameState.setState(STATE_LEVEL_SELECT);
+                        if (mainMenu && mainMenu.timeWheel) {
                             let nextDay = currentDayID + 1;
                             mainMenu.timeWheel.selectedDay = nextDay;
-                            // Keep sidebar index in sync so day cards are centred correctly
                             mainMenu.timeWheel.targetIndex  = nextDay - 1;
                             mainMenu.timeWheel.currentIndex = nextDay - 1;
+                            mainMenu.timeWheel.triggerEntrance();
                         }
-                        mainMenu.timeWheel.triggerEntrance();
                     }
                 });
             } else if (option === "RESTART") {
