@@ -94,7 +94,7 @@
 
 | Week | Title | Documentation |
 |:---:|:---|:---:|
-| 01 | **Lab 1: List of Game Ideas** | [📂 ReadMe](./docs/Labs/Week_1_List_of_Ideas/README.md) |
+| 01 | **Lab 1: List of Game Ideas** | [📂 ReadMe](./docs/Labs/Week_1_List_of_Ideas/ReadMe.md) |
 | 02 | **Lab 2: Prototyping & Git** | [📂 ReadMe](./Labs/Week2/README.md) |
 | 03 | **Lab 3: Sprite Animation** | [📂 ReadMe](./Labs/Week3/README.md) |
 | 04 | **Lab 4: Game Physics** | [📂 ReadMe](./Labs/Week4/README.md) |
