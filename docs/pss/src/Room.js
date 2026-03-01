@@ -232,30 +232,37 @@ class RoomScene {
             image(assets.roomBg, width / 2, height / 2, assets.roomBg.width * s, assets.roomBg.height * s);
         }
 
-        // 3. Update and draw interaction indicators
-        this.checkInteraction();
+        // 3. Interaction indicators, tutorial hints, and UI — hidden during cutscenes
+        //    (the room background is reused as a backdrop; the cutscene owns the screen)
+        let _inCutscene = (typeof gameState !== 'undefined' &&
+                           typeof STATE_CUTSCENE !== 'undefined' &&
+                           gameState.currentState === STATE_CUTSCENE);
 
-        // Dismiss the movement tutorial once the player has walked 50px from spawn
-        if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'MOVE' &&
-            typeof player !== 'undefined') {
-            let dx = player.x - this.playerSpawnX;
-            let dy = player.y - this.playerSpawnY;
-            if (dx * dx + dy * dy > 50 * 50) {
-                tutorialHints.roomPhase = 'DESK';
-                tutorialHints.moveTutorialDone = true;
+        if (!_inCutscene) {
+            this.checkInteraction();
+
+            // Dismiss the movement tutorial once the player has walked 50px from spawn
+            if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'MOVE' &&
+                typeof player !== 'undefined') {
+                let dx = player.x - this.playerSpawnX;
+                let dy = player.y - this.playerSpawnY;
+                if (dx * dx + dy * dy > 50 * 50) {
+                    tutorialHints.roomPhase = 'DESK';
+                    tutorialHints.moveTutorialDone = true;
+                }
             }
+
+            this.drawInteractionIndicators();
+
+            // 4. Door-blocked dialogue box
+            this.dialogueBox.display();
+            this.drawTutorialHints();
+
+            // 5. Back button
+            this.backButton.isFocused = this.backButton.checkMouse(mouseX, mouseY);
+            this.backButton.update();
+            this.backButton.display();
         }
-
-        this.drawInteractionIndicators();
-
-        // 4. Door-blocked dialogue box
-        this.dialogueBox.display();
-        this.drawTutorialHints();
-
-        // 5. Back button
-        this.backButton.isFocused = this.backButton.checkMouse(mouseX, mouseY);
-        this.backButton.update();
-        this.backButton.display();
 
         // 6. Developer overlay
         this.drawRoomDevTools();

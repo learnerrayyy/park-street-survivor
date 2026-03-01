@@ -385,9 +385,10 @@ class SuccessScreen extends EndScreenBase {
     }
 
     display() {
-        if (assets.libraryBg) {
+        let libBg = (assets.csLibraryBg || assets.libraryBg);
+        if (libBg) {
             imageMode(CORNER);
-            image(assets.libraryBg, 0, 0, width, height);
+            image(libBg, 0, 0, width, height);
         } else {
             background(20);
         }

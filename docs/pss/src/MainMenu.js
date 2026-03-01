@@ -57,12 +57,27 @@ class MainMenu {
         let centerY = height - 250;
         let spacing = 420;
         this.buttons.push(new UIButton(width / 2 - spacing, centerY, 256, 96, "START", () => {
-            triggerTransition(() => {
-                this.menuState = STATE_LEVEL_SELECT;
-                gameState.currentState = STATE_LEVEL_SELECT;
-                this.timeWheel.bgAlpha = 0;
-                this.timeWheel.triggerEntrance();
-            });
+            if (typeof _prologueSeen !== 'undefined' && !_prologueSeen &&
+                typeof CS_PROLOGUE !== 'undefined' && typeof startCutscene === 'function') {
+                _prologueSeen = true;
+                triggerTransition(() => {
+                    startCutscene('news', CS_PROLOGUE, () => {
+                        triggerTransition(() => {
+                            this.menuState = STATE_LEVEL_SELECT;
+                            gameState.currentState = STATE_LEVEL_SELECT;
+                            this.timeWheel.bgAlpha = 0;
+                            this.timeWheel.triggerEntrance();
+                        });
+                    });
+                });
+            } else {
+                triggerTransition(() => {
+                    this.menuState = STATE_LEVEL_SELECT;
+                    gameState.currentState = STATE_LEVEL_SELECT;
+                    this.timeWheel.bgAlpha = 0;
+                    this.timeWheel.triggerEntrance();
+                });
+            }
         }));
         this.buttons.push(new UIButton(width / 2, centerY, 256, 96, "HELP", () => {
             triggerTransition(() => {

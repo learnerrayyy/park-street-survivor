@@ -20,6 +20,8 @@ let assets = {
     warningImg: null,
     bbg: null,
     libraryBg: null,
+    csNewsBg:  null,   // assets/dialogue/news.png  — prologue cutscene bg
+    csLibraryBg: null, // assets/dialogue/library.png — NPC cutscene + success screen bg
     irisSuccess: [],
     celebrateSheet: null,
     storyShape: null,
@@ -275,6 +277,10 @@ let tutorialHints = {
 // ─── SPLASH LOGO ANIMATION STATE ─────────────────────────────────────────────
 let titleDrop = { y: -200, vy: 0, landed: false, shake: 0 };
 
+// ─── WIN-CUTSCENE GUARD ───────────────────────────────────────────────────────
+// Prevents checkSettlementPoint() from triggering the NPC cutscene more than once.
+let _winCutscenePending = false;
+
 // ─── ITEM ENCYCLOPEDIA ───────────────────────────────────────────────────────
 const ITEM_WIKI = [
     // BUFFS (Help Page 2)
@@ -335,6 +341,8 @@ function preload() {
 
     assets.bbg         = loadImage('assets/background/bbg.png', itemLoaded);
     assets.libraryBg   = loadImage('assets/background/library.jpg', itemLoaded);
+    assets.csNewsBg    = loadImage('assets/dialogue/news.png',    itemLoaded);
+    assets.csLibraryBg = loadImage('assets/dialogue/library.png', itemLoaded);
 
     loadImage('assets/end_screen/spritesheet_celebrate.png', (img) => {
         let fW = img.width / 5;
@@ -500,6 +508,10 @@ function draw() {
                 drawLoadingScreen();
                 break;
 
+            case STATE_CUTSCENE:
+                drawCutsceneScreen();
+                break;
+
             case STATE_WARNING:
                 drawWarningScreen();
                 break;
@@ -660,8 +672,40 @@ function runGameLoop() {
 
     // Win condition: settlement point reached
     if (!freezeGameplay && levelController && levelController.checkSettlementPoint()) {
-        console.log("[runGameLoop] STATE_WIN triggered!");
-        gameState.setState(STATE_WIN);
+        if (!_winCutscenePending) {
+            _winCutscenePending = true;
+            let day = currentDayID;
+            console.log(`[runGameLoop] Settlement → NPC cutscene Day ${day}`);
+
+            if (day === 5) {
+                // Day 5: Charlotte dialogue → player choice → no endscreen
+                let day5Choices = [
+                    { label: "Don't Stay", cb: () => {
+                        triggerTransition(() => startCutscene('library', CS_DAY5_LEAVE, () => {
+                            triggerTransition(() => {
+                                _day5Ending = 'leave';
+                                resetCredits();
+                                gameState.setState(STATE_CREDITS);
+                            });
+                        }));
+                    }},
+                    { label: "Stay", cb: () => {
+                        triggerTransition(() => {
+                            _day5Ending = 'stay';
+                            resetCredits();
+                            gameState.setState(STATE_CREDITS);
+                        });
+                    }}
+                ];
+                triggerTransition(() => startCutscene('library', CS_DAY_NPC[5], null, day5Choices));
+
+            } else {
+                // Days 1–4: NPC dialogue → success end screen
+                triggerTransition(() => startCutscene('library', CS_DAY_NPC[day], () => {
+                    triggerTransition(() => gameState.setState(STATE_WIN));
+                }));
+            }
+        }
     }
 }
 
@@ -742,12 +786,25 @@ function keyPressed() {
     if (globalFade.isFading) return;
     let state = gameState.currentState;
 
+    // Cutscene: Enter/Space advances dialogue
+    if (state === STATE_CUTSCENE) {
+        if (keyCode === ENTER || keyCode === 13 || key === ' ') csAdvance();
+        return;
+    }
+
     // Credits screen: any key skips scroll/pause → poem, or exits poem → menu
     if (state === STATE_CREDITS) {
         if (_creditPhase === 'poem' && _creditPoemAlpha >= 255) {
-            triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+            if (_day5Ending === 'stay') {
+                let ending = _day5Ending; _day5Ending = null;
+                triggerTransition(() => startCutscene('library', CS_DAY5_STAY, () => {
+                    triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+                }));
+            } else {
+                triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+            }
         } else if (_creditPhase !== 'poem') {
-            _creditPhase = 'poem'; _creditPoemAlpha = 0; // skip to epilogue
+            _creditPhase = 'poem'; _creditPoemAlpha = 0;
         }
         return;
     }
@@ -782,7 +839,8 @@ function keyPressed() {
             state !== STATE_SETTINGS && state !== STATE_HELP &&
             state !== STATE_SPLASH && state !== STATE_INVENTORY &&
             state !== STATE_WARNING &&
-            state !== STATE_CREDITS) {
+            state !== STATE_CREDITS &&
+            state !== STATE_CUTSCENE) {
             playSFX(sfxClick);
             playSFX(sfxClick);
             togglePause();
@@ -1024,10 +1082,23 @@ function mousePressed() {
 
     let state = gameState.currentState;
 
+    // Cutscene: click advances or selects choice
+    if (state === STATE_CUTSCENE) {
+        csClick(mouseX, mouseY);
+        return;
+    }
+
     // Credits screen: click skips scroll/pause → poem, or exits poem → menu
     if (state === STATE_CREDITS) {
         if (_creditPhase === 'poem' && _creditPoemAlpha >= 255) {
-            triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+            if (_day5Ending === 'stay') {
+                let ending = _day5Ending; _day5Ending = null;
+                triggerTransition(() => startCutscene('library', CS_DAY5_STAY, () => {
+                    triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+                }));
+            } else {
+                triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+            }
         } else if (_creditPhase !== 'poem') {
             _creditPhase = 'poem'; _creditPoemAlpha = 0;
         }
@@ -1161,6 +1232,9 @@ function mouseDragged() {
  */
 function mouseMoved() {
     if (!gameState) return;
+    if (gameState.currentState === STATE_CUTSCENE) {
+        csMoveHover(mouseX, mouseY);
+    }
     if (gameState.currentState === STATE_FAIL || gameState.currentState === STATE_WIN) {
         if (endScreenManager) endScreenManager.handleMouseMove(mouseX, mouseY);
     }
@@ -1190,12 +1264,15 @@ function togglePause() {
  */
 function setupRun(dayID) {
     currentDayID = dayID;
+    _winCutscenePending = false;  // reset so the NPC cutscene can fire this run
+
     player.applyLevelStats(dayID);
     player.x = GLOBAL_CONFIG.lanes.lane1;
-    player.y = PLAYER_RUN_FOOT_Y;  // Player foot anchor for day run
+    player.y = PLAYER_RUN_FOOT_Y;
     roomScene.reset();
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
+
     if (typeof tutorialHints !== 'undefined') {
         if (dayID === 1 && !tutorialHints.uiTutorialDone) {
             tutorialHints.roomPhase  = 'UI_INTRO';
@@ -1209,7 +1286,22 @@ function setupRun(dayID) {
     if (backpackUI) backpackUI.resetForNewDay();
     if (endScreenManager) endScreenManager._activeScreen = null;
 
-    gameState.setState(STATE_ROOM);
+    // Room cutscene — only on first visit per day per session
+    if (typeof CS_DAY_ROOM !== 'undefined' && CS_DAY_ROOM[dayID] &&
+        !_roomCutsceneSeen[dayID]) {
+        _roomCutsceneSeen[dayID] = true;
+        // Place player at room starting position so bg looks correct
+        if (player) { player.x = 940; player.y = 550; }
+        startCutscene('room', CS_DAY_ROOM[dayID], () => {
+            // For Day 2+, skip to DESK phase (no movement tutorial needed again)
+            if (dayID > 1 && typeof tutorialHints !== 'undefined') {
+                tutorialHints.roomPhase = 'DESK';
+            }
+            gameState.setState(STATE_ROOM);
+        });
+    } else {
+        gameState.setState(STATE_ROOM);
+    }
 }
 
 /**

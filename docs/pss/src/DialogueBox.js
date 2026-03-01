@@ -1,7 +1,7 @@
 // Park Street Survivor - Dialogue Box
 // Responsibilities: Reusable typewriter-style dialogue overlay.
 // Renders a bottom-screen bar with a character portrait and word-by-word text reveal.
-// Any scene or system can trigger a line by calling trigger(text, portrait).
+// Any scene or system can trigger a line by calling trigger(text, portrait, speakerName).
 
 class DialogueBox {
 
@@ -14,13 +14,19 @@ class DialogueBox {
         this.wordInterval = 4;
         /** Assign a p5.Sound asset here to play a click on each appended word. */
         this.typingSfx    = null;
+        /**
+         * When true the box stays visible indefinitely — timer is ignored.
+         * Use this for cutscene/VN dialogue that the player advances manually.
+         */
+        this.persistent   = false;
 
         this.reset();
     }
 
     /**
-     * Resets all dialogue state to inactive.
+     * Resets all per-line state to inactive.
      * Call this whenever the owning scene reinitialises (e.g. RoomScene.reset()).
+     * Note: does NOT reset `persistent` — that is a configuration flag.
      */
     reset() {
         this.active        = false;
@@ -31,6 +37,7 @@ class DialogueBox {
         this.wordIndex     = 0;
         this.displayedText = "";
         this.wordTick      = 0;
+        this.speakerName   = "";
     }
 
     // ─── PUBLIC API ──────────────────────────────────────────────────────────
@@ -38,32 +45,42 @@ class DialogueBox {
     /**
      * Triggers a dialogue line.
      *
-     * @param {string}   text       The message to display.
-     * @param {p5.Image} [portrait] Character portrait image.
-     *                              Omit (or pass null) to use the default player portrait.
-     *
-     * Example — player speaks:
-     *   dialogueBox.trigger("I haven't packed my bag yet.");
-     *
-     * Example — NPC speaks:
-     *   dialogueBox.trigger("Hey! You dropped your student card!", npcPortraitImg);
+     * @param {string}   text          The message to display.
+     * @param {p5.Image} [portrait]    Character portrait (null → default player portrait).
+     * @param {string}   [speakerName] Name shown in a tag above the bar. Omit or "" to hide.
      */
-    trigger(text, portrait) {
+    trigger(text, portrait, speakerName) {
         this.active        = true;
         this.timer         = this.timerMax;
-        this.portraitImg   = portrait || null;   // null → player portrait resolved at render time
+        this.portraitImg   = portrait || null;
         this.fullText      = text;
         this.words         = text.trim().split(/\s+/);
         this.wordIndex     = 0;
         this.displayedText = "";
         this.wordTick      = 0;
+        this.speakerName   = speakerName || "";
     }
 
     /**
      * Returns true while the dialogue bar is visible on screen.
      */
     isActive() {
-        return this.active && this.timer > 0;
+        return this.active && (this.persistent || this.timer > 0);
+    }
+
+    /**
+     * Returns true once the typewriter has finished revealing all words.
+     */
+    isFinishedTyping() {
+        return this.wordIndex >= this.words.length;
+    }
+
+    /**
+     * Instantly reveals the complete text, skipping the typewriter animation.
+     */
+    skipToEnd() {
+        this.displayedText = this.fullText;
+        this.wordIndex     = this.words.length;
     }
 
     // ─── RENDERING ───────────────────────────────────────────────────────────
@@ -73,9 +90,13 @@ class DialogueBox {
      * Must be called once per frame from the owning scene's display() method.
      */
     display() {
-        if (!this.active || this.timer <= 0) return;
+        if (!this.active) return;
 
-        this.timer--;
+        // Timer-based auto-dismiss (skipped entirely in persistent mode)
+        if (!this.persistent) {
+            if (this.timer <= 0) return;
+            this.timer--;
+        }
 
         // ── Typewriter: append one word per interval ──────────────────────────
         if (this.wordIndex < this.words.length) {
@@ -97,7 +118,8 @@ class DialogueBox {
         const s = min(width / DESIGN_W, height / DESIGN_H);
 
         const alpha = 230;
-        const boxH  = 220 * s;
+        const boxH  = 320 * s;
+        const barY  = height - boxH;
 
         push();
 
@@ -105,7 +127,30 @@ class DialogueBox {
         rectMode(CORNER);
         noStroke();
         fill(56, 39, 96, alpha);
-        rect(0, height - boxH, width, boxH);
+        rect(0, barY, width, boxH);
+
+        // ── Speaker name tag (floats just above bar, aligned to text edge) ────
+        if (this.speakerName) {
+            const tagPadX = 18 * s;
+            const tagH    = 38 * s;
+            const tagX    = 496 * s;
+            const tagY    = barY - tagH - 2 * s;
+
+            // Measure name width before drawing so the tag auto-sizes
+            let fT = (typeof fonts !== 'undefined') ? (fonts.title || fonts.body) : null;
+            if (fT) textFont(fT);
+            textSize(20 * s);
+            const tagW = max(140 * s, textWidth(this.speakerName) + tagPadX * 2);
+
+            fill(56, 39, 96, 240);
+            stroke(200, 170, 100); strokeWeight(1.5 * s);
+            rectMode(CORNER);
+            rect(tagX, tagY, tagW, tagH, 7 * s);
+            noStroke();
+            fill(220, 190, 110);
+            textAlign(LEFT, CENTER);
+            text(this.speakerName, tagX + tagPadX, tagY + tagH / 2);
+        }
 
         // Character portrait
         const px    = 30 * s;
@@ -123,13 +168,14 @@ class DialogueBox {
             rect(px, py, pSize, pSize, 18 * s);
         }
 
-        // Dialogue text
+        // Dialogue text — ty/th are derived from barY so text never overflows the canvas
         const tx = 496 * s;
-        const ty = 932 * s;
+        const ty = barY + 60 * s;
         const tw = (DESIGN_W - 496 - 40) * s;
-        const th = (220 - 30) * s;
+        const th = height - ty - 24 * s;
 
-        if (typeof fonts !== 'undefined' && fonts.body) textFont(fonts.body);
+        let fB = (typeof fonts !== 'undefined' && fonts.body) ? fonts.body : null;
+        if (fB) textFont(fB);
         textSize(48);
         fill(255);
         noStroke();
@@ -138,8 +184,8 @@ class DialogueBox {
 
         pop();
 
-        // Auto-close when timer expires
-        if (this.timer <= 0) {
+        // Auto-close when timer expires (non-persistent only)
+        if (!this.persistent && this.timer <= 0) {
             this.active = false;
         }
     }
