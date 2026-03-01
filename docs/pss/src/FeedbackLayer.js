@@ -38,6 +38,45 @@ class FeedbackLayer {
         this.smallBusinessRipples = [];
         this.smallBusinessBadgeX = width / 2;
         this.smallBusinessBadgeY = height / 2;
+
+        // --- SFX Mapping Table ---
+        this.sfxMap = {
+
+            collision_generic: (payload) => {
+                const baseType = payload.type;
+                if (baseType === "SMALL_CAR" && typeof sfxHitSmallCar !== "undefined" && sfxHitSmallCar) {
+                    playSFX(sfxHitSmallCar);
+                    return;
+                }
+                // LARGE_CAR 或未知情况：先用 BigCar 当 generic fallback
+                if (typeof sfxHitBigCar !== "undefined" && sfxHitBigCar) {
+                    playSFX(sfxHitBigCar);
+                    return;
+                }
+            },
+
+            pickup_buff: (payload) => {
+                const baseType = payload.type;
+                if (baseType === "COFFEE" && typeof sfxPickupCoffee !== "undefined" && sfxPickupCoffee) {
+                    playSFX(sfxPickupCoffee);
+                    return;
+                }
+
+                if (baseType === "EMPTY_SCOOTER" && typeof sfxPickupScooter !== "undefined" && sfxPickupScooter) {
+                    playSFX(sfxPickupScooter);
+                    return;
+                }
+
+            },
+
+            collision_small_business: (payload) => {
+                if (typeof sfxSmallBusiness !== "undefined" && sfxSmallBusiness) {
+                    playSFX(sfxSmallBusiness);
+                }
+            }
+
+        };
+    
     }
 
     onCollision(type, context = {}) {
@@ -115,8 +154,19 @@ class FeedbackLayer {
         // if (eventName === "collision_small_business" && typeof sfxScold !== "undefined" && sfxScold) {
         //     playSFX(sfxScold);
         // }
-        void eventName;
-        void payload;
+        // 只在 Day Run 状态下播放
+        if (gameState.currentState !== STATE_DAY_RUN &&
+            !(gameState.currentState === STATE_PAUSED && 
+                gameState.previousState === STATE_DAY_RUN)) {
+            return;
+        }
+
+        const handler = this.sfxMap[eventName];
+
+        if (handler) {
+            handler(payload);
+        }
+
     }
 
     isHitStopActive() {

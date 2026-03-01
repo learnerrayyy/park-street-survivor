@@ -11,14 +11,9 @@ class DialogueBox {
         /** Display duration in frames (120 = 2 s at 60 fps). */
         this.timerMax     = 120;
         /** Frames between each appended word (lower = faster typing). */
-        this.wordInterval = 4;
+        this.wordInterval = 6;
         /** Assign a p5.Sound asset here to play a click on each appended word. */
-        this.typingSfx    = null;
-        /**
-         * When true the box stays visible indefinitely — timer is ignored.
-         * Use this for cutscene/VN dialogue that the player advances manually.
-         */
-        this.persistent   = false;
+        this.typingSfx    = sfxDialogue;
 
         this.reset();
     }

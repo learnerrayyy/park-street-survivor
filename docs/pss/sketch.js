@@ -370,9 +370,14 @@ function preload() {
 
     // Audio
     soundFormats('mp3', 'wav');
-    bgm = loadSound('assets/audio/music/MainTheme.mp3', itemLoaded);
+    bgm = loadSound('assets/audio/music/MainTheme.wav', itemLoaded);
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
     sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
+    sfxDialogue = loadSound('assets/audio/effects/Dialogue.mp3', itemLoaded);
+    sfxHitBigCar = loadSound('assets/audio/effects/HitBigCar.mp3', itemLoaded);
+    sfxHitSmallCar = loadSound('assets/audio/effects/HitSmallCar.mp3', itemLoaded);
+    sfxPickupCoffee = loadSound('assets/audio/effects/CoffeeDrink.wav', itemLoaded);
+    sfxPickupScooter = loadSound('assets/audio/effects/ScooterPick.wav', itemLoaded);
     // sfxScold = loadSound('assets/audio/effects/Scold.wav', itemLoaded); // TODO: add asset later
 
     // Control key sprites
