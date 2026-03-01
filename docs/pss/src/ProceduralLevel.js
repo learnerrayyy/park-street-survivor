@@ -4,64 +4,67 @@
 
 const MODE_PRESETS = {
   1: {
-    avgbuffPerWindow: 3.0,
-    buffGlobalMinGapSec: 5.0,
-    buffTypeMinGapSec: { COFFEE: 4, EMPTY_SCOOTER: 14.0 },
-    avgobPerWindow: 2.2,
-    obTypeMinGapSec: { LARGE_CAR: 6.0, PROMOTER: 8.0 },
+    avgobPerWindow: 4.0,
+    obTypeMinGapSec: { PROMOTER: 8.0, SCOOTER_RIDER: 8.0 },
     obWeights: {
-      LARGE_CAR: 0.8,
-      SMALL_CAR: 2.2,
-      SCOOTER_RIDER: 0.9,
-      HOMELESS: 1.0,
-      PROMOTER: 0.8,
-      SMALL_BUSINESS: 1.0
+      LARGE_CAR: 0.0,
+      SMALL_CAR: 1.0,
+      SCOOTER_RIDER: 0.5,
+      HOMELESS: 0.2,
+      PROMOTER: 0.9,
+      SMALL_BUSINESS: 1.0,
     },
-    minOnScreenOb: 1,
+    minOnScreenOb: 2,
     maxOnScreenOb: 4
   },
   2: {
-    avgbuffPerWindow: 0.6,
-    buffGlobalMinGapSec: 9.0,
-    buffTypeMinGapSec: { COFFEE: 10.0, EMPTY_SCOOTER: 16.0 },
-    avgobPerWindow: 3.0,
-    obTypeMinGapSec: { LARGE_CAR: 4.5, PROMOTER: 7.0 },
+    avgobPerWindow: 5.0,
+    obTypeMinGapSec: { LARGE_CAR: 6.0, PROMOTER: 7.0, SCOOTER_RIDER: 6.0 },
     obWeights: {
-      LARGE_CAR: 1.3,
-      SMALL_CAR: 1.8,
-      SCOOTER_RIDER: 1.0,
-      HOMELESS: 1.2,
-      PROMOTER: 1.0,
+      LARGE_CAR: 0.1,
+      SMALL_CAR: 1.0,
+      SCOOTER_RIDER: 0.2,
+      HOMELESS: 0.5,
+      PROMOTER: 0.8,
       SMALL_BUSINESS: 1.1,
       FANTASY_COFFEE: 0.5,
       PUDDLE: 0.8
     },
-    minOnScreenOb: 2,
-    maxOnScreenOb: 5
+    minOnScreenOb: 3,
+    maxOnScreenOb: 6
   },
   3: {
-    avgbuffPerWindow: 1.0,
-    buffGlobalMinGapSec: 7.5,
-    buffTypeMinGapSec: { COFFEE: 9.0, EMPTY_SCOOTER: 12.0 },
-    avgobPerWindow: 2.5,
+    avgobPerWindow: 6.0,
     obTypeMinGapSec: { LARGE_CAR: 5.0, PROMOTER: 7.0 },
     obWeights: {
-      LARGE_CAR: 0.9,
-      SMALL_CAR: 1.4,
-      SCOOTER_RIDER: 1.3,
-      HOMELESS: 1.6,
-      PROMOTER: 1.4,
-      SMALL_BUSINESS: 1.3,
+      LARGE_CAR: 0.5,
+      SMALL_CAR: 2.0,
+      SCOOTER_RIDER: 0.5,
+      HOMELESS: 0.6,
+      PROMOTER: 0.8,
+      SMALL_BUSINESS: 2.1,
       FANTASY_COFFEE: 0.8,
-      PUDDLE: 0.9
     },
-    minOnScreenOb: 1,
-    maxOnScreenOb: 4
+    minOnScreenOb: 5,
+    maxOnScreenOb: 7
   },
   4: {
-    avgbuffPerWindow: 0.4,
-    buffGlobalMinGapSec: 10.0,
-    buffTypeMinGapSec: { COFFEE: 12.0, EMPTY_SCOOTER: 18.0 },
+    avgobPerWindow: 3.6,
+    obTypeMinGapSec: { LARGE_CAR: 3.8, PROMOTER: 6.0 },
+    obWeights: {
+      LARGE_CAR: 1.8,
+      SMALL_CAR: 1.6,
+      SCOOTER_RIDER: 1.6,
+      HOMELESS: 1.1,
+      PROMOTER: 0.9,
+      SMALL_BUSINESS: 1.0,
+      FANTASY_COFFEE: 1.0,
+      PUDDLE: 1.2
+    },
+    minOnScreenOb: 2,
+    maxOnScreenOb: 6
+  },
+  5: {
     avgobPerWindow: 3.6,
     obTypeMinGapSec: { LARGE_CAR: 3.8, PROMOTER: 6.0 },
     obWeights: {
@@ -77,6 +80,7 @@ const MODE_PRESETS = {
     minOnScreenOb: 2,
     maxOnScreenOb: 6
   }
+
 };
 
 function createModeCycleConfig(modePattern, modePresets, windowSec = 5) {
@@ -101,7 +105,7 @@ const DIFFICULTY_PROGRESSION = {
     spawnConfig: {
       minObstacleInterval: 30
     },
-    modeCycleConfig: createModeCycleConfig([1, 2, 3, 1, 2, 3, 1, 2, 3, 4, 3], MODE_PRESETS, 5),
+    difficultyModeCycleConfig: createModeCycleConfig([1, 1, 2, 2, 1, 2, 1, 2, 1, 2, 1], MODE_PRESETS, 5),
     variants: {}
   },
 
@@ -111,7 +115,7 @@ const DIFFICULTY_PROGRESSION = {
     spawnConfig: {
       minObstacleInterval: 50
     },
-    modeCycleConfig: createModeCycleConfig([1, 2, 1, 3], MODE_PRESETS, 5),
+    difficultyModeCycleConfig: createModeCycleConfig([1, 2, 1, 2, 2, 2, 3, 2, 2, 1, 1, 2, 1], MODE_PRESETS, 5),
     variants: {}
   },
 
@@ -121,7 +125,7 @@ const DIFFICULTY_PROGRESSION = {
     spawnConfig: {
       minObstacleInterval: 40
     },
-    modeCycleConfig: createModeCycleConfig([2, 3, 2, 4], MODE_PRESETS, 5),
+    difficultyModeCycleConfig: createModeCycleConfig([1, 2, 2, 2, 3, 3, 2, 2, 3, 1, 2, 1, 2, 3, 1, 1, 1], MODE_PRESETS, 5),
     variants: {}
   },
 
@@ -131,7 +135,7 @@ const DIFFICULTY_PROGRESSION = {
     spawnConfig: {
       minObstacleInterval: 35
     },
-    modeCycleConfig: createModeCycleConfig([2, 4, 3, 4, 2], MODE_PRESETS, 5),
+    difficultyModeCycleConfig: createModeCycleConfig([2, 4, 3, 4, 2], MODE_PRESETS, 5),
     variants: {}
   },
 
@@ -141,7 +145,7 @@ const DIFFICULTY_PROGRESSION = {
     spawnConfig: {
       minObstacleInterval: 30
     },
-    modeCycleConfig: createModeCycleConfig([3, 4, 2, 4, 3, 4], MODE_PRESETS, 5),
+    difficultyModeCycleConfig: createModeCycleConfig([3, 4, 2, 4, 3, 4], MODE_PRESETS, 5),
     variants: {}
   }
 };

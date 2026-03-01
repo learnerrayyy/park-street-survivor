@@ -107,7 +107,12 @@ class ObstacleManager {
     }
 
     initializeBuffControlState(difficultyConfig) {
-        const cfg = difficultyConfig && difficultyConfig.buffControlConfig ? difficultyConfig.buffControlConfig : {};
+        const dayID = Number((typeof currentDayID !== "undefined" && currentDayID) ? currentDayID : 1);
+        const dayCfg = (typeof DAYS_CONFIG !== "undefined" && DAYS_CONFIG) ? DAYS_CONFIG[dayID] : null;
+        // Buff control is owned by per-day global config only.
+        const cfg = (dayCfg && dayCfg.buffControlConfig && typeof dayCfg.buffControlConfig === "object")
+            ? dayCfg.buffControlConfig
+            : {};
         const avgSecRaw = Number(cfg.avgRespawnSec || 6.0);
         const jitterRaw = Number(cfg.respawnJitter || 0);
         this.buffSpawnState.avgRespawnFrames = Math.max(1, this.secondsToFrames(Number.isFinite(avgSecRaw) ? avgSecRaw : 6.0));
