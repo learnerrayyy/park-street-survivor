@@ -95,7 +95,7 @@
 | Week | Title | Documentation |
 |:---:|:---|:---:|
 | 01 | **Lab 1: List of Game Ideas** | [📂 ReadMe](./docs/Labs/Week_1_List_of_Ideas/README.md) |
-| 02 | **Lab 2: Interactive Paint System** | [📂 ReadMe](./docs/Labs/Week_2_Paint_App/README.md) |
+| 02 | **Lab 2: Paint System & Game Brainstorming** | [📂 ReadMe](./docs/Labs/Week_2_Paint_App/README.md) |
 | 03 | **Lab 3: Sprite Animation** | [📂 ReadMe](./Labs/Week3/README.md) |
 | 04 | **Lab 4: Game Physics** | [📂 ReadMe](./Labs/Week4/README.md) |
 | 05 | **Lab 5: Collision Detection** | [📂 ReadMe](./Labs/Week5/README.md) |
