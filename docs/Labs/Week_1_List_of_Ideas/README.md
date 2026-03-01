@@ -42,7 +42,11 @@ Set in a "Cyber-Forest" invaded by a "Mechanical Virus." Players plant "Elementa
 - Interactive Terrain Modification: destroying "Old Tech Junk" grants currency and alters terrain properties
 
 ### Screenshots
-Carrot Fantasy, Genshin Impact screenshots (images referenced in original)
+**Carrot Fantasy (Grid Strategy & UI Inspiration)**
+<img src="assets/CY_Carrot_Fantasy.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+
+**Genshin Impact (Elemental Synergy & Visual Effects)**
+<img src="assets/CY_Genshin_Impact.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
 ### Possible Challenges
 1. Complexity of Interaction Rules - managing elemental combination rules
@@ -87,11 +91,11 @@ Carrot Fantasy, Genshin Impact screenshots (images referenced in original)
   - Noise-Cancelling Headphones: Automatically ignores negative social events (Promoters/Homeless) but blocks positive audio cues (Car horns).
 
 ### Screenshots
-Road Fighter (NES)
-<img width="970" height="770" alt="image" src="https://github.com/user-attachments/assets/95e15f57-3c0f-4b75-b591-b61719f4d6ed" />
+**Road Fighter (Vertical Scrolling & Obstacle Avoidance)**
+<img src="assets/CY_Road_Fighter.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
-Crossy Road screenshots
-<img width="1918" height="1186" alt="image" src="https://github.com/user-attachments/assets/67d5dca1-1978-4dc8-a356-9cce45c4e71f" />
+**Crossy Road (Voxel Aesthetic & Grid-based Movement)**
+<img src="assets/CY_Crossy_Road.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
 ### Possible Challenges
 1. Complex State Management
@@ -133,14 +137,19 @@ Main mechanics:
 - Reduce the number of rounds per run to 3–6.
 
 ## Screenshots
-Game start interface
-<img width="2560" height="1600" alt="image" src="https://github.com/user-attachments/assets/2ef86a1e-764a-4515-b734-1b1dda480347" />
-gameplay interface
-<img width="2560" height="1600" alt="image" src="https://github.com/user-attachments/assets/7bb34da8-5178-4cfc-835b-3960b4d94b9a" />
-scoring display
-<img width="2560" height="1600" alt="image" src="https://github.com/user-attachments/assets/6d312c57-a531-4d24-8b05-a4ddb1c824da" />
-shop page
-<img width="2560" height="1600" alt="image" src="https://github.com/user-attachments/assets/1d6de465-3125-4779-9fb5-a5f33eb5c5b5" />
+**Game Start Interface**
+<img src="assets/LZ_Balatro_Start.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+
+**Gameplay Interface**
+<img src="assets/LZ_Balatro_Round_Start.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+<br>
+<img src="assets/LZ_Balatro_In_Game.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+
+**Scoring Display**
+<img src="assets/LZ_Balatro_Score.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+
+**Shop Page**
+<img src="assets/LZ_Balatro_Shop.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
 ## Possible Challenges
 1. Hand score algorithm - detecting card combinations and calculating scores with element reactions
@@ -171,10 +180,15 @@ A multiplayer cooperative clearance game. Similar to Fireboy and Watergirl but a
 Add character abilities: each player’s chosen character has a different ability, such as jumping farther, being able to push blocks, creating temporary steps, etc.
 
 ### Screenshots:
-Start page
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/ba64cb78-f5f4-433e-9adc-d19d24cabbf2" />
-gameplay pages
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/8835aabb-dcb6-4e66-bf5b-7d9e705ef243" />
+**Start Page (Multiplayer Lobby)**
+<img src="assets/LZ_Pico_Park_Start.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+
+**Gameplay Interface (Level Mechanisms)**
+<img src="assets/LZ_Pico_Park_In_Game_1.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+
+<img src="assets/LZ_Pico_Park_In_Game_2.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+
+<img src="assets/LZ_Pico_Park_In_Game_3.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
 ### Possible Challenges:
 1. Input synchronization in multiplayer
@@ -205,8 +219,8 @@ Players control a bird that moves vertically along the screen's axis, navigating
 Unlike the linear, one-hit-death mechanic of the original Flappy Bird, our game introduces 360-degree freedom. The player controls a bird that can move on both X and Y axes with a sophisticated accele[...]
 
 ### Screenshots
-Flappy Bird screenshot
-<img width="650" height="365" alt="image" src="https://github.com/user-attachments/assets/74773eac-3998-42cf-a61a-66f4c2d556c7" />
+**Flappy Bird Screenshot (Core Loop Inspiration)**
+<img src="assets/RW_Flappy_Bird.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
 
 ### Possible Challenges
@@ -230,9 +244,12 @@ Super Mario Bros
 Players leap between platforms, collect items, stomp on enemies, and reach the finish line.
 
 ### Screenshots:
-Super Mario Bros screenshots
-<img width="900" height="501" alt="image" src="https://github.com/user-attachments/assets/f634249a-8634-450f-8296-dfb466315bb7" />
-<img width="900" height="501" alt="image" src="https://github.com/user-attachments/assets/8e54ad21-5f06-4184-a695-a5ad19f8faeb" />
+**Super Mario Bros - Level Design**
+<img src="assets/RW_Super_Mario_Bros_1.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+
+
+**Super Mario Bros - Gameplay Mechanics**
+<img src="assets/RW_Super_Mario_Bros_2.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
 ---
 
@@ -251,9 +268,8 @@ Tableturf Battle (from Splatoon 3)
 On a grid map, both sides compete to fill areas with color by placing blocks of different shapes (similar to Tetris). Each block must connect to existing areas of their own color. The player controlli[...]
 
 ### Screenshots:
-Tableturf Battle screenshot
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d2d16a91-65a3-4a63-a802-c2b8ad0fac7b" />
-
+**Tableturf Battle Screenshot (Grid Strategy)**
+<img src="assets/RW_Tableturf_Battle.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
 ### Possible Challenges:
 1. Intelligent AI Opponent
@@ -292,10 +308,11 @@ Tableturf Battle screenshot
 - Emotional Environmental Storytelling: world tells its story through ruins, lighting, sound, and silence
 
 ### Screenshots
-Fireboy and Watergirl screenshot
-<img width="900" height="506" alt="image" src="https://github.com/user-attachments/assets/7da1ddaf-39b6-491a-b112-15059576c545" />
-FEZ screenshot
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/a51d045b-376b-48a6-a294-f2e2084cfafe" />
+**Fireboy and Watergirl (Asymmetric Cooperation Reference)**
+<img src="assets/LP_Fireboy_and_Watergirl.jpg" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+
+**FEZ (World Perception & Mechanic Shift Reference)**
+<img src="assets/LP_FEZ.jpg" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
 ### Possible Challenges
 1. Rule State Management - managing different rule sets per level with clean transitions between mechanics
@@ -332,10 +349,11 @@ FEZ screenshot
 - **Character-as-Mechanic Design:** each monster is a living game mechanic
 
 ### Screenshots
-Monolith screenshot
-<img width="1024" height="768" alt="image" src="https://github.com/user-attachments/assets/2eb57b35-ea9b-4cbc-8596-6e669ce115d8" />
-Lemmings screenshot (images referenced in original)
-<img width="466" height="630" alt="image" src="https://github.com/user-attachments/assets/5553f9ee-da0b-4ab5-bd42-f49b2cfb7c80" />
+**Monolith (Pixel-art Style & Skill Activation Reference)**
+<img src="assets/LP_Monolith.jpg" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+
+**Lemmings (Indirect Control & Positioning Logic Reference)**
+<img src="assets/LP_Lemmings.jpg" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
 ### Possible Challenges
 1. AI Behaviour Coordination - designing AI for hero, enemies, and player-controlled monster
@@ -371,8 +389,8 @@ Grid-based lane defense where players place plants to repel zombies. Core loop: 
 - New Zombies: Studded Sled Zombie (accelerates on ice), Aurora Beacon Carrier (disrupts lighting plants)
 
 ### Screenshots
-Plants vs. Zombies screenshot
-<img width="2048" height="1536" alt="image" src="https://github.com/user-attachments/assets/9684feb0-771a-4f70-8ab7-0bcb1242abf3" />
+**Plants vs. Zombies (Core Lane-Defense Reference)**
+<img src="assets/KZ_Zombies_Plants.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
 ### Possible Challenges
 Possible Challenges
@@ -428,10 +446,11 @@ The game world remembers significant player actions over time. Locations gain hi
 Instead of choosing a predefined role or class, the player’s identity is formed dynamically through gameplay behavior. NPC attitudes, dialogue, and story outcomes adapt based on how the player lives[...]
 
 ## Screenshots
-Minecraft screenshot
-<img width="1538" height="812" alt="image" src="https://github.com/user-attachments/assets/99138510-4500-4f96-a9f1-ca22c32d8ae1" />
-Stardew Valley screenshot
-<img width="1192" height="704" alt="image" src="https://github.com/user-attachments/assets/c34a374c-0761-4fc2-986c-73c63811ab68" />
+**Minecraft (3D Voxel Building & Exploration Reference)**
+<img src="assets/YP_Minecraft.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
+
+**Stardew Valley (Farming, Social & Seasonal System Reference)**
+<img src="assets/YP_Stardew_Valley.png" width="800" style="border-radius: 8px; border: 1px solid #ddd;" />
 
 ## Possible Challenges
 - Accidentally causing damage to the environment may affect subsequent development, and an archive function can be established to address this issue.
