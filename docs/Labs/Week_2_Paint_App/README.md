@@ -16,7 +16,7 @@
 
 ## Live Demo & Source
 
-[**[ Click Here to Run Paint App ]**](https://uob-comsm0166.github.io/2026-group-7/docs/Labs/Week_2_Paint_App)
+[**[ Click Here to Run Paint App ]**](https://uob-comsm0166.github.io/2026-group-7/docs/Labs/Week_2_Paint_App/)
 
 [**View Source Code (sketch.js)**](./sketch.js)
 
@@ -77,6 +77,6 @@
 
 <div align="center">
 
-**[ Back to Project Home ](../../README.md)**
+**[ Back to Project Home ](../../../README.md)**
 
 </div>
