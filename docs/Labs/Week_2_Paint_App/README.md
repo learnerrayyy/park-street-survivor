@@ -1,10 +1,22 @@
 <div align="center">
 
-# Lab 2: Interactive Paint System
+# Lab 2: Interactive Paint System & Game Brainstorming
 
 <br>
 
-## Description
+## Summary
+
+| Deliverable | Description | Status |
+|:---:|:---|:---|
+| **Paint Application** | Advanced p5.js drawing tool with 7 brushes & symmetry | [Live Demo](#live-demo--source) |
+| **Idea 1: Survival** | Park Street Survivor (Top-down roguelike) | [Selected](#1-park-street-survivor-top-down-survival) |
+| **Idea 2: Co-op** | The Strongest Support (Asymmetric cooperative) | [Selected](#2-the-strongest-support-asymmetric-cooperative) |
+
+<br>
+
+---
+
+## Part 1: Interactive Paint Tool
 
 </div>
 
@@ -14,7 +26,7 @@
 
 <div align="center">
 
-## Live Demo & Source
+### Live Demo & Source
 
 [**[ Click Here to Run Paint App ]**](https://uob-comsm0166.github.io/2026-group-7/docs/Labs/Week_2_Paint_App/)
 
@@ -24,7 +36,7 @@
 
 ---
 
-## Catalog of Features
+### Catalog of Features
 
 | Category | Functionality | Key Mechanism |
 |:---:|:---|:---|
@@ -37,7 +49,7 @@
 
 ---
 
-## Core System Overview
+### Core System Overview
 
 </div>
 
@@ -61,17 +73,58 @@
 
 <br>
 
+---
+
 <div align="center">
 
-## Technical Challenges & Solutions
+## Part 2: Final Game Ideas Selection
 
 </div>
 
-1. **Input Synchronization:** Managing `pmouse` vs `mouse` coordinates across different layers to ensure smooth lines without "gaps" during high-speed movement.
-2. **State Management:** Utilizing a centralized `currentBrush` state machine to toggle between distinct rendering logic in a single `draw()` loop.
-3. **Right-Click Hijacking:** Overriding the browser's `contextmenu` to repurpose the right mouse button as a secondary eraser tool.
+> Based on our brainstorming sessions, we have decided to progress with the following **TWO IDEAS** for next week's workshop, balancing technical feasibility with creative gameplay.
 
 <br>
+
+### 1. Park Street Survivor (Top-down Survival)
+This is a fast-paced, top-down roguelike survival game set in the iconic Park Street of Bristol. Players must navigate through waves of increasingly difficult obstacles (inspired by local Bristol elements like seagulls or steep hills) while collecting "academic credits" to level up. The core mechanic focuses on strategic positioning and weapon upgrades, drawing inspiration from *Vampire Survivors*, but with a distinct local aesthetic that captures the unique challenge of climbing Bristol's famous slopes.
+
+<br>
+
+<p align="center">
+  <b>Road Fighter (Vertical Scrolling & Obstacle Avoidance)</b><br>
+  <img src="../Week_1_List_of_Ideas/assets/CY_Road_Fighter.png" width="800" style="display: block; margin: 0 auto; border-radius: 8px; border: 1px solid #ddd;" />
+</p>
+
+<br>
+
+<p align="center">
+  <b>Crossy Road (Voxel Aesthetic & Grid-based Movement)</b><br>
+  <img src="../Week_1_List_of_Ideas/assets/CY_Crossy_Road.png" width="800" style="display: block; margin: 0 auto; border-radius: 8px; border: 1px solid #ddd;" />
+</p>
+
+<br>
+
+### 2. The Strongest Support (Asymmetric Cooperative)
+A unique asymmetric cooperative game where one player takes on the role of the "Hero" facing challenges, while the other plays as the "Strongest Support." Unlike traditional co-op games, the supporter doesn't fight directly but manipulates the environment, provides strategic buffs, and manages resources to ensure the Hero's survival. This idea emphasizes communication and interdependent mechanics, drawing inspiration from *Keep Talking and Nobody Explodes* and *It Takes Two*, focusing on the "invisible hand" that guides a hero to victory.
+
+<br>
+
+<p align="center">
+  <b>Monolith (Pixel-art Style Reference)</b><br>
+  <img src="../Week_1_List_of_Ideas/assets/LP_Monolith.jpg" width="800" style="display: block; margin: 0 auto; border-radius: 8px; border: 1px solid #ddd;" />
+</p>
+
+<br>
+
+<p align="center">
+  <b>Lemmings (Indirect Control Reference)</b><br>
+  <img src="../Week_1_List_of_Ideas/assets/LP_Lemmings.jpg" width="800" style="display: block; margin: 0 auto; border-radius: 8px; border: 1px solid #ddd;" />
+</p>
+
+<br>
+
+<div align="center">
+
 
 ---
 
