@@ -1078,7 +1078,7 @@ class TestingPanel {
                 if (gameState && typeof gameState.setState === "function") {
                     gameState.setState(STATE_DAY_RUN);
                 } else if (gameState) {
-                    gameState.currentState = STATE_DAY_RUN;
+                    gameState.setState(STATE_DAY_RUN);;
                 }
             } catch (fallbackErr) {
                 console.error("[DEV] runDayDirect fallback failed:", fallbackErr);

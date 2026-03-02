@@ -42,26 +42,26 @@ class FeedbackLayer {
         // --- SFX Mapping Table ---
         this.sfxMap = {
 
-        collision_generic: (payload) => {
-            const baseType = payload.type;
+            collision_generic: (payload) => {
+                const baseType = payload.type;
 
-            if (baseType === "SMALL_CAR" && typeof sfxHitSmallCar !== "undefined" && sfxHitSmallCar) {
-                playSFX(sfxHitSmallCar, {
-                    id: 'collision_small_car',
-                    cooldownMs: 140,
-                    monophonic: true
-                });
-               return;
-            }
+                if (baseType === "SMALL_CAR" && typeof sfxHitSmallCar !== "undefined" && sfxHitSmallCar) {
+                    playSFX(sfxHitSmallCar, {
+                        id: 'collision_small_car',
+                        cooldownMs: 140,
+                        monophonic: true
+                    });
+                    return;
+                }
 
-            // LARGE_CAR 或未知情况：BigCar fallback
-            if (typeof sfxHitBigCar !== "undefined" && sfxHitBigCar) {
-                playSFX(sfxHitBigCar, {
-                    id: 'collision_big_car',
-                    cooldownMs: 160,
-                    monophonic: true
-                });
-                return;
+                // LARGE_CAR or unknown: use BigCar as generic fallback
+                if (typeof sfxHitBigCar !== "undefined" && sfxHitBigCar) {
+                    playSFX(sfxHitBigCar, {
+                        id: 'collision_big_car',
+                        cooldownMs: 160,
+                        monophonic: true
+                    });
+                    return;
                 }
             },
 
