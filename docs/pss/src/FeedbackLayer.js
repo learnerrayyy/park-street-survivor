@@ -42,39 +42,60 @@ class FeedbackLayer {
         // --- SFX Mapping Table ---
         this.sfxMap = {
 
-            collision_generic: (payload) => {
-                const baseType = payload.type;
-                if (baseType === "SMALL_CAR" && typeof sfxHitSmallCar !== "undefined" && sfxHitSmallCar) {
-                    playSFX(sfxHitSmallCar);
-                    return;
-                }
-                // LARGE_CAR 或未知情况：先用 BigCar 当 generic fallback
-                if (typeof sfxHitBigCar !== "undefined" && sfxHitBigCar) {
-                    playSFX(sfxHitBigCar);
-                    return;
+        collision_generic: (payload) => {
+            const baseType = payload.type;
+
+            if (baseType === "SMALL_CAR" && typeof sfxHitSmallCar !== "undefined" && sfxHitSmallCar) {
+                playSFX(sfxHitSmallCar, {
+                    id: 'collision_small_car',
+                    cooldownMs: 140,
+                    monophonic: true
+                });
+               return;
+            }
+
+            // LARGE_CAR 或未知情况：BigCar fallback
+            if (typeof sfxHitBigCar !== "undefined" && sfxHitBigCar) {
+                playSFX(sfxHitBigCar, {
+                    id: 'collision_big_car',
+                    cooldownMs: 160,
+                    monophonic: true
+                });
+                return;
                 }
             },
 
             pickup_buff: (payload) => {
                 const baseType = payload.type;
+
                 if (baseType === "COFFEE" && typeof sfxPickupCoffee !== "undefined" && sfxPickupCoffee) {
-                    playSFX(sfxPickupCoffee);
+                    playSFX(sfxPickupCoffee, {
+                        id: 'pickup_coffee',
+                        cooldownMs: 120,
+                        monophonic: true
+                    });
                     return;
                 }
 
                 if (baseType === "EMPTY_SCOOTER" && typeof sfxPickupScooter !== "undefined" && sfxPickupScooter) {
-                    playSFX(sfxPickupScooter);
+                    playSFX(sfxPickupScooter, {
+                        id: 'pickup_scooter',
+                        cooldownMs: 120,
+                        monophonic: true
+                    });
                     return;
                 }
-
             },
 
             collision_small_business: (payload) => {
                 if (typeof sfxSmallBusiness !== "undefined" && sfxSmallBusiness) {
-                    playSFX(sfxSmallBusiness);
+                    playSFX(sfxSmallBusiness, {
+                        id: 'collision_small_business',
+                        cooldownMs: 200,
+                        monophonic: true
+                    });
                 }
             }
-
         };
     
     }
@@ -141,19 +162,6 @@ class FeedbackLayer {
     }
 
     requestSFX(eventName, payload = {}) {
-        // SFX hook point for the future audio pass.
-        // Keep this centralized so balancing volume/priorities is easy.
-        //
-        // Example mappings (uncomment when assets are available):
-        // if (eventName === "collision_generic" && typeof sfxCollisionGeneric !== "undefined") {
-        //     playSFX(sfxCollisionGeneric);
-        // }
-        // if (eventName === "pickup_buff" && typeof sfxPickupBuff !== "undefined") {
-        //     playSFX(sfxPickupBuff);
-        // }
-        // if (eventName === "collision_small_business" && typeof sfxScold !== "undefined" && sfxScold) {
-        //     playSFX(sfxScold);
-        // }
         // 只在 Day Run 状态下播放
         if (gameState.currentState !== STATE_DAY_RUN &&
             !(gameState.currentState === STATE_PAUSED && 

@@ -165,7 +165,7 @@ function setupRunTestMode(dayOverride) {
     }
     if (obstacleManager) obstacleManager = new ObstacleManager();
     if (levelController) levelController.initializeLevel(dayID);
-    gameState.currentState = STATE_DAY_RUN;
+    gameState.setState(STATE_DAY_RUN);
 }
 
 /**
@@ -234,10 +234,6 @@ function devApplyStartupSkip() {
         console.log("[DEV] Opening Inventory screen directly");
     }
 
-    if (bgm && !bgm.isPlaying()) {
-        bgm.loop();
-        bgm.setVolume(masterVolumeBGM);
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1082,7 +1078,7 @@ class TestingPanel {
                 if (gameState && typeof gameState.setState === "function") {
                     gameState.setState(STATE_DAY_RUN);
                 } else if (gameState) {
-                    gameState.currentState = STATE_DAY_RUN;
+                    gameState.setState(STATE_DAY_RUN);;
                 }
             } catch (fallbackErr) {
                 console.error("[DEV] runDayDirect fallback failed:", fallbackErr);

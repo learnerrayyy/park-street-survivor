@@ -8,6 +8,8 @@ let endScreenManager;
 let testingPanel;
 let feedbackLayer;
 let tutorialDialogue;   // global dialogue box for tutorial page explanations
+let __sfxFrame = -1;
+let __sfxCounts = Object.create(null);
 
 // ─── GAME PROGRESS STATE ─────────────────────────────────────────────────────
 let currentUnlockedDay = 1;
@@ -41,7 +43,7 @@ let assets = {
     }
 };
 let fonts = {};
-let bgm, sfxSelect, sfxClick, sfxScold;
+let sfxSelect, sfxClick, sfxScold;
 
 // ─── AUDIO VOLUME CONTROLS ───────────────────────────────────────────────────
 let masterVolumeBGM = 0.25;
@@ -370,7 +372,15 @@ function preload() {
 
     // Audio
     soundFormats('mp3', 'wav');
-    bgm = loadSound('assets/audio/music/MainTheme.wav', itemLoaded);
+    bgms.Main = loadSound('assets/audio/music/MainTheme.wav', itemLoaded);
+    bgms.TimeRoom = loadSound('assets/audio/music/TimeRoom.mp3', itemLoaded);
+    bgms.Level12 = loadSound('assets/audio/music/Level12.mp3', itemLoaded);
+    bgms.Level34 = loadSound('assets/audio/music/Level34.mp3', itemLoaded);
+    bgms.Level5 = loadSound('assets/audio/music/Level5.mp3', itemLoaded);
+    bgms.Library = loadSound('assets/audio/music/Library.wav', itemLoaded);
+    bgms.EndL = loadSound('assets/audio/music/LifeEnding.mp3', itemLoaded);
+    bgms.EndD = loadSound('assets/audio/music/DeathEnding.mp3', itemLoaded);
+
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
     sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
     sfxDialogue = loadSound('assets/audio/effects/Dialogue.mp3', itemLoaded);
@@ -467,7 +477,6 @@ function preload() {
     });
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 2: ENGINE LIFECYCLE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -496,9 +505,11 @@ function setup() {
     tutorialDialogue.timerMax = 300;   // 5 s — long enough to read tutorial page explanations
 
     textFont(fonts.body);
-    gameState.currentState = STATE_LOADING;
+    gameState.setState(STATE_LOADING);
 
     if (developerMode) devApplyStartupSkip();
+
+    //debugHookBGMCalls();
 }
 
 /**
@@ -719,16 +730,69 @@ function runGameLoop() {
 // SECTION 3: AUDIO
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─── SFX ANTI-SPAM / ANTI-LAYER ─────────────────────────────────────────────
+const _sfxCooldownUntil = Object.create(null);  // {id: timestamp}
+
 /**
- * Plays a sound effect at the global SFX volume level.
+ * Plays a sound effect with global volume + anti-spam protection.
  */
-function playSFX(sound) {
-    if (sound) {
-        sound.setVolume(masterVolumeSFX);
-        sound.play();
+function playSFX(sound, opt = {}) {
+    try {
+        
+        // 1. basic check
+        if (!sound || typeof sound.isLoaded !== 'function' || !sound.isLoaded()) {
+            return; 
+        }
+
+        // 2. Ensure ID and attribute
+        const id = opt.id || sound._url || 'SFX';
+        const isUI = !!opt.ui || sound === sfxSelect || sound === sfxClick;
+
+        // Inside the `playSFX(){try}, add the following before the cooldown check:
+        if (__sfxFrame !== frameCount) {
+            // Clear at the beginning of each frame
+            __sfxFrame = frameCount;
+            __sfxCounts = Object.create(null);
+        }
+
+        __sfxCounts[id] = (__sfxCounts[id] || 0) + 1;
+
+        // 3. cooldownMs logic
+        const cooldownMs = (typeof opt.cooldownMs === 'number') ? opt.cooldownMs : (isUI ? 80 : 150);
+        const now = performance.now();
+        if (now < (_sfxCooldownUntil[id] || 0)) return;
+        _sfxCooldownUntil[id] = now + cooldownMs;
+
+        // 4. Mono/overlay logic processing
+        const monophonic = (typeof opt.monophonic === 'boolean') ? opt.monophonic : (!isUI);
+
+        if (monophonic && typeof sound.isPlaying === 'function' && sound.isPlaying()) {
+            // Optimization: Use jump(0) to reduce the overhead of reconnecting nodes.
+            try { 
+                sound.jump(0); 
+            } catch (jumpErr) { 
+                sound.stop(); 
+                sound.play(); 
+            }
+        } else {
+            // 5. Adjust volume and play.
+            const vol = (typeof masterVolumeSFX === 'number') ? masterVolumeSFX : 0.5;
+            sound.setVolume(vol);
+            sound.play();
+        }
+
+    } catch (e) {
+        // Capture all potential errors to prevent audio issues from crashing the game logic.
+        console.warn('[SFX] playSFX internal error:', e);
+    }
+    if (frameCount % 30 === 0) {
+        let topId = null, topN = 0;
+        for (const k in __sfxCounts) {
+            if (__sfxCounts[k] > topN) { topN = __sfxCounts[k]; topId = k; }
+        }
+        if (topN > 3) console.warn("[AUDIO] top playSFX calls:", topId, topN, __sfxCounts);
     }
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 4: TRANSITIONS
@@ -757,7 +821,13 @@ function renderGlobalFade() {
 
     if (globalFade.dir === 1 && globalFade.alpha >= 255) {
         globalFade.alpha = 255;
-        if (globalFade.callback) globalFade.callback();
+        if (globalFade.callback) {
+        try {
+            globalFade.callback();
+        } catch (e) {
+            console.error('[Transition] callback crashed:', e);
+        }
+    }
         globalFade.dir = -1;
     }
     if (globalFade.dir === -1 && globalFade.alpha <= 0) {
@@ -1059,6 +1129,14 @@ function handleRestartChoice() {
  * Dispatches mouse press events; also unlocks the Web Audio context on first click.
  */
 function mousePressed() {
+    
+        if (frameCount % 60 === 0) {
+            const ctx = (typeof getAudioContext === 'function') ? getAudioContext() : null;
+            if (ctx && ctx.state !== 'running') {
+                ctx.resume().catch(e => console.warn('[SFX] Context resume failed', e));
+            }
+        }
+    
     if (globalFade.isFading || !gameState) return;
 
     // Dev corner-drag: intercept before everything else
@@ -1114,10 +1192,7 @@ function mousePressed() {
     if (state === STATE_SPLASH) {
         if (getAudioContext().state !== 'running') getAudioContext().resume();
         playSFX(sfxClick);
-        if (bgm && !bgm.isPlaying()) {
-            bgm.setVolume(masterVolumeBGM);
-            bgm.loop();
-        }
+
         triggerTransition(() => gameState.setState(STATE_MENU));
         return;
     }

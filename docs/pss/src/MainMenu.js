@@ -64,7 +64,7 @@ class MainMenu {
                     startCutscene('news', CS_PROLOGUE, () => {
                         triggerTransition(() => {
                             this.menuState = STATE_LEVEL_SELECT;
-                            gameState.currentState = STATE_LEVEL_SELECT;
+                            gameState.setState(STATE_LEVEL_SELECT);
                             this.timeWheel.bgAlpha = 0;
                             this.timeWheel.triggerEntrance();
                         });
@@ -73,7 +73,7 @@ class MainMenu {
             } else {
                 triggerTransition(() => {
                     this.menuState = STATE_LEVEL_SELECT;
-                    gameState.currentState = STATE_LEVEL_SELECT;
+                    gameState.setState(STATE_LEVEL_SELECT);
                     this.timeWheel.bgAlpha = 0;
                     this.timeWheel.triggerEntrance();
                 });
@@ -221,7 +221,7 @@ class MainMenu {
 
         masterVolumeBGM = this.bgmSlider.value;
         masterVolumeSFX = this.sfxSlider.value;
-        if (bgm) bgm.setVolume(masterVolumeBGM);
+        if (typeof BGM !== 'undefined') BGM.syncVolume();
 
         // ── Difficulty selector (label centered, selector row below) ──────
         let diffLabelY = height / 2 + 145;

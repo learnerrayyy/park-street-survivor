@@ -38,6 +38,9 @@ let _csLastSyncIndex = -1;   // tracks last index synced to _csBox to avoid re-t
  * @param {Array}    [choices]  [{ label, cb }, ...] shown after the last line, or null
  */
 function startCutscene(bgType, lines, onComplete, choices = null) {
+    // set global marker so routeBGMByState can detect the specific cutscene
+    if (typeof BGM !== 'undefined') BGM.setCutsceneScene(bgType);
+    
     _cs.bg             = bgType;
     _cs.lines          = lines;
     _cs.index          = 0;

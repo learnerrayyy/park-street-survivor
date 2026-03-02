@@ -313,9 +313,6 @@ class Player {
      */
     drawTopBar() {
         push();
-        /*fill(56, 39, 96);
-        noStroke();
-        rect(0, 0, width, 170);*/
 
         this.drawHealthBar(165, 65);
         this.drawBackpackIcon(98, 85);
