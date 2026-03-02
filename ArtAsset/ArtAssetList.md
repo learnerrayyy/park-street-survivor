@@ -12,6 +12,7 @@ All background assets are standard **1920x1080** resolution unless otherwise spe
 | **bg_library**     | 1920x1080      | In library, player and NPC dialogue scene.                                                                  | ArtAsset\Background          |
 | **bg_news**        | 1920x1080      | News report on incident.                                                                                    | ArtAsset\Background         |
 | **bg_tutorial**        | 1920x1080      | Picture used in tutorial.                                                                                    | ArtAsset\Background         |
+| **bg_hospital**        | 1920x1080      | Hospital background.                                                                                   | ArtAsset\Background         |
 ## Dialogue & UI Backgrounds
 | **Asset Name**  | **Dimensions** | Description**                                                    | Path                        |
 | --------------- | -------------- | ---------------------------------------------------------------- | --------------------------- |
@@ -22,12 +23,12 @@ All background assets are standard **1920x1080** resolution unless otherwise spe
 ## Portraits
 | **Asset Name**         | **Dimensions** | **Description**                                                              | Path                                    |
 | ---------------------- | -------------- | ---------------------------------------------------------------------------- | --------------------------------------- |
-| **portrait_Iris**      | 380x380        | Dialogue portrait of the protagonist wearing a helmet and riding a scooter.  | ArtAsset\Character\Iris\portrait |
+| **portrait_ris**      | 380x380        | Dialogue portrait of the protagonist wearing a helmet and riding a scooter.  | ArtAsset\Character\Iris |
 | **portrait_wiola**     | 380x380        | Brown long hair, gentle, no glasses, wearing windbreaker.                    | ArtAsset\Character\Wiola                |
 | **portrait_layla**     | 380x380        | mysterious, short-haired, wearing a hoodie.                                  | ArtAsset\Character\Layla              |
-| **portrait_yuki**      | 380x380        | irritable, repetitive in speech, appears artificial/fake, curly hair, dress. |                                         |
-| **portrait_raymond**   | 380x380        | robot, abstract, eerie expression, long straight black hair T-shirt.         |                                         |
-| **portrait_charlotte** | 380x380        | Most normal, a true friend, short hair, red hair, leather jacket.            |                                         |
+| **portrait_yuki**      | 380x380        | irritable, repetitive in speech, appears artificial/fake, curly hair, dress. | ArtAsset\Character\Yuki                  |
+| **portrait_raymond**   | 380x380        | robot, abstract, eerie expression, long straight black hair T-shirt.         | ArtAsset\Character\Raymond                 |
+| **portrait_charlotte** | 380x380        | Most normal, a true friend, short hair, red hair, leather jacket.            | ArtAsset\Character\Charlotte                  |
 |                        |                |                                                                              |                                         |
 
 ## Sprite Sheets
@@ -74,3 +75,4 @@ The gameplay area is divided into four lanes: Lanes 1 & 4 (Sidewalks, 200px) and
 | ----------------- | -------------- | ---------------------- | ----------------- |
 | **icon_success**   | 300x300        | Iris celebrating. Used in success page.    | ArtAsset\UI |
 | **Frame**    | 1920x1080        | Story background frame            | ArtAsset\UI |
+| **dialog_box**    | 550x200        | In-game dialogue box.            | ArtAsset\UI |
