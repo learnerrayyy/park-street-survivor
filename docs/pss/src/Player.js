@@ -46,7 +46,7 @@ class Player {
         this.dir        = 'south';
         this.animFrame  = 0;
         this.isWalking  = false;
-        this.animSpeed  = 0.18;
+        this.animSpeed  = 0.12;  // room walk pace (was 0.18)
         this.runAnimSpeed = 0.28;
 
         // Status effects
@@ -173,7 +173,7 @@ class Player {
      * 4-directional movement for the bedroom scene, with collision detection via RoomScene.
      */
     handleRoomMovement() {
-        let s = 12; // was 8 — increased for snappier room navigation
+        let s = 7; // room walk speed (was 12)
         let oldX = this.x;
         let oldY = this.y;
         let moveX = 0;

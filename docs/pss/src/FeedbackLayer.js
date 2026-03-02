@@ -48,7 +48,7 @@ class FeedbackLayer {
                     playSFX(sfxHitSmallCar);
                     return;
                 }
-                // LARGE_CAR 或未知情况：先用 BigCar 当 generic fallback
+                // LARGE_CAR or unknown: use BigCar as generic fallback
                 if (typeof sfxHitBigCar !== "undefined" && sfxHitBigCar) {
                     playSFX(sfxHitBigCar);
                     return;
@@ -61,12 +61,10 @@ class FeedbackLayer {
                     playSFX(sfxPickupCoffee);
                     return;
                 }
-
                 if (baseType === "EMPTY_SCOOTER" && typeof sfxPickupScooter !== "undefined" && sfxPickupScooter) {
                     playSFX(sfxPickupScooter);
                     return;
                 }
-
             },
 
             collision_small_business: (payload) => {
@@ -76,7 +74,6 @@ class FeedbackLayer {
             }
 
         };
-    
     }
 
     onCollision(type, context = {}) {
@@ -141,32 +138,17 @@ class FeedbackLayer {
     }
 
     requestSFX(eventName, payload = {}) {
-        // SFX hook point for the future audio pass.
-        // Keep this centralized so balancing volume/priorities is easy.
-        //
-        // Example mappings (uncomment when assets are available):
-        // if (eventName === "collision_generic" && typeof sfxCollisionGeneric !== "undefined") {
-        //     playSFX(sfxCollisionGeneric);
-        // }
-        // if (eventName === "pickup_buff" && typeof sfxPickupBuff !== "undefined") {
-        //     playSFX(sfxPickupBuff);
-        // }
-        // if (eventName === "collision_small_business" && typeof sfxScold !== "undefined" && sfxScold) {
-        //     playSFX(sfxScold);
-        // }
-        // 只在 Day Run 状态下播放
+        // Only play SFX during day run (or paused mid-run)
         if (gameState.currentState !== STATE_DAY_RUN &&
-            !(gameState.currentState === STATE_PAUSED && 
+            !(gameState.currentState === STATE_PAUSED &&
                 gameState.previousState === STATE_DAY_RUN)) {
             return;
         }
 
         const handler = this.sfxMap[eventName];
-
         if (handler) {
             handler(payload);
         }
-
     }
 
     isHitStopActive() {

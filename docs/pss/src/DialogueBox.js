@@ -13,7 +13,12 @@ class DialogueBox {
         /** Frames between each appended word (lower = faster typing). */
         this.wordInterval = 6;
         /** Assign a p5.Sound asset here to play a click on each appended word. */
-        this.typingSfx    = sfxDialogue;
+        this.typingSfx    = (typeof sfxDialogue !== 'undefined') ? sfxDialogue : null;
+        /**
+         * When true the box stays visible indefinitely — timer is ignored.
+         * Use this for cutscene/VN dialogue that the player advances manually.
+         */
+        this.persistent   = false;
 
         this.reset();
     }
