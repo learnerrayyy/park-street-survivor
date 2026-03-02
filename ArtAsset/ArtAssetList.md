@@ -15,19 +15,18 @@ All background assets are standard **1920x1080** resolution unless otherwise spe
 ## Dialogue & UI Backgrounds
 | **Asset Name**  | **Dimensions** | Description**                                                    | Path                        |
 | --------------- | -------------- | ---------------------------------------------------------------- | --------------------------- |
-| **bg_game_end** | N/A            | A icon of Iris celebrating.                                      |                             |
 | **bg_bedroom**  | 1920x1080      | A cluttered student dormitory interior.                          | ArtAsset\Background\Bedroom |
-| **bg_hospital** | 1920x1080      | Interior view of a hospital ceiling featuring surgical lighting. |                             |
+| **bg_hospital** | 1920x1080      | Interior view of a hospital ceiling featuring surgical lighting. | ArtAsset\Background\Bedroom          |
 # 2. Character Assets
 ## Portraits
 | **Asset Name**         | **Dimensions** | **Description**                                                              | Path                                    |
 | ---------------------- | -------------- | ---------------------------------------------------------------------------- | --------------------------------------- |
-| **portrait_Iris**      | 380x380        | Dialogue portrait of the protagonist wearing a helmet and riding a scooter.  | ArtAsset\Character\Iris\portrait |
+| **portrait_ris**      | 380x380        | Dialogue portrait of the protagonist wearing a helmet and riding a scooter.  | ArtAsset\Character\Iris |
 | **portrait_wiola**     | 380x380        | Brown long hair, gentle, no glasses, wearing windbreaker.                    | ArtAsset\Character\Wiola                |
 | **portrait_layla**     | 380x380        | mysterious, short-haired, wearing a hoodie.                                  | ArtAsset\Character\Layla              |
-| **portrait_yuki**      | 380x380        | irritable, repetitive in speech, appears artificial/fake, curly hair, dress. |                                         |
-| **portrait_raymond**   | 380x380        | robot, abstract, eerie expression, long straight black hair T-shirt.         |                                         |
-| **portrait_charlotte** | 380x380        | Most normal, a true friend, short hair, red hair, leather jacket.            |                                         |
+| **portrait_yuki**      | 380x380        | irritable, repetitive in speech, appears artificial/fake, curly hair, dress. | ArtAsset\Character\Yuki                  |
+| **portrait_raymond**   | 380x380        | robot, abstract, eerie expression, long straight black hair T-shirt.         | ArtAsset\Character\Raymond                 |
+| **portrait_charlotte** | 380x380        | Most normal, a true friend, short hair, red hair, leather jacket.            | ArtAsset\Character\Charlotte                  |
 |                        |                |                                                                              |                                         |
 
 ## Sprite Sheets
@@ -49,7 +48,7 @@ The gameplay area is divided into four lanes: Lanes 1 & 4 (Sidewalks, 200px) and
 | **obstacle_scooter**   | 110x230        | A motorized scooter operated by a driver.                                  | ArtAsset\Obstacle |
 | **obstacle_kebab**    | 320x230        | Kebab stall on side-walk.| ArtAsset\Obstacle |
 | **obstacle_scoop**    | 270x311        | Ice cream stall on side-walk.| ArtAsset\Obstacle |
-| **obstacle_puddle**    | 260x120        | Environmental hazard; appears exclusively during rainy weather conditions. | ArtAsset\Obstacle |
+| **obstacle_puddle**    | 170x80        | Environmental hazard; appears exclusively during rainy weather conditions. | ArtAsset\Obstacle |
 ## Sidewalk Obstacles (Lanes 1 & 4)
 | **Asset Name**        | **Dimensions** | **Description**                                                 | Path              |
 | --------------------- | -------------- | --------------------------------------------------------------- | ----------------- |
@@ -74,3 +73,4 @@ The gameplay area is divided into four lanes: Lanes 1 & 4 (Sidewalks, 200px) and
 | ----------------- | -------------- | ---------------------- | ----------------- |
 | **icon_success**   | 300x300        | Iris celebrating. Used in success page.    | ArtAsset\UI |
 | **Frame**    | 1920x1080        | Story background frame            | ArtAsset\UI |
+| **dialog_box**    | 510x200        | In-game dialogue box.            | ArtAsset\UI |
