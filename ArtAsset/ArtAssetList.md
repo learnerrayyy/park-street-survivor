@@ -74,4 +74,4 @@ The gameplay area is divided into four lanes: Lanes 1 & 4 (Sidewalks, 200px) and
 | ----------------- | -------------- | ---------------------- | ----------------- |
 | **icon_success**   | 300x300        | Iris celebrating. Used in success page.    | ArtAsset\UI |
 | **Frame**    | 1920x1080        | Story background frame            | ArtAsset\UI |
-| **dialog_box**    | 510x200        | In-game dialogue box.            | ArtAsset\UI |
+| **dialog_box**    | 550x200        | In-game dialogue box.            | ArtAsset\UI |
