@@ -141,7 +141,9 @@ class RoomScene {
      *   ENTER near door — starts the day run.
      */
     handleKeyPress(keyCode) {
-        if (this.isPlayerNearDesk && keyCode === 69) {
+        const isConfirmKey = keyCode === 69 || keyCode === ENTER || keyCode === 13;
+
+        if (this.isPlayerNearDesk && isConfirmKey) {
             console.log("[RoomScene] Opening backpack");
             // Refresh desk items for the current day before opening
             if (typeof backpackUI !== 'undefined' && backpackUI) {
@@ -157,7 +159,7 @@ class RoomScene {
             }
         }
 
-        if (this.isPlayerNearDoor && (keyCode === ENTER || keyCode === 13)) {
+        if (this.isPlayerNearDoor && isConfirmKey) {
             // Tutorial gate: door is locked until the backpack phase is fully done
             if (typeof tutorialHints !== 'undefined' &&
                 tutorialHints.roomPhase !== 'DOOR' &&
@@ -337,30 +339,43 @@ class RoomScene {
 
         // ── Proximity prompt: tracks what the player is actually near ──
         // Door takes priority over desk so the correct prompt always shows.
-        let promptTarget = null;
+        let promptLabel = null;
         if (doorUnlocked && this.isPlayerNearDoor) {
-            promptTarget = { label: "LEAVE ROOM", key: 'enter' };
+            promptLabel = "LEAVE ROOM";
         } else if (this.isPlayerNearDesk) {
-            promptTarget = { label: "CHECK DESK", key: 'e' };
+            promptLabel = "CHECK DESK";
         }
 
-        if (promptTarget) {
+        if (promptLabel) {
             textAlign(CENTER, CENTER);
             textFont(fonts.title);
             textSize(22);
             fill(255, 216, 0, 180 + pulse * 75);
             noStroke();
-            text(`PRESS [${promptTarget.key.toUpperCase()}] TO ${promptTarget.label}`, width / 2, roomTopY);
+            text(`[E] / [ENTER]  TO ${promptLabel}`, width / 2, roomTopY);
 
-            if (assets.keys && assets.keys[promptTarget.key]) {
-                let sheet = assets.keys[promptTarget.key];
-                let frame = floor(frameCount / 15) % 3;
-                let sw    = sheet.width / 3;
-                imageMode(CENTER);
-                tint(255, 200 + pulse * 55);
-                image(sheet, width / 2, roomTopY - 60, 50, 40, frame * sw, 0, sw, sheet.height);
-                noTint();
+            // Show E icon and ENTER icon side by side above the text
+            let iconY  = roomTopY - 60;
+            let iconH  = 40;
+            let gap    = 14;
+            let frame  = floor(frameCount / 15) % 3;
+            let tintA  = 200 + pulse * 55;
+            imageMode(CENTER);
+            tint(255, tintA);
+
+            if (assets.keys && assets.keys.e) {
+                let sh = assets.keys.e;
+                let sw = sh.width / 3;
+                let iw = iconH * (sw / sh.height);
+                image(sh, width / 2 - iw / 2 - gap, iconY, iw, iconH, frame * sw, 0, sw, sh.height);
             }
+            if (assets.keys && assets.keys.enter) {
+                let sh = assets.keys.enter;
+                let sw = sh.width / 3;
+                let iw = iconH * (sw / sh.height);
+                image(sh, width / 2 + iw / 2 + gap, iconY, iw, iconH, frame * sw, 0, sw, sh.height);
+            }
+            noTint();
         }
 
         pop();

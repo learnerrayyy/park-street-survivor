@@ -491,83 +491,100 @@ class ObstacleManager {
         const textContent = String(obs.dialogue || "").trim();
         if (!textContent) return;
 
-        const bubble = this.getHomelessBubbleMetrics(obs, textContent);
+        // ── Image dimensions (510×200 source, displayed at fixed scale) ──────
+        const IMG_W      = 300;
+        const IMG_H      = Math.round(IMG_W * (200 / 510)); // ≈ 118
+        // Tail tip sits at roughly (80, 200) in source → (47, IMG_H) in display
+        const TAIL_TIP_X = Math.round(IMG_W * (80 / 510));  // ≈ 47 from left
+        const BODY_FRAC  = 0.78;   // main body occupies top 78 % of the image
+        const PAD_X      = Math.round(IMG_W * 0.07);        // ≈ 21
+        const PAD_Y      = Math.round(IMG_H * 0.10);        // ≈ 12
 
+        const cfg          = (obs && obs.config) || {};
+        const bubbleTextSize = Math.max(10, Number(cfg.bubbleTextSize || 14));
+        const headY        = obs.y - obs.height / 2;
+        const bubbleGap    = 6;
+
+        // Anchor: tail tip at obs.x, bottom of image at headY
+        let imgX = obs.x - TAIL_TIP_X;
+        let imgY = headY - IMG_H - bubbleGap;
+        imgX = constrain(imgX, 8, width - IMG_W - 8);
+        // Only render once there is room above the head — prevents the bubble from
+        // appearing at the top of the screen before the homeless sprite enters view.
+        if (imgY < 0) return;
+
+        // Draw image (or fallback rect)
+        const img = (typeof assets !== 'undefined') ? assets.dialogBox : null;
+        if (img) {
+            imageMode(CORNER);
+            noStroke();
+            image(img, imgX, imgY, IMG_W, IMG_H);
+        } else {
+            const bodyH = Math.round(IMG_H * BODY_FRAC);
+            noStroke();
+            fill(245, 245, 255, 240);
+            rect(imgX, imgY, IMG_W, bodyH, 10);
+            triangle(
+                imgX + TAIL_TIP_X - 10, imgY + bodyH,
+                imgX + TAIL_TIP_X + 10, imgY + bodyH,
+                imgX + TAIL_TIP_X,      imgY + IMG_H
+            );
+        }
+
+        // Draw text inside the content area (body only, above the tail)
+        const textMaxW = IMG_W - PAD_X * 2;
+        const lines    = this.wrapTextToWidth(textContent, textMaxW);
+        const lineH    = Math.round(bubbleTextSize * 1.35);
         textAlign(LEFT, TOP);
         textStyle(BOLD);
-        textSize(bubble.textSize);
-
-        noStroke();
-        fill(245, 245, 255, 240);
-        rect(bubble.x, bubble.y, bubble.w, bubble.h, 10);
-
-        // Fixed-size v1 bubble; future pass can map size to Y-depth.
-        const anchorX = constrain(obs.x + bubble.offsetX, bubble.x + 22, bubble.x + bubble.w - 22);
-        const tailBaseY = bubble.y + bubble.h;
-        triangle(
-            anchorX - 10, tailBaseY,
-            anchorX + 10, tailBaseY,
-            anchorX, tailBaseY + bubble.tailHeight
-        );
-
+        textSize(bubbleTextSize);
         fill(25, 25, 35);
-        for (let i = 0; i < bubble.lines.length; i++) {
-            const tx = bubble.x + bubble.textPaddingX;
-            const ty = bubble.y + bubble.textPaddingY + i * bubble.lineHeight;
-            // Draw twice with tiny offset to strengthen pixel-font weight.
-            text(bubble.lines[i], tx, ty);
-            text(bubble.lines[i], tx + 0.8, ty);
+        noStroke();
+        for (let i = 0; i < lines.length; i++) {
+            const tx = imgX + PAD_X;
+            const ty = imgY + PAD_Y + i * lineH;
+            text(lines[i], tx, ty);
+            text(lines[i], tx + 0.8, ty);
         }
     }
 
     getHomelessBubbleMetrics(obs, textContent) {
-        const cfg = (obs && obs.config) || {};
-        const bubbleOffsetX = Number(cfg.bubbleOffsetX || 0);
+        // Returns the rendered bounds for collision detection.
+        // Matches the fixed-size image layout used in displayHomelessDialogueBubble.
+        const IMG_W      = 300;
+        const IMG_H      = Math.round(IMG_W * (200 / 510)); // ≈ 118
+        const TAIL_TIP_X = Math.round(IMG_W * (80 / 510));  // ≈ 47
+        const BODY_FRAC  = 0.78;
+        const PAD_X      = Math.round(IMG_W * 0.07);
+        const PAD_Y      = Math.round(IMG_H * 0.10);
+
+        const cfg          = (obs && obs.config) || {};
         const bubbleTextSize = Math.max(10, Number(cfg.bubbleTextSize || 14));
-        const roadCenterX = (GLOBAL_CONFIG.lanes.lane2 + GLOBAL_CONFIG.lanes.lane3) / 2;
-        const towardRoadDir = obs.x <= roadCenterX ? 1 : -1;
-        const directionalOffsetX = bubbleOffsetX * towardRoadDir;
+        const headY        = obs.y - obs.height / 2;
+        const bubbleGap    = 6;
 
-        const minBubbleWidth = 180;
-        const maxBubbleWidth = 420;
-        const textPaddingX = 14;
-        const textPaddingY = 12;
-        const lineHeight = Math.round(bubbleTextSize * 1.35);
-        const tailHeight = 12;
-        const bubbleGap = 14;
+        let imgX = obs.x - TAIL_TIP_X;
+        let imgY = headY - IMG_H - bubbleGap;
+        imgX = constrain(imgX, 8, width - IMG_W - 8);
+        // No clamp: matches the render guard so hitbox is only active when bubble is visible.
 
-        textAlign(LEFT, TOP);
-        textStyle(BOLD);
-        textSize(bubbleTextSize);
-        const rawTextWidth = textWidth(textContent);
-        const preferredBubbleWidth = constrain(rawTextWidth + textPaddingX * 2, minBubbleWidth, maxBubbleWidth);
-        const textMaxWidth = preferredBubbleWidth - textPaddingX * 2;
-        const lines = this.wrapTextToWidth(textContent, textMaxWidth);
-        let maxLineWidth = 0;
-        for (const ln of lines) {
-            maxLineWidth = Math.max(maxLineWidth, textWidth(ln));
-        }
-        const bubbleW = constrain(maxLineWidth + textPaddingX * 2, minBubbleWidth, maxBubbleWidth);
-        const bubbleH = textPaddingY * 2 + lines.length * lineHeight;
-        const headY = obs.y - obs.height / 2;
-        const bubbleBottomY = headY - bubbleGap;
-        let bubbleY = bubbleBottomY - bubbleH;
-        let bubbleX = (obs.x + directionalOffsetX) - bubbleW / 2;
-        bubbleX = constrain(bubbleX, 12, width - bubbleW - 12);
-        bubbleY = max(106, bubbleY);
+        const bodyH    = Math.round(IMG_H * BODY_FRAC);
+        const lineH    = Math.round(bubbleTextSize * 1.35);
+        const textMaxW = IMG_W - PAD_X * 2;
+        const lines    = this.wrapTextToWidth(textContent, textMaxW);
 
         return {
-            x: bubbleX,
-            y: bubbleY,
-            w: bubbleW,
-            h: bubbleH,
+            x: imgX,
+            y: imgY,
+            w: IMG_W,
+            h: bodyH,          // hitbox covers the main body only (not the tail)
             lines: lines,
-            lineHeight: lineHeight,
-            textPaddingX: textPaddingX,
-            textPaddingY: textPaddingY,
-            tailHeight: tailHeight,
+            lineHeight: lineH,
+            textPaddingX: PAD_X,
+            textPaddingY: PAD_Y,
+            tailHeight: IMG_H - bodyH,
             textSize: bubbleTextSize,
-            offsetX: directionalOffsetX
+            offsetX: -TAIL_TIP_X
         };
     }
 

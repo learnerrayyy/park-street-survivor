@@ -22,8 +22,9 @@ let assets = {
     warningImg: null,
     bbg: null,
     libraryBg: null,
-    csNewsBg:  null,   // assets/dialogue/news.png  — prologue cutscene bg
+    csNewsBg:   null,   // assets/dialogue/news.png  — prologue cutscene bg
     csLibraryBg: null, // assets/dialogue/library.png — NPC cutscene + success screen bg
+    dialogBox:  null,  // assets/obstacles/dialog_box.png — homeless speech bubble
     irisSuccess: [],
     celebrateSheet: null,
     storyShape: null,
@@ -44,6 +45,7 @@ let assets = {
 };
 let fonts = {};
 let sfxSelect, sfxClick, sfxScold;
+let sfxDialogue, sfxHitBigCar, sfxHitSmallCar, sfxPickupCoffee, sfxPickupScooter;
 
 // ─── AUDIO VOLUME CONTROLS ───────────────────────────────────────────────────
 let masterVolumeBGM = 0.25;
@@ -53,6 +55,10 @@ let masterVolumeSFX = 0.7;
 // 0 = EASY (locked), 1 = NORMAL (default), 2 = HARD (locked)
 let gameDifficulty = 1;
 const DIFFICULTY_LABELS = ["EASY", "NORMAL", "HARD"];
+
+// ─── WIN-CUTSCENE GUARD ───────────────────────────────────────────────────────
+// Prevents checkSettlementPoint() from triggering the NPC cutscene more than once.
+let _winCutscenePending = false;
 
 // ─── GLOBAL BACKGROUND WITH OVERLAY ──────────────────────────────────────────
 /**
@@ -279,10 +285,6 @@ let tutorialHints = {
 // ─── SPLASH LOGO ANIMATION STATE ─────────────────────────────────────────────
 let titleDrop = { y: -200, vy: 0, landed: false, shake: 0 };
 
-// ─── WIN-CUTSCENE GUARD ───────────────────────────────────────────────────────
-// Prevents checkSettlementPoint() from triggering the NPC cutscene more than once.
-let _winCutscenePending = false;
-
 // ─── ITEM ENCYCLOPEDIA ───────────────────────────────────────────────────────
 const ITEM_WIKI = [
     // BUFFS (Help Page 2)
@@ -307,7 +309,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 48;
+const totalAssetsToLoad = 56;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -343,8 +345,9 @@ function preload() {
 
     assets.bbg         = loadImage('assets/background/bbg.png', itemLoaded);
     assets.libraryBg   = loadImage('assets/background/library.jpg', itemLoaded);
-    assets.csNewsBg    = loadImage('assets/dialogue/news.png',    itemLoaded);
-    assets.csLibraryBg = loadImage('assets/dialogue/library.png', itemLoaded);
+    assets.csNewsBg    = loadImage('assets/dialogue/news.png',              itemLoaded);
+    assets.csLibraryBg = loadImage('assets/dialogue/library.png',           itemLoaded);
+    assets.dialogBox   = loadImage('assets/obstacles/dialog_box.png',       itemLoaded);
 
     loadImage('assets/end_screen/spritesheet_celebrate.png', (img) => {
         let fW = img.width / 5;
@@ -383,10 +386,10 @@ function preload() {
 
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
     sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
-    sfxDialogue = loadSound('assets/audio/effects/Dialogue.mp3', itemLoaded);
-    sfxHitBigCar = loadSound('assets/audio/effects/HitBigCar.mp3', itemLoaded);
-    sfxHitSmallCar = loadSound('assets/audio/effects/HitSmallCar.mp3', itemLoaded);
-    sfxPickupCoffee = loadSound('assets/audio/effects/CoffeeDrink.wav', itemLoaded);
+    sfxDialogue      = loadSound('assets/audio/effects/DIalogue.mp3',   itemLoaded);
+    sfxHitBigCar     = loadSound('assets/audio/effects/HitBigCar.mp3',  itemLoaded);
+    sfxHitSmallCar   = loadSound('assets/audio/effects/HitSmallCar.mp3', itemLoaded);
+    sfxPickupCoffee  = loadSound('assets/audio/effects/CoffeeDrink.wav', itemLoaded);
     sfxPickupScooter = loadSound('assets/audio/effects/ScooterPick.wav', itemLoaded);
     // sfxScold = loadSound('assets/audio/effects/Scold.wav', itemLoaded); // TODO: add asset later
 
@@ -686,7 +689,7 @@ function runGameLoop() {
 
     if (levelController) { levelController.display(); }
 
-    // Win condition: settlement point reached
+    // Win condition: settlement point reached → NPC cutscene then win
     if (!freezeGameplay && levelController && levelController.checkSettlementPoint()) {
         if (!_winCutscenePending) {
             _winCutscenePending = true;
@@ -694,7 +697,7 @@ function runGameLoop() {
             console.log(`[runGameLoop] Settlement → NPC cutscene Day ${day}`);
 
             if (day === 5) {
-                // Day 5: Charlotte dialogue → player choice → no endscreen
+                // Day 5: Charlotte dialogue → player choice → credits
                 let day5Choices = [
                     { label: "Don't Stay", cb: () => {
                         triggerTransition(() => startCutscene('library', CS_DAY5_LEAVE, () => {
@@ -871,7 +874,7 @@ function keyPressed() {
     if (state === STATE_CREDITS) {
         if (_creditPhase === 'poem' && _creditPoemAlpha >= 255) {
             if (_day5Ending === 'stay') {
-                let ending = _day5Ending; _day5Ending = null;
+                _day5Ending = null;
                 triggerTransition(() => startCutscene('library', CS_DAY5_STAY, () => {
                     triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
                 }));
@@ -1113,8 +1116,8 @@ function handleRestartChoice() {
         triggerTransition(() => {
             showRestartChoice = false;
             player.applyLevelStats(currentDayID);
-            player.x = 500;
-            player.y = height / 2;
+            player.x = GLOBAL_CONFIG.lanes.lane1;
+            player.y = PLAYER_RUN_FOOT_Y;
             obstacleManager = new ObstacleManager();
             levelController.initializeLevel(currentDayID);
             if (endScreenManager) endScreenManager._activeScreen = null;
@@ -1175,7 +1178,7 @@ function mousePressed() {
     if (state === STATE_CREDITS) {
         if (_creditPhase === 'poem' && _creditPoemAlpha >= 255) {
             if (_day5Ending === 'stay') {
-                let ending = _day5Ending; _day5Ending = null;
+                _day5Ending = null;
                 triggerTransition(() => startCutscene('library', CS_DAY5_STAY, () => {
                     triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
                 }));

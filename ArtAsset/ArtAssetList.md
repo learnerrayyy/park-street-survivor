@@ -12,6 +12,7 @@ All background assets are standard **1920x1080** resolution unless otherwise spe
 | **bg_library**     | 1920x1080      | In library, player and NPC dialogue scene.                                                                  | ArtAsset\Background          |
 | **bg_news**        | 1920x1080      | News report on incident.                                                                                    | ArtAsset\Background         |
 | **bg_tutorial**        | 1920x1080      | Picture used in tutorial.                                                                                    | ArtAsset\Background         |
+| **bg_hospital**        | 1920x1080      | Hospital background.                                                                                   | ArtAsset\Background         |
 ## Dialogue & UI Backgrounds
 | **Asset Name**  | **Dimensions** | Description**                                                    | Path                        |
 | --------------- | -------------- | ---------------------------------------------------------------- | --------------------------- |

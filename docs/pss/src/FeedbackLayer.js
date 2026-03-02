@@ -76,7 +76,6 @@ class FeedbackLayer {
                     });
                     return;
                 }
-
                 if (baseType === "EMPTY_SCOOTER" && typeof sfxPickupScooter !== "undefined" && sfxPickupScooter) {
                     playSFX(sfxPickupScooter, {
                         id: 'pickup_scooter',
@@ -97,7 +96,6 @@ class FeedbackLayer {
                 }
             }
         };
-    
     }
 
     onCollision(type, context = {}) {
@@ -162,19 +160,17 @@ class FeedbackLayer {
     }
 
     requestSFX(eventName, payload = {}) {
-        // 只在 Day Run 状态下播放
+        // Only play SFX during day run (or paused mid-run)
         if (gameState.currentState !== STATE_DAY_RUN &&
-            !(gameState.currentState === STATE_PAUSED && 
+            !(gameState.currentState === STATE_PAUSED &&
                 gameState.previousState === STATE_DAY_RUN)) {
             return;
         }
 
         const handler = this.sfxMap[eventName];
-
         if (handler) {
             handler(payload);
         }
-
     }
 
     isHitStopActive() {
