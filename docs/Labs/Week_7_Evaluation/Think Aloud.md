@@ -23,7 +23,7 @@ Starting from the opening screen, please enter the game and complete what you be
 | 03:50 | Returned to Room           | “How do I leave now?”                      | 6s pause                       | Navigation          | No clear prompt to return to Room |
 | 04:10 | Found door                 | “Is this the exit?”                        | Hesitant click                 | Visual affordance   | Door marker not obvious           |
 
-## Summary：
+## Summary
 ### Current issues
 
 Players were able to understand the main menu and setting page quickly. The Start button was clear and did not cause confusion. However, once entering the Room phase, hesitation increased. Players were unsure what objects were interactive and spent time walking around without a clear goal. This suggests that the Room lacks strong visual guidance.  
@@ -37,4 +37,3 @@ Overall, the main problem is not the core gameplay itself, but the clarity of gu
 1. Strengthen prompts.  
 2. Improve visual hierarchy.  
 3. Make interaction points and constraints more explicit.  
-These adjustments should reduce hesitation and create a smoother onboarding experience.
