@@ -1074,6 +1074,13 @@ function keyPressed() {
     }
 
     // Promoter leaflet interaction: SPACE is consumed by obstacle system while active.
+    if (state === STATE_DAY_RUN && player &&
+        typeof player.handlePuddleEscapePress === 'function' &&
+        (keyCode === 32 || key === ' ')) {
+        if (player.handlePuddleEscapePress()) return false;
+    }
+
+    // Promoter leaflet interaction: SPACE is consumed by obstacle system while active.
     if (state === STATE_DAY_RUN && obstacleManager &&
         typeof obstacleManager.handlePromoterSpacePress === 'function' &&
         (keyCode === 32 || key === ' ')) {

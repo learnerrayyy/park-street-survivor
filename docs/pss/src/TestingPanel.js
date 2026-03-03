@@ -1091,6 +1091,11 @@ class TestingPanel {
             return;
         }
 
+        if (actionId === "run_selected_day_full") {
+            runDayDirect(this.selectedDay);
+            return;
+        }
+
         if (actionId === "run_selected_day") {
             applySingleModeLoopForDay(this.selectedDay, this.selectedModeId);
             runDayDirect(this.selectedDay);
@@ -1311,6 +1316,8 @@ class TestingPanel {
 
         this.drawDevActions(sectionX, cursorY + 6, sectionW, 170);
         cursorY += 176;
+        const devActionsH = this.drawDevActions(sectionX, cursorY + 6, sectionW, 84);
+        cursorY += devActionsH + 6;
         pop();
     }
 
@@ -1870,7 +1877,8 @@ class TestingPanel {
         // ── Row 1: gameplay shortcuts ──────────────────────────────────────
         const row1Buttons = [
             { id: "restart_current", label: "Restart Current" },
-            { id: "run_selected_day", label: `Run Day ${this.selectedDay} (M${this.selectedModeId})` },
+            { id: "run_selected_day_full", label: `Run Day ${this.selectedDay} Full` },
+            { id: "run_selected_day", label: `Run Day ${this.selectedDay} Mode M${this.selectedModeId}` },
             { id: "goto_room", label: "Go Room" },
             { id: "goto_pause", label: "Open Pause" },
             { id: "refill", label: "Refill HP" },
@@ -1884,14 +1892,13 @@ class TestingPanel {
         ];
 
         const btnGap = 8;
-        const btnH   = 34;
         const startX = x + 8;
-
+        const btnH = 38;
         const r1BtnW = floor((w - 16 - (row1Buttons.length - 1) * btnGap) / row1Buttons.length);
-        const r1Y    = y + 28;
+        const r1Y = y + 28;
 
         for (let i = 0; i < row1Buttons.length; i++) {
-            const b  = row1Buttons[i];
+            const b = row1Buttons[i];
             const bx = startX + i * (r1BtnW + btnGap);
             stroke(0); strokeWeight(1.2); fill(255);
             rect(bx, r1Y, r1BtnW, btnH, 6);
@@ -1923,10 +1930,10 @@ class TestingPanel {
         ];
 
         const r2BtnW = floor((w - 16 - (csButtons.length - 1) * btnGap) / csButtons.length);
-        const r2Y    = r2LabelY + 20;
+        const r2Y = r2LabelY + 20;
 
         for (let i = 0; i < csButtons.length; i++) {
-            const b  = csButtons[i];
+            const b = csButtons[i];
             const bx = startX + i * (r2BtnW + btnGap);
             stroke(0, 120); strokeWeight(1); fill(230, 240, 255);
             rect(bx, r2Y, r2BtnW, btnH, 6);
@@ -1935,5 +1942,7 @@ class TestingPanel {
             text(b.label, bx + r2BtnW / 2, r2Y + btnH / 2 + 1);
             this.devButtons.push({ id: b.id, x: bx, y: r2Y, w: r2BtnW, h: btnH });
         }
+
+        return r2Y + btnH + 16;
     }
 }
