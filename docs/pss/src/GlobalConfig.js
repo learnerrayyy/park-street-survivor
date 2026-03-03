@@ -16,8 +16,9 @@ const STATE_SPLASH = 9;
 const STATE_HELP = 10;
 const STATE_INVENTORY = 11;
 const STATE_WARNING  = 12;
-const STATE_CREDITS  = 13;
-const STATE_CUTSCENE = 14;
+const STATE_CREDITS     = 13;
+const STATE_CUTSCENE    = 14;
+const STATE_SAVE_CHOICE = 15;
 
 /**
  * Core canvas resolution, world-space boundaries, and scroll physics.

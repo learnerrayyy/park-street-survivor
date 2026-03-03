@@ -38,6 +38,9 @@ class DialogueBox {
         this.displayedText = "";
         this.wordTick      = 0;
         this.speakerName   = "";
+        this.options       = null;
+        /** Optional callback: (opt, index) => void — intercepts option clicks for echo/tracking. */
+        this.onOptionSelect = null;
     }
 
     // ─── PUBLIC API ──────────────────────────────────────────────────────────
@@ -49,7 +52,7 @@ class DialogueBox {
      * @param {p5.Image} [portrait]    Character portrait (null → default player portrait).
      * @param {string}   [speakerName] Name shown in a tag above the bar. Omit or "" to hide.
      */
-    trigger(text, portrait, speakerName) {
+    trigger(text, portrait, speakerName, options = null) {
         this.active        = true;
         this.timer         = this.timerMax;
         this.portraitImg   = portrait || null;
@@ -59,6 +62,7 @@ class DialogueBox {
         this.displayedText = "";
         this.wordTick      = 0;
         this.speakerName   = speakerName || "";
+        this.options = options;
     }
 
     /**
@@ -118,10 +122,15 @@ class DialogueBox {
         const s = min(width / DESIGN_W, height / DESIGN_H);
 
         const alpha = 230;
-        const boxH  = 320 * s;
+        const boxH  = 340 * s;
         const barY  = height - boxH;
 
         push();
+
+        const tx = this.portraitImg ? (496 * s) : (80 * s); 
+        const tw = (width - tx - 60 * s);
+        const ty = barY + 60 * s;
+        const th = height - ty - 24 * s;
 
         // Background bar
         rectMode(CORNER);
@@ -133,7 +142,7 @@ class DialogueBox {
         if (this.speakerName) {
             const tagPadX = 18 * s;
             const tagH    = 38 * s;
-            const tagX    = 496 * s;
+            const tagX    = tx;
             const tagY    = barY - tagH - 2 * s;
 
             // Measure name width before drawing so the tag auto-sizes
@@ -153,34 +162,88 @@ class DialogueBox {
         }
 
         // Character portrait
-        const px    = 30 * s;
-        const py    = 700 * s;
-        const pSize = 380 * s;
 
         imageMode(CORNER);
-        let portrait = this.portraitImg ||
-                       (typeof assets !== 'undefined' ? assets.portraitPlayerNormal : null);
-        if (portrait) {
-            image(portrait, px, py, pSize, pSize);
-        } else {
-            fill(255, 255, 255, 40);
-            noStroke();
-            rect(px, py, pSize, pSize, 18 * s);
+        if (this.portraitImg) {
+            const px    = 30 * s;
+            const py    = barY - 60 * s;
+            const pSize = 380 * s;
+            imageMode(CORNER);
+            image(this.portraitImg, px, py, pSize, pSize);
         }
 
         // Dialogue text — ty/th are derived from barY so text never overflows the canvas
-        const tx = 496 * s;
-        const ty = barY + 60 * s;
-        const tw = (DESIGN_W - 496 - 40) * s;
-        const th = height - ty - 24 * s;
 
         let fB = (typeof fonts !== 'undefined' && fonts.body) ? fonts.body : null;
         if (fB) textFont(fB);
-        textSize(48);
+        textSize(52 * s);
         fill(255);
         noStroke();
         textAlign(LEFT, TOP);
         text(this.displayedText, tx, ty, tw, th);
+
+        // ─── VN-STYLE CENTERED CHOICE PANEL ─────────────────────────────────
+        if (this.options && this.isFinishedTyping()) {
+            const n      = this.options.length;
+            const optH   = 84 * s;
+            const optGap = 26 * s;
+            const optW   = 820 * s;
+            const totalH = n * optH + (n - 1) * optGap;
+            // Center the block in the upper portion of screen (above the dialogue bar)
+            const panelCY  = barY * 0.5;
+            const startY   = panelCY - totalH / 2;
+            const optX     = width / 2 - optW / 2;
+            const optPadX  = 28 * s;
+            const accentW  = 6 * s;
+
+            let fB = (typeof fonts !== 'undefined') ? fonts.body : null;
+
+            this.options.forEach((opt, idx) => {
+                const btnY   = startY + idx * (optH + optGap);
+                const isHover = (mouseX > optX && mouseX < optX + optW &&
+                                 mouseY > btnY  && mouseY < btnY  + optH);
+
+                push();
+                rectMode(CORNER);
+
+                // Background — match dialogue bar color
+                fill(isHover ? color(72, 50, 120, 245) : color(56, 39, 96, 230));
+                stroke(isHover ? color(220, 185, 90, 255) : color(180, 148, 72, 160));
+                strokeWeight(1.5 * s);
+                rect(optX, btnY, optW, optH, 8 * s);
+
+                // Gold accent bar on hover
+                if (isHover) {
+                    noStroke();
+                    fill(220, 185, 70, 220);
+                    rect(optX, btnY, accentW, optH, 8 * s, 0, 0, 8 * s);
+                    cursor(HAND);
+                }
+
+                // Option text
+                noStroke();
+                fill(isHover ? color(255, 225, 120) : color(220, 200, 155));
+                if (fB) textFont(fB);
+                textSize(32 * s);
+                textAlign(LEFT, CENTER);
+                text(opt.label, optX + optPadX + (isHover ? accentW : 0), btnY + optH / 2);
+                pop();
+
+                // Click detection
+                if (isHover && mouseIsPressed) {
+                    mouseIsPressed = false;  // prevent click-through
+                    if (typeof this.onOptionSelect === 'function') {
+                    this.onOptionSelect(opt, idx);
+                } else {
+                    if (typeof opt.cb === 'function') {
+                        opt.cb();
+                    } else if (opt.nextIndex !== undefined) {
+                        if (typeof handleOptionSelect === 'function') handleOptionSelect(opt.nextIndex);
+                    }
+                }
+                }
+            });
+        }
 
         pop();
 

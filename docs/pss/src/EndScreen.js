@@ -340,14 +340,13 @@ class FailScreen extends EndScreenBase {
 
     executeSelection() {
         let option = this.options[this.selectedIndex];
-        
+
         if (this.stateStep === "MAIN") {
             if (option === "NEW GAME") {
-                // Switch to sub-menu layer
+                // Show the BACK TO ROOM / START RUN sub-menu
                 this.stateStep = "MODE_SELECT";
                 this.options = this.modeOptions;
-                this.selectedIndex = -1; // Reset highlight
-                if (typeof playSFX === 'function') playSFX(sfxClick);
+                this.selectedIndex = -1;
             } else if (option === "EXIT") {
                 triggerTransition(() => {
                     gameState.resetFlags();
@@ -358,12 +357,12 @@ class FailScreen extends EndScreenBase {
             if (option === "BACK TO ROOM") {
                 triggerTransition(() => {
                     gameState.resetFlags();
-                    setupRun(currentDayID); // Regular spawn in room
+                    if (player) { player.x = 940; player.y = 550; }
+                    gameState.setState(STATE_ROOM);
                 });
             } else if (option === "START RUN") {
                 triggerTransition(() => {
-                    gameState.resetFlags();
-                    setupRunDirectly(currentDayID); // Spawn directly on the street
+                    setupRunDirectly(currentDayID);
                 });
             }
         }
@@ -487,11 +486,10 @@ class SuccessScreen extends EndScreenBase {
                     }
                 });
             } else if (option === "RESTART") {
-                // Switch to sub-menu layer
+                // Show the BACK TO ROOM / START RUN sub-menu
                 this.stateStep = "MODE_SELECT";
                 this.options = this.modeOptions;
-                this.selectedIndex = -1; // Reset highlight
-                if (typeof playSFX === 'function') playSFX(sfxClick);
+                this.selectedIndex = -1;
             } else if (option === "EXIT") {
                 triggerTransition(() => {
                     gameState.resetFlags();
@@ -502,12 +500,12 @@ class SuccessScreen extends EndScreenBase {
             if (option === "BACK TO ROOM") {
                 triggerTransition(() => {
                     gameState.resetFlags();
-                    setupRun(currentDayID); // Regular spawn in room
+                    if (player) { player.x = 940; player.y = 550; }
+                    gameState.setState(STATE_ROOM);
                 });
             } else if (option === "START RUN") {
                 triggerTransition(() => {
-                    gameState.resetFlags();
-                    setupRunDirectly(currentDayID); // Spawn directly on the street
+                    setupRunDirectly(currentDayID);
                 });
             }
         }

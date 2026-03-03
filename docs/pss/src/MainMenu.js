@@ -37,13 +37,61 @@ class MainMenu {
             { id: 'e', a: "INTERACT", d: "Talk to NPCs or use items." },
             { id: 'p', a: "PAUSE", d: "Freeze time & system menu." }
         ];
-        this._helpCharacters = [
-            { name: "IRIS", desc: "UoB student rushing to class.", imgKey: "player", unlockDay: 1 },
-            { name: "WIOLA", desc: "Always prepared. Always calm.", imgKey: "npc_1", unlockDay: 1 },
-            { name: "LAYLA", desc: "Lived on coffee and questions.", imgKey: "bus_driver", unlockDay: 2 },
-            { name: "YUKI", desc: "Quiet. Observant.", imgKey: "npc_promoter", unlockDay: 3 },
-            { name: "RAYMOND", desc: "Steady and practical.", imgKey: "npc_promoter", unlockDay: 4 },
-            { name: "CHARLOTTE", desc: "Thoughtful. Direct.", imgKey: "npc_promoter", unlockDay: 5 }
+        // Character index for the wiki sub-navigation (page 1)
+        this._helpCharIndex = 0;
+
+        // ── Detailed character wiki data (one entry per NPC) ─────────────────
+        this._helpCharDetails = [
+            {
+                name: "WIOLA",
+                unlockDay: 1,
+                portraitKey: "portraitWiola",
+                mbti: "ENFJ",
+                mbtiLabel: "The Protagonist",
+                description: "Caring, enthusiastic, idealistic, organised, responsible. Loves reading books in her free time, but only reads crime novels. She is a bit of a mastermind and could crack any code within seconds. Her dream job is a cybercrime investigator — deleting your search history won't give you anonymity. Her only flaw is losing her temper when her friends don't look out for themselves. Sometimes called the \"Mama\" of the group.",
+                signature: "Black americano  ·  H&B supplements  ·  Yubi-key",
+                story: "Wiola and Iris worked together in Woodes Café during their undergraduate years. Apart from studying the same subject, they also survived long shifts and endured an annoying boss. They even briefly lived together when transitioning to new accommodations. Over the years they came truly close, like sisters, and even spent the Chinese New Year together. However, during their master's degree, Wiola had to move abroad for personal reasons. She would briefly visit Bristol for a few weeks, during which they had a lot of catching up to do."
+            },
+            {
+                name: "LAYLA",
+                unlockDay: 2,
+                portraitKey: "portraitLayla",
+                mbti: "ESFP",
+                mbtiLabel: "The Entertainer",
+                description: "Playful, enthusiastic, friendly, spontaneous. Has a vast social circle due to her continuous pursuit of new hobbies and interests. She likes to exercise and thrives on vitality — but besides staying active, she also loves puzzle solving and inventing new ideas. So don't challenge her to poker, basketball or pool if you're not ready to lose. Currently completing an internship at \"Frontier Developments\". She stays up-to-date on trends, making her the perfect plus-one for any social event.",
+                signature: "Gucci sunglasses  ·  Fitness tracker  ·  Tamagotchi",
+                story: "Layla and Iris met during their second undergraduate year when they both attended a \"language café\" aiming to explore new cultures in such a diverse city. They instantly connected and discovered a shared love of spontaneity, often spending evenings playing card games and cooking multicultural dishes. During this time, Iris also introduced Raymond and Layla so they could travel around Spain and Poland together."
+            },
+            {
+                name: "RAYMOND",
+                unlockDay: 3,
+                portraitKey: "portraitRaymond",
+                mbti: "INTJ",
+                mbtiLabel: "The Architect",
+                description: "Independent, strategic, logical, good sense of humour. Has a passion for travelling and exploring new cities — avoids tourist traps and prefers authentic local customs. Likes to debate abstract ideas while also joking around with friends, keeping a balance between intellect and humour. She enjoys bouldering, gaming and eating Pho. If you share a common inside joke with her, you know you're buddies.",
+                signature: "Carabiner  ·  Nintendo 3DS  ·  Yakinori coupon",
+                story: "Raymond and Iris go way back to middle school. They went to the same International department school in China and grew up together during their teenage years. Having each other's side through first heartbreaks and exam seasons inevitably made them best friends. They've stayed together ever since and chose to come to the UK together to study. During their undergraduate years, both went on a quest to make new friends — becoming especially close to Wiola and Charlotte."
+            },
+            {
+                name: "YUKI",
+                unlockDay: 4,
+                portraitKey: "portraitYuki",
+                mbti: "ISFJ",
+                mbtiLabel: "The Defender",
+                description: "Quiet, dependable, observant. Deeply caring but rarely shows it outwardly. Notices things others miss and remembers small details about the people she cares about. Prefers small gatherings over loud social events. Has a deep appreciation for Japanese street food culture — her idea of travelling involves finding the perfect ramen shop. She is calm under pressure, the kind of person who quietly fixes things before anyone realises they were broken.",
+                signature: "Hand cream  ·  Onigiri  ·  Mini succulent plant",
+                story: "Yuki met Iris in their second year at university, through a mutual friend. She was initially the quietest of the group — the one most likely to disappear mid-party and be found feeding stray cats outside. But once she let you in, she was completely loyal. She was also the first to notice when something was genuinely wrong with Iris — long before anyone else said anything aloud. [Story details to be added soon...]"
+            },
+            {
+                name: "CHARLOTTE",
+                unlockDay: 5,
+                portraitKey: "portraitCharlotte",
+                mbti: "ENTJ",
+                mbtiLabel: "The Commander",
+                description: "Decisive, passionate, resourceful. Charlotte commands any room she walks into — not because she demands attention but because she genuinely gives it. She is fiercely protective of the people she loves and doesn't shy away from saying the hard things. She's currently working at a theatre production company and is often found either stress-buying candles or spontaneously planning group trips nobody asked for.",
+                signature: "Planner notebook  ·  Lavender candle  ·  Vintage film camera",
+                story: "Charlotte and Iris first crossed paths during a group study session in the library — Iris had taken the last power socket, and Charlotte had politely but firmly asked her to share it. That was Year 1. By Year 2 they were inseparable. Charlotte became the planner, the organiser, the one who made sure the group actually showed up to things. During Iris's hardest year, Charlotte was the one who refused to stop checking in — even when nothing she said seemed to land. [Story details to be added soon...]"
+            }
         ];
         // Pre-filter ITEM_WIKI once — avoids Array.filter() on every draw frame
         this._helpBuffs = ITEM_WIKI.filter(item => item.type === 'BUFF');
@@ -57,6 +105,17 @@ class MainMenu {
         let centerY = height - 250;
         let spacing = 420;
         this.buttons.push(new UIButton(width / 2 - spacing, centerY, 256, 96, "START", () => {
+            // Only offer save/load on the very first START press this page load.
+            // If the player has already been in-game and returned to the menu,
+            // skip the prompt and go straight to level select.
+            const isFirstStart = (typeof _sessionStarted === 'undefined' || !_sessionStarted);
+            if (isFirstStart && typeof SaveSystem !== 'undefined' && SaveSystem.hasSave()) {
+                if (typeof _sessionStarted !== 'undefined') _sessionStarted = true;
+                if (typeof _saveChoiceIndex !== 'undefined') _saveChoiceIndex = 0;
+                triggerTransition(() => { gameState.setState(STATE_SAVE_CHOICE); });
+                return;
+            }
+            if (typeof _sessionStarted !== 'undefined') _sessionStarted = true;
             if (typeof _prologueSeen !== 'undefined' && !_prologueSeen &&
                 typeof CS_PROLOGUE !== 'undefined' && typeof startCutscene === 'function') {
                 _prologueSeen = true;
@@ -329,6 +388,8 @@ class MainMenu {
      */
     drawHelpScreen() {
         push();
+        drawingContext.save();
+        drawingContext.letterSpacing = "1.5px";
         drawOtherBgWithOverlay();
 
         // Header
@@ -391,38 +452,162 @@ class MainMenu {
                 textFont(fonts.body); fill(80); textSize(16); text(c.d, x + 145, y + 70, cw - 165);
             });
         }
-        // PAGE 1: Character wiki with per-day unlock states
+        // PAGE 1: Character wiki — one character per sub-page
         else if (this.helpPage === 1) {
-            // Use pre-cached array (no per-frame allocation)
-            let characters = this._helpCharacters;
-            let pulse = sin(frameCount * 0.1) * 30 + 80; // calculate once for all locked cards
+            const char      = this._helpCharDetails[this._helpCharIndex];
+            const n         = this._helpCharDetails.length;
+            const isUnlocked = char.unlockDay <= currentUnlockedDay ||
+                               (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
 
-            characters.forEach((char, i) => {
-                let x = sx + (i % 2) * (cw + gap);
-                let y = sy + floor(i / 2) * (ch + gap);
-                let isUnlocked = char.unlockDay <= currentUnlockedDay;
+            // ── Left portrait panel ────────────────────────────────────────
+            const lx = 90, ly = 155, lw = 510, lh = 710;
+            push();
+            rectMode(CORNER);
+            fill(15, 8, 35, 220);
+            stroke(180, 148, 72); strokeWeight(2);
+            rect(lx, ly, lw, lh, 16);
 
-                if (isUnlocked) {
-                    noStroke(); fill(240); rect(x, y, cw, ch, 12);
-
-                    let charImg = assets.previews[char.imgKey];
-                    if (charImg) {
-                        imageMode(CENTER);
-                        image(charImg, x + 75, y + ch / 2, 100, 100);
-                    }
-
-                    textAlign(LEFT, TOP);
-                    textFont(fonts.title); fill(20); textSize(18); text(char.name, x + 145, y + 35);
-                    textFont(fonts.body); fill(80); textSize(16); text(char.desc, x + 145, y + 70, cw - 165);
-                } else {
-                    // Locked state: dark card — use pre-computed pulse value
-                    fill(30); noStroke(); rect(x, y, cw, ch, 12);
-                    textAlign(CENTER, CENTER);
-                    textFont(fonts.title);
-                    fill(pulse); textSize(18);
-                    text(`LOCKED // DAY ${char.unlockDay}`, x + cw / 2, y + ch / 2);
+            if (isUnlocked) {
+                let portrait = assets[char.portraitKey];
+                if (portrait) {
+                    imageMode(CORNER);
+                    noStroke(); noTint();
+                    let maxW = lw - 16, maxH = lh - 16;
+                    let sc = min(maxW / portrait.width, maxH / portrait.height);
+                    let pw = portrait.width * sc, ph = portrait.height * sc;
+                    image(portrait, lx + (lw - pw) / 2, ly + (lh - ph) / 2, pw, ph);
                 }
-            });
+            } else {
+                // Locked portrait placeholder
+                textAlign(CENTER, CENTER);
+                textFont(fonts.title); fill(255, 215, 0); noStroke(); textSize(28);
+                text("???", lx + lw / 2, ly + lh / 2 - 30);
+                textFont(fonts.body); fill(200, 185, 120); textSize(20);
+                text(`Unlocks on Day ${char.unlockDay}`, lx + lw / 2, ly + lh / 2 + 20);
+            }
+            pop();
+
+            // ── Right info panel ───────────────────────────────────────────
+            const rx = 640, ry = 155, rw = 1190, rh = 710;
+            const pad = 36;
+            const tx  = rx + pad, tw = rw - pad * 2;
+
+            push();
+            rectMode(CORNER);
+            fill(15, 8, 35, 210);
+            stroke(180, 148, 72); strokeWeight(2);
+            rect(rx, ry, rw, rh, 16);
+
+            if (isUnlocked) {
+                noStroke();
+
+                // ── Character name ─────────────────────────────────────────
+                textFont(fonts.title);
+                textSize(52); textAlign(LEFT, TOP);
+                fill(255, 215, 0);
+                text(char.name, tx, ry + 26);
+
+                // ── Day badge ──────────────────────────────────────────────
+                const badgeX = rx + rw - pad - 116;
+                const badgeY = ry + 34;
+                fill(40, 28, 72); stroke(180, 148, 72); strokeWeight(1.5);
+                rectMode(CORNER); rect(badgeX, badgeY, 116, 34, 8);
+                noStroke(); fill(200, 175, 100);
+                textFont(fonts.body); textSize(18); textAlign(CENTER, CENTER);
+                text(`DAY ${char.unlockDay}`, badgeX + 58, badgeY + 17);
+
+                // ── MBTI badge ─────────────────────────────────────────────
+                const mbtiY = ry + 92;
+                fill(58, 32, 100); stroke(160, 120, 210); strokeWeight(1.5);
+                rectMode(CORNER); rect(tx, mbtiY, 160, 38, 10);
+                noStroke(); fill(200, 165, 245);
+                textFont(fonts.title); textSize(18); textAlign(LEFT, CENTER);
+                text(char.mbti, tx + 12, mbtiY + 19);
+                noStroke(); fill(170, 145, 210);
+                textFont(fonts.body); textSize(20); textAlign(LEFT, CENTER);
+                text(`— ${char.mbtiLabel}`, tx + 186, mbtiY + 19);
+
+                // ── Separator ──────────────────────────────────────────────
+                stroke(180, 148, 72, 70); strokeWeight(1);
+                line(tx, ry + 148, rx + rw - pad, ry + 148);
+
+                // ── Description ────────────────────────────────────────────
+                noStroke();
+                fill(140, 118, 90); textFont(fonts.body); textSize(17);
+                textAlign(LEFT, TOP);
+                text("ABOUT", tx, ry + 162);
+
+                fill(220, 210, 195); textSize(22);
+                text(char.description, tx, ry + 186, tw, 175);
+
+                // ── Separator ──────────────────────────────────────────────
+                stroke(180, 148, 72, 70); strokeWeight(1);
+                line(tx, ry + 375, rx + rw - pad, ry + 375);
+
+                // ── Signature items ────────────────────────────────────────
+                noStroke();
+                fill(140, 118, 90); textFont(fonts.body); textSize(17);
+                textAlign(LEFT, TOP);
+                text("SIGNATURE ITEMS", tx, ry + 389);
+
+                fill(255, 210, 90); textSize(22);
+                text(char.signature, tx, ry + 413);
+
+                // ── Separator ──────────────────────────────────────────────
+                stroke(180, 148, 72, 70); strokeWeight(1);
+                line(tx, ry + 453, rx + rw - pad, ry + 453);
+
+                // ── Story ──────────────────────────────────────────────────
+                noStroke();
+                fill(140, 118, 90); textFont(fonts.body); textSize(17);
+                textAlign(LEFT, TOP);
+                text("STORY", tx, ry + 467);
+
+                fill(205, 193, 178); textSize(22);
+                text(char.story, tx, ry + 491, tw, 200);
+
+            } else {
+                // Locked — solid gold, no animation
+                textAlign(CENTER, CENTER);
+                noStroke();
+                textFont(fonts.title); fill(255, 215, 0); textSize(30);
+                text("LOCKED", rx + rw / 2, ry + rh / 2 - 30);
+                textFont(fonts.body); fill(200, 185, 120); textSize(22);
+                text(`Meet this character on Day ${char.unlockDay}`, rx + rw / 2, ry + rh / 2 + 20);
+            }
+            pop();
+
+            // ── Character sub-navigation (arrows + counter) ────────────────
+            const charNavY = 900;
+            const charNavLX = width / 2 - 120;
+            const charNavRX = width / 2 + 120;
+
+            textAlign(CENTER, CENTER);
+            textFont(fonts.body); textSize(22);
+            stroke(0, 0, 0, 160); strokeWeight(3); fill(255, 215, 0);
+            text(`${this._helpCharIndex + 1}  /  ${n}`, width / 2, charNavY);
+            noStroke(); fill(255, 215, 0);
+            text(`${this._helpCharIndex + 1}  /  ${n}`, width / 2, charNavY);
+
+            if (assets.backImg) {
+                if (this._helpCharIndex > 0) {
+                    let lhov = dist(mouseX, mouseY, charNavLX, charNavY) < 28;
+                    push(); translate(charNavLX, charNavY);
+                    if (lhov) scale(1.25);
+                    imageMode(CENTER); tint(lhov ? 255 : 170);
+                    image(assets.backImg, 0, 0, 38, 38);
+                    noTint(); pop();
+                }
+                if (this._helpCharIndex < n - 1) {
+                    let rhov = dist(mouseX, mouseY, charNavRX, charNavY) < 28;
+                    push(); translate(charNavRX, charNavY);
+                    scale(-1, 1);
+                    if (rhov) scale(1.25, 1.25);
+                    imageMode(CENTER); tint(rhov ? 255 : 170);
+                    image(assets.backImg, 0, 0, 38, 38);
+                    noTint(); pop();
+                }
+            }
         }
         // PAGE 2 & 3: Item encyclopedia (Buffs or Hazards)
         else {
@@ -514,6 +699,7 @@ class MainMenu {
 
         fill(150); textSize(18);
         text("PRESS [ESC] TO BACK", width / 2, height - 55);
+        drawingContext.restore();
         pop();
     }
 
@@ -526,10 +712,25 @@ class MainMenu {
         if (globalFade.isFading) return;
 
         if (this.menuState === STATE_HELP) {
-            if ((keyCode === RIGHT_ARROW || keyCode === 68) && this.helpPage < 3) {
-                playSFX(sfxSelect); this.helpPage++;
-            } else if ((keyCode === LEFT_ARROW || keyCode === 65) && this.helpPage > 0) {
-                playSFX(sfxSelect); this.helpPage--;
+            const n = this._helpCharDetails.length;
+            if (keyCode === RIGHT_ARROW || keyCode === 68) {
+                if (this.helpPage === 1 && this._helpCharIndex < n - 1) {
+                    // Navigate to next character within the wiki page
+                    playSFX(sfxSelect); this._helpCharIndex++;
+                } else if (this.helpPage < 3) {
+                    // Move to next help page (reset char index when entering wiki)
+                    playSFX(sfxSelect); this.helpPage++;
+                    if (this.helpPage === 1) this._helpCharIndex = 0;
+                }
+            } else if (keyCode === LEFT_ARROW || keyCode === 65) {
+                if (this.helpPage === 1 && this._helpCharIndex > 0) {
+                    // Navigate to previous character within the wiki page
+                    playSFX(sfxSelect); this._helpCharIndex--;
+                } else if (this.helpPage > 0) {
+                    // Move to previous help page
+                    playSFX(sfxSelect); this.helpPage--;
+                    if (this.helpPage === 1) this._helpCharIndex = n - 1;
+                }
             }
         }
 
@@ -591,11 +792,29 @@ class MainMenu {
                 let arrowRightX = width / 2 + 200;
                 if (this.helpPage > 0 && dist(mx, my, arrowLeftX, arrowY) < 35) {
                     playSFX(sfxSelect); this.helpPage--;
+                    if (this.helpPage === 1) this._helpCharIndex = this._helpCharDetails.length - 1;
                     return;
                 }
                 if (this.helpPage < 3 && dist(mx, my, arrowRightX, arrowY) < 35) {
                     playSFX(sfxSelect); this.helpPage++;
+                    if (this.helpPage === 1) this._helpCharIndex = 0;
                     return;
+                }
+
+                // Character sub-navigation arrows (only on wiki page)
+                if (this.helpPage === 1) {
+                    const charNavY  = 900;
+                    const charNavLX = width / 2 - 120;
+                    const charNavRX = width / 2 + 120;
+                    const n = this._helpCharDetails.length;
+                    if (this._helpCharIndex > 0 && dist(mx, my, charNavLX, charNavY) < 28) {
+                        playSFX(sfxSelect); this._helpCharIndex--;
+                        return;
+                    }
+                    if (this._helpCharIndex < n - 1 && dist(mx, my, charNavRX, charNavY) < 28) {
+                        playSFX(sfxSelect); this._helpCharIndex++;
+                        return;
+                    }
                 }
             }
             if (this.menuState === STATE_SETTINGS) {

@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(sips -g pixelWidth -g pixelHeight /Users/charlotteyu/Desktop/2026-group-7/docs/pss/assets/obstacles/dialog_box.png)"
+      "Bash(sips -g pixelWidth -g pixelHeight /Users/charlotteyu/Desktop/2026-group-7/docs/pss/assets/obstacles/dialog_box.png)",
+      "Bash(git stash push -m \"local-changes-before-upstream-merge\")"
     ]
   }
 }

@@ -124,8 +124,9 @@ const BGM = (() => {
                     // - stay  -> EndD
                     return (_day5Ending === 'leave') ? 'EndL' : 'EndD';
                 }
-                // Otherwise: normal library cutscenes (Days 1–4 NPC settlement dialogues)
-                return 'Library';
+                // Otherwise: normal library cutscenes (Days 1–4 NPC settlement dialogues).
+                // Fall back to TimeRoom until a dedicated Library track is added.
+                return _has('Library') ? 'Library' : 'TimeRoom';
             }
             // Other cutscenes (e.g. room dialogue/news) — keep current BGM
             return null;
