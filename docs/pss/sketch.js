@@ -518,12 +518,12 @@ function preload() {
 
     const portraitPath = 'assets/characters/portrait/';
 
-    assets.portraitPlayerNormal = loadImage('assets/characters/portrait/main.png', itemLoaded);
-    assets.portraitWiola        = loadImage(portraitPath + 'Wiola.png', itemLoaded);
-    assets.portraitLayla        = loadImage(portraitPath + 'Layla.png', itemLoaded);
-    assets.portraitRaymond      = loadImage(portraitPath + 'Raymond.png', itemLoaded);
-    assets.portraitYuki         = loadImage(portraitPath + 'Yuki.png', itemLoaded);
-    assets.portraitCharlotte     = loadImage(portraitPath + 'Charlotte.png', itemLoaded);
+    assets.portraitPlayerNormal = loadImage(portraitPath + 'portrait_iris.png', itemLoaded);
+    assets.portraitWiola        = loadImage(portraitPath + 'portrait_wiola.png', itemLoaded);
+    assets.portraitLayla        = loadImage(portraitPath + 'portrait_layla.png', itemLoaded);
+    assets.portraitRaymond      = loadImage(portraitPath + 'portrait_raymond.png', itemLoaded);
+    assets.portraitYuki         = loadImage(portraitPath + 'portrait_yuki.png', itemLoaded);
+    assets.portraitCharlotte     = loadImage(portraitPath + 'portrait_charlotte.png', itemLoaded);
 
     // Player directional frame animation (uses authored frame PNGs directly)
     assets.playerAnim = {};
