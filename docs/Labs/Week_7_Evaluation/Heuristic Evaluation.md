@@ -39,3 +39,42 @@ Issue: The purpose or flow of the dialog page is currently ambiguous.
 Improvement: Refine Text Hierarchy and Placement.
 
 Solution: Standardize the dialog UI by placing a dedicated text box at the bottom of the screen. Use a "Tap to Continue" indicator (like a blinking arrow) to signal that there is more text, making the interaction intuitive.
+
+## 5. Backpack Repetition
+
+Issue: Players feel confused and frustrated by having to repeatedly place the same mandatory items into the backpack every day.
+
+Improvement: Reduce Repetitive Interaction.
+
+Solution: Automatically fix mandatory daily items into permanent backpack slots. Only optional or strategic items remain selectable. This removes redundant actions and streamlines pre-level preparation.
+
+## 6. Lack of Tutorial
+
+Issue: Players are confused about UI elements, movement boundaries, and the effects of obstacles during levels.
+
+Improvement: Introduce Structured Onboarding.
+
+Solution: Add a tutorial sequence before the first gameplay session. The tutorial will clearly explain:
+
+- UI elements (stamina bar, timer, indicators)
+
+- Movement boundaries and playable area
+
+- Obstacle effects and consequences
+
+
+## 7. Level Length
+
+Issue: Players report that levels feel too long, which reduces engagement and pacing quality.
+
+Improvement: Optimize Level Duration.
+
+Solution: Shorten overall level length by reducing total travel distance or adjusting progression pacing. Maintain challenge while improving tempo and player retention.
+
+## 8. Dialog UI Clarity
+
+Issue: The instruction and interaction flow of the dialog page are unclear to users.
+
+Improvement: Integrate Dialog Guidance into Tutorial.
+
+Solution: Include a clear explanation of dialog interaction within the tutorial. Demonstrate how to proceed (e.g., tap to continue), and ensure visual cues are consistent throughout gameplay.
