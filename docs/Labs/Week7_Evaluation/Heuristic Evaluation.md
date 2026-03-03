@@ -1,3 +1,4 @@
+# Heuristic Evaluation
 
 | **Interface**             | **Issue**                                                      | **Heuristic(s)**                | **Frequency**                           | **Impact**                              | **Persistence**                             | **Severity**                             |
 | ------------------------- | -------------------------------------------------------------- | ------------------------------- | --------------------------------------- | --------------------------------------- | ------------------------------------------- | ---------------------------------------- |
@@ -9,3 +10,31 @@
 | without tutorial page     | lack of tutorial                                               | Help and documentation          | 4                                       | 3                                       | 3                                           | 3.33                                     |
 | level design              | too much dialogs                                               | Aesthetic and minimalist design | 0                                       | 0                                       | 0                                           | **0.00**                                 |
 | ui                        | instruction of dialog page is not clear                        | Help and documentation          | 1                                       | 0                                       | 0                                           | **0.33**                                 |
+
+## 1. Item Management (Backpack)
+Issue: The backpack interface feels repetitive or redundant when selecting core items.
+
+Improvement: Implement Fixed Core Slots.
+
+Solution: Lock the two mandatory items in place by default. This reduces cognitive load and clicks, allowing the user to focus exclusively on selecting optional power-ups or strategic items.
+
+## 2. Onboarding & Guidance (Tutorial)
+Issue: New players lack direction and don't understand game mechanics.
+
+Improvement: Introduce an Integrated Tutorial & Glossary.
+
+Solution: Add a "How to Play" overlay at the start of the first session. Include a visual encyclopedia (Tooltips or a Help Page) that clearly defines the effects of power-ups and the threats posed by specific obstacles.
+
+## 3. Narrative Pacing (Dialogs)
+Issue: Large amounts of text can frustrate players who prefer action over story.
+
+Improvement: Add a Global "Skip" Function.
+
+Solution: Place a "Skip" or "Fast-Forward" button in the corner of dialog sequences. This empowers the user with control over their pace while keeping the script available for story-driven players.
+
+## 4. UI Clarity (Dialog Interface)
+Issue: The purpose or flow of the dialog page is currently ambiguous.
+
+Improvement: Refine Text Hierarchy and Placement.
+
+Solution: Standardize the dialog UI by placing a dedicated text box at the bottom of the screen. Use a "Tap to Continue" indicator (like a blinking arrow) to signal that there is more text, making the interaction intuitive.
