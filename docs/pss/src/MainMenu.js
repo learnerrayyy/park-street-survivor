@@ -15,13 +15,20 @@ class MainMenu {
         this.setupButtons();
 
         this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => this.handleBackAction());
-        this.bgmSlider = new UISlider(width / 2, height / 2 - 80, 400, 0, 1, masterVolumeBGM, "BGM VOLUME");
-        this.sfxSlider = new UISlider(width / 2, height / 2 + 50, 400, 0, 1, masterVolumeSFX, "SFX VOLUME");
+        this.bgmSlider = new UISlider(width / 2, height / 2 - 80, 400, 0, 1, masterVolumeBGM, "MUSIC VOLUME");
+        this.sfxSlider = new UISlider(width / 2, height / 2 + 50, 400, 0, 1, masterVolumeSFX, "SOUND EFFECTS");
 
-        // Difficulty selector state
+        // Difficulty selector state (kept for save-system compatibility)
         this.difficultyIndex = gameDifficulty;  // 0=EASY, 1=NORMAL, 2=HARD
         this.diffToastText = "";
         this.diffToastTimer = 0;
+
+        // ── Difficulty select / confirm / load-game screen state ──────────
+        this.diffSelectIndex   = 1;   // 0=Easy, 1=Normal, 2=Difficult (keyboard focus)
+        this.selectedDifficulty = -1; // confirmed selection before showing confirm screen
+        this.diffInfoShown     = -1;  // which ! info panel is open (-1 = none)
+        this.diffConfirmBtnIndex = 0; // 0=CONFIRM, 1=BACK (keyboard focus on confirm screen)
+        this.loadGameIndex     = 0;   // 0=New Game, 1=Continue (keyboard focus on load screen)
 
         // Mute state tracking for settings menu
         this.isBGMMuted = false;
@@ -105,38 +112,13 @@ class MainMenu {
         let centerY = height - 250;
         let spacing = 420;
         this.buttons.push(new UIButton(width / 2 - spacing, centerY, 256, 96, "START", () => {
-            // Only offer save/load on the very first START press this page load.
-            // If the player has already been in-game and returned to the menu,
-            // skip the prompt and go straight to level select.
-            const isFirstStart = (typeof _sessionStarted === 'undefined' || !_sessionStarted);
-            if (isFirstStart && typeof SaveSystem !== 'undefined' && SaveSystem.hasSave()) {
-                if (typeof _sessionStarted !== 'undefined') _sessionStarted = true;
-                if (typeof _saveChoiceIndex !== 'undefined') _saveChoiceIndex = 0;
-                triggerTransition(() => { gameState.setState(STATE_SAVE_CHOICE); });
-                return;
-            }
-            if (typeof _sessionStarted !== 'undefined') _sessionStarted = true;
-            if (typeof _prologueSeen !== 'undefined' && !_prologueSeen &&
-                typeof CS_PROLOGUE !== 'undefined' && typeof startCutscene === 'function') {
-                _prologueSeen = true;
-                triggerTransition(() => {
-                    startCutscene('news', CS_PROLOGUE, () => {
-                        triggerTransition(() => {
-                            this.menuState = STATE_LEVEL_SELECT;
-                            gameState.setState(STATE_LEVEL_SELECT);
-                            this.timeWheel.bgAlpha = 0;
-                            this.timeWheel.triggerEntrance();
-                        });
-                    });
-                });
-            } else {
-                triggerTransition(() => {
-                    this.menuState = STATE_LEVEL_SELECT;
-                    gameState.setState(STATE_LEVEL_SELECT);
-                    this.timeWheel.bgAlpha = 0;
-                    this.timeWheel.triggerEntrance();
-                });
-            }
+            // Go to difficulty selection screen
+            triggerTransition(() => {
+                this.diffSelectIndex    = 1;   // default highlight on NORMAL
+                this.diffInfoShown      = -1;
+                this.selectedDifficulty = -1;
+                gameState.setState(STATE_DIFF_SELECT);
+            });
         }));
         this.buttons.push(new UIButton(width / 2, centerY, 256, 96, "HELP", () => {
             triggerTransition(() => {
@@ -162,7 +144,9 @@ class MainMenu {
         imageMode(CORNER);
         if (this.menuState === STATE_LEVEL_SELECT) {
             // Level select uses its own background drawn by TimeWheel
-        } else if (this.menuState === STATE_SETTINGS || this.menuState === STATE_HELP) {
+        } else if (this.menuState === STATE_SETTINGS || this.menuState === STATE_HELP ||
+                   this.menuState === STATE_DIFF_SELECT || this.menuState === STATE_DIFF_CONFIRM ||
+                   this.menuState === STATE_LOAD_GAME) {
             // Background drawn inside each sub-screen via drawOtherBgWithOverlay()
         } else {
             if (assets.menuBg) image(assets.menuBg, 0, 0, width, height);
@@ -170,10 +154,13 @@ class MainMenu {
         }
 
         switch (this.menuState) {
-            case STATE_MENU: this.drawHomeScreen(); break;
-            case STATE_LEVEL_SELECT: this.drawSelectScreen(); break;
-            case STATE_SETTINGS: this.drawSettingsScreen(); break;
-            case STATE_HELP: this.drawHelpScreen(); break;
+            case STATE_MENU:         this.drawHomeScreen();       break;
+            case STATE_LEVEL_SELECT: this.drawSelectScreen();     break;
+            case STATE_SETTINGS:     this.drawSettingsScreen();   break;
+            case STATE_HELP:         this.drawHelpScreen();       break;
+            case STATE_DIFF_SELECT:  this.drawDiffSelectScreen(); break;
+            case STATE_DIFF_CONFIRM: this.drawDiffConfirmScreen();break;
+            case STATE_LOAD_GAME:    this.drawLoadGameScreen();   break;
         }
 
         if (this.menuState !== STATE_MENU) {
@@ -238,25 +225,25 @@ class MainMenu {
         push();
         textAlign(CENTER, CENTER);
         textFont(fonts.title);
-        textSize(50);
+        textSize(64);
         stroke(0, 0, 0, 200);
         strokeWeight(6);
         fill(255, 215, 0);
-        text("SETTINGS", width / 2, height / 2 - 250);
+        text("SETTINGS", width / 2, height / 2 - 260);
         noStroke();
         fill(255, 215, 0);
-        text("SETTINGS", width / 2, height / 2 - 250);
+        text("SETTINGS", width / 2, height / 2 - 260);
 
-        // ── Volume sliders (shifted up) ─────────────────────────────────────
+        // ── Volume sliders ───────────────────────────────────────────────────
         this.bgmSlider.display();
         this.sfxSlider.display();
 
         // Mute toggle icons with hover zoom effect
-        let iconSz = 45;
-        let iconXOffset = 240;
-        let iconHitR = 28;
+        let iconSz = 52;
+        let iconXOffset = 260;
+        let iconHitR = 32;
 
-        // BGM mute toggle icon
+        // Music mute toggle icon
         let bgmIconX = this.bgmSlider.x + iconXOffset;
         let bgmIconY = this.bgmSlider.y;
         let bgmHover = dist(mouseX, mouseY, bgmIconX, bgmIconY) < iconHitR;
@@ -267,7 +254,7 @@ class MainMenu {
         if (bgmIcon) { imageMode(CENTER); image(bgmIcon, 0, 0, iconSz, iconSz); }
         pop();
 
-        // SFX mute toggle icon
+        // Sound effects mute toggle icon
         let sfxIconX = this.sfxSlider.x + iconXOffset;
         let sfxIconY = this.sfxSlider.y;
         let sfxHover = dist(mouseX, mouseY, sfxIconX, sfxIconY) < iconHitR;
@@ -282,100 +269,21 @@ class MainMenu {
         masterVolumeSFX = this.sfxSlider.value;
         if (typeof BGM !== 'undefined') BGM.syncVolume();
 
-        // ── Difficulty selector (label centered, selector row below) ──────
-        let diffLabelY = height / 2 + 145;
-        let diffRowY   = height / 2 + 230;
-        let boxX       = width / 2;
-        let boxW       = 330, boxH = 60;
-        let arrowGap   = boxW / 2 + 80;
-
-        // Label — centered, larger
-        textFont(fonts.body);
-        textSize(32);
-        textAlign(CENTER, CENTER);
-        stroke(0, 0, 0, 200);
-        strokeWeight(5);
-        fill(255, 215, 0);
-        text("DIFFICULTY", boxX, diffLabelY);
-        noStroke();
-        fill(255, 215, 0);
-        text("DIFFICULTY", boxX, diffLabelY);
-
-        // Selector box — purple rounded rectangle (same color as slider bar)
+        // ── Hint ────────────────────────────────────────────────────────────
         rectMode(CENTER);
+        fill(15, 8, 42, 210);
+        stroke(200, 160, 255, 200); strokeWeight(1.5);
+        rect(width / 2, height - 72, 620, 56, 28);
         noStroke();
-        fill(160, 90, 255, 180);
-        rect(boxX, diffRowY, boxW, boxH, 10);
-        noFill();
-        stroke(160, 90, 255, 255);
-        strokeWeight(2);
-        rect(boxX, diffRowY, boxW, boxH, 10);
-        noStroke();
-
-        // Current difficulty label — readable size, shifted up
         textFont(fonts.body);
-        textSize(26);
+        textSize(28);
         textAlign(CENTER, CENTER);
-        stroke(0, 0, 0, 180);
-        strokeWeight(5);
-        fill(255, 215, 0);
-        text(DIFFICULTY_LABELS[this.difficultyIndex], boxX, diffRowY - 5);
+        stroke(0, 0, 0, 180); strokeWeight(3);
+        fill(220, 185, 255);
+        text("Press \u2190 or [ESC] to go back", width / 2, height - 72);
         noStroke();
-        fill(255, 215, 0);
-        text(DIFFICULTY_LABELS[this.difficultyIndex], boxX, diffRowY - 5);
-
-        // Left / Right arrows — use back.png (flipped for right), larger
-        let arrowSz = 70;
-        let hitR = 36;
-        let arrowHoverL = (mouseX > boxX - arrowGap - hitR && mouseX < boxX - arrowGap + hitR &&
-                           mouseY > diffRowY - hitR && mouseY < diffRowY + hitR);
-        let arrowHoverR = (mouseX > boxX + arrowGap - hitR && mouseX < boxX + arrowGap + hitR &&
-                           mouseY > diffRowY - hitR && mouseY < diffRowY + hitR);
-
-        if (assets.backImg) {
-            push();
-            translate(boxX - arrowGap, diffRowY);
-            if (arrowHoverL) scale(1.25);
-            imageMode(CENTER);
-            image(assets.backImg, 0, 0, arrowSz, arrowSz);
-            pop();
-
-            push();
-            translate(boxX + arrowGap, diffRowY);
-            scale(-1, 1);
-            if (arrowHoverR) scale(1.25);
-            imageMode(CENTER);
-            image(assets.backImg, 0, 0, arrowSz, arrowSz);
-            pop();
-        }
-
-        // ── Toast message ───────────────────────────────────────────────────
-        if (this.diffToastTimer > 0) {
-            this.diffToastTimer--;
-            let alpha = min(this.diffToastTimer * 4, 255);
-            rectMode(CENTER);
-            fill(22, 10, 48, alpha * 0.9);
-            stroke(255, 160, 60, alpha);
-            strokeWeight(2);
-            rect(width / 2, diffRowY + 120, 550, 60, 10);
-            noStroke();
-            fill(255, 200, 80, alpha);
-            textFont(fonts.body);
-            textSize(25);
-            textAlign(CENTER, CENTER);
-            text(this.diffToastText, width / 2, diffRowY + 115);
-        }
-
-        textFont(fonts.body);
-        textSize(20);
-        textAlign(CENTER, CENTER);
-        stroke(0, 0, 0, 160);
-        strokeWeight(3);
-        fill(200, 160, 255);
-        text("PRESS ESC TO BACK", width / 2, height - 80);
-        noStroke();
-        fill(200, 160, 255);
-        text("PRESS ESC TO BACK", width / 2, height - 80);
+        fill(220, 185, 255);
+        text("Press \u2190 or [ESC] to go back", width / 2, height - 72);
         pop();
     }
 
@@ -749,10 +657,51 @@ class MainMenu {
                 this.buttons[this.currentIndex].handleClick();
             }
         } else if (this.menuState === STATE_SETTINGS) {
-            if (keyCode === LEFT_ARROW || keyCode === 65) {
-                this.cycleDifficulty(-1);
-            } else if (keyCode === RIGHT_ARROW || keyCode === 68) {
-                this.cycleDifficulty(1);
+            if (keyCode === ESCAPE) {
+                this.handleBackAction();
+            }
+        } else if (this.menuState === STATE_DIFF_SELECT) {
+            if (keyCode === UP_ARROW || keyCode === 87) {
+                this.diffSelectIndex = max(0, this.diffSelectIndex - 1);
+                playSFX(sfxSelect);
+            } else if (keyCode === DOWN_ARROW || keyCode === 83) {
+                this.diffSelectIndex = min(2, this.diffSelectIndex + 1);
+                playSFX(sfxSelect);
+            } else if (keyCode === ENTER || keyCode === 13) {
+                playSFX(sfxClick);
+                this.selectedDifficulty  = this.diffSelectIndex;
+                this.diffConfirmBtnIndex = 0;
+                triggerTransition(() => { gameState.setState(STATE_DIFF_CONFIRM); });
+            } else if (keyCode === ESCAPE) {
+                this.handleBackAction();
+            }
+        } else if (this.menuState === STATE_DIFF_CONFIRM) {
+            if (this.selectedDifficulty !== 1) {
+                // Coming soon screen — any key returns to diff select
+                if (keyCode === ENTER || keyCode === 13 || keyCode === ESCAPE) {
+                    this.handleBackAction();
+                }
+            } else {
+                if (keyCode === ENTER || keyCode === 13) {
+                    playSFX(sfxClick);
+                    triggerTransition(() => {
+                        this.loadGameIndex = 0;
+                        gameState.setState(STATE_LOAD_GAME);
+                    });
+                } else if (keyCode === ESCAPE) {
+                    this.handleBackAction();
+                }
+            }
+        } else if (this.menuState === STATE_LOAD_GAME) {
+            const hasSave = typeof SaveSystem !== 'undefined' && SaveSystem.hasSave();
+            const numOpts = hasSave ? 2 : 1;
+            if ((keyCode === UP_ARROW || keyCode === 87 ||
+                 keyCode === DOWN_ARROW || keyCode === 83) && numOpts > 1) {
+                this.loadGameIndex = (this.loadGameIndex + 1) % numOpts;
+                playSFX(sfxSelect);
+            } else if (keyCode === ENTER || keyCode === 13) {
+                playSFX(sfxClick);
+                this._executeLoadGame(this.loadGameIndex);
             } else if (keyCode === ESCAPE) {
                 this.handleBackAction();
             }
@@ -820,19 +769,91 @@ class MainMenu {
             if (this.menuState === STATE_SETTINGS) {
                 this.bgmSlider.handlePress(mx, my);
                 this.sfxSlider.handlePress(mx, my);
-                this.handleDifficultyClick(mx, my);
 
-                let iconXOffset = 240;
-                let hitR = 25;
+                let iconXOffset = 260;
+                let hitR = 28;
 
-                // Check BGM mute toggle click
+                // Check Music mute toggle click
                 if (dist(mx, my, this.bgmSlider.x + iconXOffset, this.bgmSlider.y) < hitR) {
                     this.toggleBGMMute();
                 }
-                // Check SFX mute toggle click
+                // Check Sound Effects mute toggle click
                 if (dist(mx, my, this.sfxSlider.x + iconXOffset, this.sfxSlider.y) < hitR) {
                     this.toggleSFXMute();
                 }
+            }
+
+            // ── Difficulty select screen ─────────────────────────────────────
+            if (this.menuState === STATE_DIFF_SELECT) {
+                const rowYs = [355, 510, 665];
+                const rowW  = 1060, rowH = 115;
+                const rowCX = width / 2;
+
+                for (let i = 0; i < 3; i++) {
+                    const rowY = rowYs[i];
+                    if (mx > rowCX - rowW / 2 && mx < rowCX + rowW / 2 &&
+                        my > rowY - rowH / 2 && my < rowY + rowH / 2) {
+                        playSFX(sfxClick);
+                        this.diffSelectIndex     = i;
+                        this.selectedDifficulty  = i;
+                        this.diffConfirmBtnIndex = 0;
+                        triggerTransition(() => { gameState.setState(STATE_DIFF_CONFIRM); });
+                        return;
+                    }
+                }
+                return;
+            }
+
+            // ── Difficulty confirm screen ────────────────────────────────────
+            if (this.menuState === STATE_DIFF_CONFIRM) {
+                const W = width, H = height, cx = W / 2;
+                const btnW = 380, btnH = 90;
+                if (this.selectedDifficulty !== 1) {
+                    // Coming soon — single BACK button
+                    const btnY = H * 0.78;
+                    if (mx > cx - btnW / 2 && mx < cx + btnW / 2 &&
+                        my > btnY - btnH / 2 && my < btnY + btnH / 2) {
+                        playSFX(sfxClick);
+                        this.handleBackAction();
+                    }
+                } else {
+                    // Normal mode — single CONFIRM button
+                    const btnW2 = 420, btnH2 = 90;
+                    const btnY = H * 0.72;
+                    if (mx > cx - btnW2 / 2 && mx < cx + btnW2 / 2 &&
+                        my > btnY - btnH2 / 2 && my < btnY + btnH2 / 2) {
+                        playSFX(sfxClick);
+                        this.diffConfirmBtnIndex = 0;
+                        triggerTransition(() => {
+                            this.loadGameIndex = 0;
+                            gameState.setState(STATE_LOAD_GAME);
+                        });
+                        return;
+                    }
+                }
+                return;
+            }
+
+            // ── Load game screen ─────────────────────────────────────────────
+            if (this.menuState === STATE_LOAD_GAME) {
+                const W = width, H = height, cx = W / 2;
+                const btnW = 900, btnH = 140;
+                const btn1Y = H * 0.42;
+                const btn2Y = H * 0.66;
+                const hasSave = typeof SaveSystem !== 'undefined' && SaveSystem.hasSave();
+                if (mx > cx - btnW / 2 && mx < cx + btnW / 2 &&
+                    my > btn1Y - btnH / 2 && my < btn1Y + btnH / 2) {
+                    playSFX(sfxClick);
+                    this._executeLoadGame(0);
+                    return;
+                }
+                if (hasSave && mx > cx - btnW / 2 && mx < cx + btnW / 2 &&
+                    my > btn2Y - btnH / 2 && my < btn2Y + btnH / 2) {
+                    playSFX(sfxClick);
+                    this._executeLoadGame(1);
+                    return;
+                }
+                return;
             }
             // Level select: click on cloud to start the selected day, or arrows to change day
             if (this.menuState === STATE_LEVEL_SELECT) {
@@ -893,51 +914,6 @@ class MainMenu {
     }
 
     /**
-     * Handles clicks on the difficulty selector buttons.
-     */
-    handleDifficultyClick(mx, my) {
-        let diffRowY = height / 2 + 220;
-        let boxX     = width / 2;
-        let boxW     = 330;
-        let arrowGap = boxW / 2 + 80;
-        let hitR     = 36;
-
-        // Left arrow click
-        if (dist(mx, my, boxX - arrowGap, diffRowY) < hitR) {
-            this.cycleDifficulty(-1);
-            return;
-        }
-        // Right arrow click
-        if (dist(mx, my, boxX + arrowGap, diffRowY) < hitR) {
-            this.cycleDifficulty(1);
-            return;
-        }
-    }
-
-    /**
-     * Cycles difficulty by delta (-1 or +1) and shows toast if locked.
-     */
-    cycleDifficulty(delta) {
-        let next = constrain(this.difficultyIndex + delta, 0, 2);
-        if (next === this.difficultyIndex) return;
-
-        if (next === 1) {
-            // Normal — always available
-            this.difficultyIndex = 1;
-            gameDifficulty       = 1;
-            playSFX(sfxClick);
-        } else {
-            // Easy / Hard — not yet available
-            this.difficultyIndex = next;
-            playSFX(sfxSelect);
-            this.diffToastText  = DIFFICULTY_LABELS[next] + " mode is coming soon — stay tuned!";
-            this.diffToastTimer = 120;
-            // Snap back to normal after showing toast
-            this.difficultyIndex = 1;
-        }
-    }
-
-    /**
      * Navigates back to the previous screen.
      * If accessed from the pause menu, returns to the pause overlay instead of the main menu.
      */
@@ -947,11 +923,22 @@ class MainMenu {
 
         if (typeof pauseFromState !== 'undefined' && pauseFromState !== null) {
             // Return to pause overlay and restore the correct resume target.
-            // setState(PAUSED) would overwrite previousState with STATE_HELP,
-            // so we manually restore it to the actual gameplay state we came from.
             gameState.setState(STATE_PAUSED);
             gameState.previousState = pauseFromState;
             this.helpPage = 0;
+        } else if (this.menuState === STATE_DIFF_SELECT) {
+            triggerTransition(() => {
+                this.menuState = STATE_MENU;
+                gameState.currentState = STATE_MENU;
+            });
+        } else if (this.menuState === STATE_DIFF_CONFIRM) {
+            triggerTransition(() => {
+                gameState.setState(STATE_DIFF_SELECT);
+            });
+        } else if (this.menuState === STATE_LOAD_GAME) {
+            triggerTransition(() => {
+                gameState.setState(STATE_DIFF_CONFIRM);
+            });
         } else {
             triggerTransition(() => {
                 this.menuState = STATE_MENU;
@@ -987,5 +974,415 @@ class MainMenu {
             this.sfxSlider.value = this.preMuteSFXVolume || 0.7;
         }
         playSFX(sfxClick);
+    }
+
+    // ─── DIFFICULTY SELECT SCREEN ─────────────────────────────────────────────
+
+    /**
+     * Renders the three-option difficulty selection screen.
+     * Each row shows a difficulty with a ! button for details.
+     * Keyboard: ↑↓ to move, Enter to confirm, ESC to go back.
+     */
+    drawDiffSelectScreen() {
+        drawOtherBgWithOverlay();
+
+        const W = width, H = height, cx = W / 2;
+
+        const diffData = [
+            {
+                name: "EASY",
+                tagline: "Endless runner  \u00b7  Relaxed pace  \u00b7  No story",
+                recommended: false
+            },
+            {
+                name: "NORMAL",
+                tagline: "Story mode  \u00b7  5 Days  \u00b7  Progressive difficulty",
+                recommended: true
+            },
+            {
+                name: "DIFFICULT",
+                tagline: "Endless runner  \u00b7  High-speed  \u00b7  No story",
+                recommended: false
+            }
+        ];
+
+        const rowYs = [355, 510, 665];   // title-to-content gap largest; reduced row-to-row gap
+        const rowW  = 1060, rowH = 115;  // narrower & shorter, fully centred
+        const rowCX = cx;
+
+        push();
+
+        // Title
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title);
+        textSize(64);
+        stroke(0, 0, 0, 200); strokeWeight(6);
+        fill(255, 215, 0);
+        text("SELECT DIFFICULTY", cx, 145);
+        noStroke(); fill(255, 215, 0);
+        text("SELECT DIFFICULTY", cx, 145);
+
+        for (let i = 0; i < 3; i++) {
+            const d       = diffData[i];
+            const rowY    = rowYs[i];
+            const isKbSel = this.diffSelectIndex === i;
+            const rowHov  = mouseX > rowCX - rowW / 2 && mouseX < rowCX + rowW / 2 &&
+                            mouseY > rowY - rowH / 2   && mouseY < rowY + rowH / 2;
+
+            if (rowHov && !globalFade.isFading) this.diffSelectIndex = i;
+
+            const active = isKbSel || rowHov;
+
+            // Row background
+            rectMode(CENTER);
+            fill(active ? color(75, 45, 135, 225) : color(15, 8, 40, 210));
+            stroke(active ? color(255, 215, 0, 255) : color(100, 80, 150, 160));
+            strokeWeight(active ? 2.5 : 1.5);
+            rect(rowCX, rowY, rowW, rowH, 14);
+            noStroke();
+
+            // Difficulty name — centred
+            textAlign(CENTER, CENTER);
+            textFont(fonts.title);
+            textSize(active ? 44 : 40);
+            fill(active ? color(255, 215, 0) : color(195, 180, 145));
+            text(d.name, rowCX, rowY - 16);
+
+            // RECOMMENDED badge (Normal only)
+            if (d.recommended) {
+                const badgeW = 215, badgeH = 30;
+                const badgeX = rowCX + 185;
+                const badgeY = rowY - 32;
+                rectMode(CORNER);
+                fill(70, 45, 130); stroke(255, 215, 0, 200); strokeWeight(1.5);
+                rect(badgeX, badgeY, badgeW, badgeH, 8);
+                noStroke();
+                textFont(fonts.body); textSize(18); textAlign(CENTER, CENTER);
+                fill(255, 215, 0);
+                text("\u2605 RECOMMENDED", badgeX + badgeW / 2, badgeY + badgeH / 2);
+            }
+
+            // Tagline — centred
+            textAlign(CENTER, CENTER);
+            textFont(fonts.body);
+            textSize(22);
+            fill(active ? color(225, 210, 185) : color(155, 143, 120));
+            text(d.tagline, rowCX, rowY + 22);
+        }
+
+        // Prominent prompt bar at bottom
+        const promptY = H - 72;
+        const promptText = "\u2191\u2193 to select  \u00b7  [ENTER] to confirm  \u00b7  [ESC] to go back";
+        const promptW = 780, promptH = 56;
+        rectMode(CENTER);
+        fill(15, 8, 42, 210);
+        stroke(200, 160, 255, 200); strokeWeight(1.5);
+        rect(cx, promptY, promptW, promptH, 29);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textFont(fonts.body);
+        textSize(28);
+        stroke(0, 0, 0, 180); strokeWeight(4);
+        fill(220, 185, 255);
+        text(promptText, cx, promptY);
+        noStroke();
+        fill(220, 185, 255);
+        text(promptText, cx, promptY);
+
+        pop();
+    }
+
+    // ─── DIFFICULTY CONFIRM SCREEN ────────────────────────────────────────────
+
+    /**
+     * Renders the confirmation screen for the selected difficulty.
+     * Normal → shows CONFIRM / BACK buttons.
+     * Easy / Difficult → shows "Coming Soon" with a BACK button.
+     */
+    drawDiffConfirmScreen() {
+        drawOtherBgWithOverlay();
+
+        const W = width, H = height, cx = W / 2;
+        const d = this.selectedDifficulty >= 0 ? this.selectedDifficulty : 1;
+        const diffNames = ["EASY", "NORMAL", "DIFFICULT"];
+        const isAvailable = d === 1;
+
+        push();
+
+        // Title
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title);
+        textSize(64);
+        stroke(0, 0, 0, 200); strokeWeight(6);
+        fill(255, 215, 0);
+        text(diffNames[d] + " MODE", cx, 115);
+        noStroke(); fill(255, 215, 0);
+        text(diffNames[d] + " MODE", cx, 115);
+
+        // Divider
+        stroke(180, 148, 72, 100); strokeWeight(1.5);
+        line(cx - 420, 168, cx + 420, 168);
+        noStroke();
+
+        if (!isAvailable) {
+            // ── Coming soon ─────────────────────────────────────────────────
+            textFont(fonts.title);
+            textSize(56);
+            stroke(0, 0, 0, 200); strokeWeight(5);
+            fill(255, 200, 60);
+            text("COMING SOON", cx, 400);
+            noStroke(); fill(255, 200, 60);
+            text("COMING SOON", cx, 400);
+
+            textFont(fonts.body);
+            textSize(30);
+            noStroke();
+            fill(210, 195, 165);
+            textAlign(CENTER, CENTER);
+            text("This mode is currently under development.", cx, 510);
+            text("We recommend trying NORMAL mode first!", cx, 560);
+
+            // BACK button
+            const btnW = 380, btnH = 90, btnY = H * 0.76;
+            const bHov  = dist(mouseX, mouseY, cx, btnY) < btnW / 2 + 15 &&
+                          abs(mouseY - btnY) < btnH / 2 + 15;
+            if (bHov && !globalFade.isFading) this.diffConfirmBtnIndex = 0;
+
+            rectMode(CENTER);
+            fill(bHov ? color(75, 50, 135, 230) : color(20, 12, 50, 210));
+            stroke(bHov ? color(255, 215, 0) : color(160, 130, 80));
+            strokeWeight(2);
+            rect(cx, btnY, btnW, btnH, 12);
+            noStroke();
+            textAlign(CENTER, CENTER);
+            textFont(fonts.title);
+            textSize(34);
+            fill(bHov ? color(255, 215, 0) : color(200, 185, 150));
+            text("\u2190 GO BACK", cx, btnY);
+
+            rectMode(CENTER);
+            fill(15, 8, 42, 210);
+            stroke(200, 160, 255, 200); strokeWeight(1.5);
+            rect(cx, H - 72, 680, 56, 28);
+            noStroke();
+            textFont(fonts.body);
+            textSize(28);
+            textAlign(CENTER, CENTER);
+            stroke(0, 0, 0, 180); strokeWeight(3);
+            fill(220, 185, 255);
+            text("[ESC] or [ENTER] to go back", cx, H - 72);
+            noStroke();
+            fill(220, 185, 255);
+            text("[ESC] or [ENTER] to go back", cx, H - 72);
+
+        } else {
+            // ── Normal mode confirmation ─────────────────────────────────────
+
+            // Description card (semi-transparent dark background for readability)
+            const cardW = 940, cardH = 230, cardY = 430;
+            rectMode(CENTER);
+            fill(10, 6, 30, 195);
+            stroke(180, 148, 72, 120); strokeWeight(1.5);
+            rect(cx, cardY, cardW, cardH, 14);
+            noStroke();
+
+            textFont(fonts.body);
+            textSize(33);
+            fill(235, 225, 200);
+            textAlign(CENTER, CENTER);
+            text("Story-driven parkour across 5 days.", cx, cardY - 56);
+            text("Difficulty increases as you progress through each day.", cx, cardY + 8);
+
+            textSize(31);
+            fill(255, 215, 0);
+            text("\u2605 Recommended for first-time players!", cx, cardY + 72);
+
+            // Single CONFIRM button centered
+            const btnW = 420, btnH = 90, btnY = H * 0.72;
+            const cHov = !globalFade.isFading &&
+                         abs(mouseX - cx) < btnW / 2 + 10 &&
+                         abs(mouseY - btnY) < btnH / 2 + 10;
+            if (cHov) this.diffConfirmBtnIndex = 0;
+
+            rectMode(CENTER);
+            fill(cHov ? color(75, 50, 135, 230) : color(20, 12, 50, 210));
+            stroke(cHov ? color(255, 215, 0) : color(120, 100, 170));
+            strokeWeight(2);
+            rect(cx, btnY, btnW, btnH, 12);
+            noStroke();
+            textAlign(CENTER, CENTER);
+            textFont(fonts.title);
+            textSize(36);
+            fill(cHov ? color(255, 215, 0) : color(200, 185, 150));
+            text("CONFIRM", cx, btnY);
+
+            rectMode(CENTER);
+            fill(15, 8, 42, 210);
+            stroke(200, 160, 255, 200); strokeWeight(1.5);
+            rect(cx, H - 72, 680, 56, 28);
+            noStroke();
+            textFont(fonts.body);
+            textSize(28);
+            textAlign(CENTER, CENTER);
+            stroke(0, 0, 0, 180); strokeWeight(3);
+            fill(220, 185, 255);
+            text("[ENTER] to confirm  \u00b7  [ESC] to go back", cx, H - 72);
+            noStroke();
+            fill(220, 185, 255);
+            text("[ENTER] to confirm  \u00b7  [ESC] to go back", cx, H - 72);
+        }
+
+        pop();
+    }
+
+    // ─── LOAD GAME SCREEN ─────────────────────────────────────────────────────
+
+    /**
+     * Renders the simple new-game / continue screen shown after confirming Normal mode.
+     * Shows NEW GAME always, and CONTINUE only when a save exists.
+     * Keyboard: ↑↓ to select, Enter to confirm, ESC to go back.
+     */
+    drawLoadGameScreen() {
+        drawOtherBgWithOverlay();
+
+        const save    = typeof SaveSystem !== 'undefined' ? SaveSystem.load() : null;
+        const hasSave = save !== null;
+        const W = width, H = height, cx = W / 2;
+
+        push();
+
+        // Title
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title);
+        textSize(64);
+        stroke(0, 0, 0, 200); strokeWeight(6);
+        fill(255, 215, 0);
+        text("START GAME", cx, 115);
+        noStroke(); fill(255, 215, 0);
+        text("START GAME", cx, 115);
+
+        // Divider
+        stroke(180, 148, 72, 100); strokeWeight(1.5);
+        line(cx - 420, 168, cx + 420, 168);
+        noStroke();
+
+        const btnW = 900, btnH = 145;
+        const btn1Y = H * 0.41;
+        const btn2Y = H * 0.65;
+
+        // Mouse hover
+        if (!globalFade.isFading) {
+            if (abs(mouseX - cx) < btnW / 2 && abs(mouseY - btn1Y) < btnH / 2)
+                this.loadGameIndex = 0;
+            if (hasSave && abs(mouseX - cx) < btnW / 2 && abs(mouseY - btn2Y) < btnH / 2)
+                this.loadGameIndex = 1;
+        }
+
+        // Clamp index if no save
+        if (!hasSave) this.loadGameIndex = 0;
+
+        // ── NEW GAME button ──────────────────────────────────────────────────
+        const ng = this.loadGameIndex === 0;
+        rectMode(CENTER);
+        fill(ng ? color(75, 50, 135, 230) : color(15, 8, 42, 210));
+        stroke(ng ? color(255, 215, 0) : color(100, 80, 155, 180));
+        strokeWeight(2.5);
+        rect(cx, btn1Y, btnW, btnH, 16);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title);
+        textSize(44);
+        fill(ng ? color(255, 215, 0) : color(200, 185, 150));
+        text("NEW GAME", cx, btn1Y);
+
+        // ── CONTINUE button (only when save exists) ──────────────────────────
+        if (hasSave) {
+            const ct = this.loadGameIndex === 1;
+            rectMode(CENTER);
+            fill(ct ? color(75, 50, 135, 230) : color(15, 8, 42, 210));
+            stroke(ct ? color(255, 215, 0) : color(100, 80, 155, 180));
+            strokeWeight(2.5);
+            rect(cx, btn2Y, btnW, btnH, 16);
+            noStroke();
+
+            textAlign(CENTER, CENTER);
+            textFont(fonts.title);
+            textSize(38);
+            fill(ct ? color(255, 215, 0) : color(200, 185, 150));
+            text("CONTINUE", cx, btn2Y - 24);
+
+            textFont(fonts.body);
+            textSize(26);
+            fill(ct ? color(255, 230, 150) : color(165, 150, 120));
+            const saveInfo = "Day " + save.currentDayID +
+                             "  \u00b7  Last saved: " +
+                             (typeof SaveSystem !== 'undefined' ? SaveSystem.formatTime(save.savedAt) : "");
+            text(saveInfo, cx, btn2Y + 24);
+        }
+
+        // Keyboard hint
+        const hint = hasSave
+            ? "\u2191\u2193 to select  \u00b7  [ENTER] to confirm  \u00b7  [ESC] to go back"
+            : "[ENTER] to start  \u00b7  [ESC] to go back";
+        const hintW = hasSave ? 820 : 520;
+        rectMode(CENTER);
+        fill(15, 8, 42, 210);
+        stroke(200, 160, 255, 200); strokeWeight(1.5);
+        rect(cx, H - 72, hintW, 56, 28);
+        noStroke();
+        textFont(fonts.body);
+        textSize(28);
+        textAlign(CENTER, CENTER);
+        stroke(0, 0, 0, 180); strokeWeight(3);
+        fill(220, 185, 255);
+        text(hint, cx, H - 72);
+        noStroke();
+        fill(220, 185, 255);
+        text(hint, cx, H - 72);
+
+        pop();
+    }
+
+    // ─── LOAD GAME EXECUTOR ───────────────────────────────────────────────────
+
+    /**
+     * Executes the selected load-game action.
+     * index 0 = New Game, index 1 = Continue from save.
+     */
+    _executeLoadGame(index) {
+        if (index === 1) {
+            // CONTINUE — restore save
+            if (typeof SaveSystem !== 'undefined' && SaveSystem.hasSave()) {
+                triggerTransition(() => SaveSystem.applyAndResume());
+            } else {
+                this._executeLoadGame(0);  // fall back to new game
+            }
+            return;
+        }
+
+        // NEW GAME — clear save, start from Day 1
+        if (typeof SaveSystem !== 'undefined') SaveSystem.clear();
+        if (typeof _playerChoices !== 'undefined') _playerChoices = {};
+        triggerTransition(() => {
+            gameState.resetFlags();
+            if (typeof currentDayID !== 'undefined')       currentDayID = 1;
+            if (typeof currentUnlockedDay !== 'undefined') currentUnlockedDay = 1;
+
+            if (typeof _prologueSeen !== 'undefined' && !_prologueSeen &&
+                typeof CS_PROLOGUE !== 'undefined' && typeof startCutscene === 'function') {
+                _prologueSeen = true;
+                startCutscene('news', CS_PROLOGUE, () => {
+                    triggerTransition(() => {
+                        this.timeWheel.bgAlpha = 0;
+                        this.timeWheel.triggerEntrance();
+                        gameState.setState(STATE_LEVEL_SELECT);
+                    });
+                });
+            } else {
+                this.timeWheel.bgAlpha = 0;
+                this.timeWheel.triggerEntrance();
+                gameState.setState(STATE_LEVEL_SELECT);
+            }
+        });
     }
 }

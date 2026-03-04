@@ -19,6 +19,9 @@ const STATE_WARNING = 12;
 const STATE_CREDITS = 13;
 const STATE_CUTSCENE = 14;
 const STATE_SAVE_CHOICE = 15;
+const STATE_DIFF_SELECT  = 16;   // Difficulty selection screen
+const STATE_DIFF_CONFIRM = 17;   // Difficulty confirmation screen
+const STATE_LOAD_GAME    = 18;   // New game / continue screen
 
 /**
  * Core canvas resolution, world-space boundaries, and scroll physics.

@@ -632,6 +632,9 @@ function draw() {
             case STATE_LEVEL_SELECT:
             case STATE_SETTINGS:
             case STATE_HELP:
+            case STATE_DIFF_SELECT:
+            case STATE_DIFF_CONFIRM:
+            case STATE_LOAD_GAME:
                 if (mainMenu) {
                     mainMenu.menuState = gameState.currentState;
                     // Auto-colorize once the entrance animation finishes — keeps visible gray period
@@ -997,7 +1000,8 @@ function keyPressed() {
             state !== STATE_SPLASH && state !== STATE_INVENTORY &&
             state !== STATE_WARNING &&
             state !== STATE_CREDITS &&
-            state !== STATE_CUTSCENE) {
+            state !== STATE_CUTSCENE &&
+            state !== STATE_DIFF_SELECT && state !== STATE_DIFF_CONFIRM && state !== STATE_LOAD_GAME) {
             playSFX(sfxClick);
             playSFX(sfxClick);
             togglePause();
@@ -1089,7 +1093,8 @@ function keyPressed() {
 
     // Menu navigation
     if (state === STATE_MENU || state === STATE_LEVEL_SELECT ||
-        state === STATE_SETTINGS || state === STATE_HELP) {
+        state === STATE_SETTINGS || state === STATE_HELP ||
+        state === STATE_DIFF_SELECT || state === STATE_DIFF_CONFIRM || state === STATE_LOAD_GAME) {
         if (mainMenu) mainMenu.handleKeyPress(key, keyCode);
     }
     // Room navigation + inventory toggle (E key handled inside roomScene — desk-proximity gated)
@@ -1352,7 +1357,8 @@ function mousePressed() {
     }
 
     if (state === STATE_MENU || state === STATE_LEVEL_SELECT ||
-        state === STATE_SETTINGS || state === STATE_HELP) {
+        state === STATE_SETTINGS || state === STATE_HELP ||
+        state === STATE_DIFF_SELECT || state === STATE_DIFF_CONFIRM || state === STATE_LOAD_GAME) {
         if (mainMenu) mainMenu.handleClick(mouseX, mouseY);
     } else if (state === STATE_FAIL || state === STATE_WIN) {
         if (endScreenManager) endScreenManager.handleClick(mouseX, mouseY);
