@@ -265,9 +265,9 @@ class TestingPanel {
         this.selectedModeId = 1;
         this.uiTunerHitboxes = [];
         this.uiTunerDefs = [
-            { key: "devMenuBtnW",     label: "Btn Width"  },
-            { key: "devMenuBtnH",     label: "Btn Height" },
-            { key: "devMenuTextSize", label: "Text Size"  }
+            { key: "devMenuBtnW", label: "Btn Width" },
+            { key: "devMenuBtnH", label: "Btn Height" },
+            { key: "devMenuTextSize", label: "Text Size" }
         ];
 
         const preferredObstacleOrder = [
@@ -806,9 +806,9 @@ class TestingPanel {
         if (this.editTarget.kind === "uiTuner") {
             let num = parseFloat(this.inputBuffer);
             if (!Number.isFinite(num)) num = 0;
-            if (this.editTarget.key === "devMenuBtnW")     devMenuBtnW     = Math.max(40,  Math.round(num));
-            if (this.editTarget.key === "devMenuBtnH")     devMenuBtnH     = Math.max(10,  Math.round(num));
-            if (this.editTarget.key === "devMenuTextSize") devMenuTextSize = Math.max(8,   Math.round(num));
+            if (this.editTarget.key === "devMenuBtnW") devMenuBtnW = Math.max(40, Math.round(num));
+            if (this.editTarget.key === "devMenuBtnH") devMenuBtnH = Math.max(10, Math.round(num));
+            if (this.editTarget.key === "devMenuTextSize") devMenuTextSize = Math.max(8, Math.round(num));
         }
 
         this.cancelEditing();
@@ -1151,6 +1151,13 @@ class TestingPanel {
         }
 
         // ── Cutscene jump buttons ──────────────────────────────────────────
+        if (actionId === "cs_main_menu") {
+            this.visible = false;
+            if (typeof gameState !== "undefined") gameState.setState(STATE_MENU);
+            if (typeof mainMenu !== "undefined" && mainMenu) mainMenu.menuState = STATE_MENU;
+            return;
+        }
+
         if (actionId === "cs_prologue") {
             this.visible = false;
             if (typeof triggerTransition === "function" && typeof startCutscene === "function") {
@@ -1914,19 +1921,20 @@ class TestingPanel {
         text("Cutscene Jump:", x + 12, r2LabelY + 8);
 
         const csButtons = [
-            { id: "cs_prologue",  label: "Prologue" },
-            { id: "cs_room_1",    label: "Room D1" },
-            { id: "cs_room_2",    label: "Room D2" },
-            { id: "cs_room_3",    label: "Room D3" },
-            { id: "cs_room_4",    label: "Room D4" },
-            { id: "cs_room_5",    label: "Room D5" },
-            { id: "cs_npc_1",     label: "NPC D1" },
-            { id: "cs_npc_2",     label: "NPC D2" },
-            { id: "cs_npc_3",     label: "NPC D3" },
-            { id: "cs_npc_4",     label: "NPC D4" },
-            { id: "cs_npc_5",     label: "NPC D5" },
-            { id: "cs_good_end",  label: "Good End" },
-            { id: "cs_bad_end",   label: "Bad End" }
+            { id: "cs_main_menu", label: "Main Menu" },
+            { id: "cs_prologue", label: "Prologue" },
+            { id: "cs_room_1", label: "Room D1" },
+            { id: "cs_room_2", label: "Room D2" },
+            { id: "cs_room_3", label: "Room D3" },
+            { id: "cs_room_4", label: "Room D4" },
+            { id: "cs_room_5", label: "Room D5" },
+            { id: "cs_npc_1", label: "NPC D1" },
+            { id: "cs_npc_2", label: "NPC D2" },
+            { id: "cs_npc_3", label: "NPC D3" },
+            { id: "cs_npc_4", label: "NPC D4" },
+            { id: "cs_npc_5", label: "NPC D5" },
+            { id: "cs_good_end", label: "Good End" },
+            { id: "cs_bad_end", label: "Bad End" }
         ];
 
         const r2BtnW = floor((w - 16 - (csButtons.length - 1) * btnGap) / csButtons.length);
