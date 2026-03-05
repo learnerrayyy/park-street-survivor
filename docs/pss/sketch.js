@@ -25,10 +25,15 @@ let assets = {
     csNewsBg:   null,   // assets/dialogue/news.png  — prologue cutscene bg
     csLibraryBg: null, // assets/dialogue/library.png — NPC cutscene + success screen bg
     dialogBox:  null,  // assets/obstacles/dialog_box.png — homeless speech bubble
+    dialogueBox: null,      // assets/dialogue/dialog_box.png — main dialogue bar
+    dialogueFrameBox: null, // assets/dialogue/frame_box.png — portrait frame
+    dialogueNameBox: null,  // assets/dialogue/name_box.png — speaker name tag
+    noticeBox: null,        // assets/dialogue/notice_box.png — menu button background
     irisSuccess: [],
     celebrateSheet: null,
     storyShape: null,
     storyCloud: null,
+    button1Img: null,
     keys: {},
     selectClouds: [],
     selectBg: {
@@ -424,6 +429,10 @@ function preload() {
     assets.csNewsBg    = loadImage('assets/dialogue/news.png',              itemLoaded);
     assets.csLibraryBg = loadImage('assets/dialogue/library.png',           itemLoaded);
     assets.dialogBox   = loadImage('assets/obstacles/dialog_box.png',       itemLoaded);
+    assets.dialogueBox = loadImage('assets/dialogue/dialog_box.png',        itemLoaded);
+    assets.dialogueFrameBox = loadImage('assets/dialogue/frame_box.png',    itemLoaded);
+    assets.dialogueNameBox = loadImage('assets/dialogue/name_box.png',      itemLoaded);
+    assets.noticeBox = loadImage('assets/dialogue/notice_box.png',          itemLoaded);
 
     loadImage('assets/end_screen/spritesheet_celebrate.png', (img) => {
         let fW = img.width / 5;
@@ -447,6 +456,8 @@ function preload() {
     fonts.title = loadFont('assets/fonts/PressStart2P-Regular.ttf', itemLoaded);
     fonts.time = loadFont('assets/fonts/VT323-Regular.ttf', itemLoaded);
     fonts.body = loadFont('assets/fonts/DotGothic16-Regular.ttf', itemLoaded);
+    fonts.dialogueBlue = loadFont('assets/fonts/Blue Screen Personal Use.ttf', itemLoaded);
+    fonts.jersey20 = loadFont('assets/fonts/Jersey20-Regular.ttf', itemLoaded);
     fonts.logo = loadFont('assets/fonts/title_1.otf', itemLoaded);
 
     // Audio
@@ -495,6 +506,7 @@ function preload() {
     assets.uobLogo = loadImage('assets/logo/uob_logo.png', itemLoaded);
     assets.warningImg = loadImage('assets/buttons/warning.png', itemLoaded);
     assets.btnImg = loadImage('assets/buttons/button.png', itemLoaded);
+    assets.button1Img = loadImage('assets/buttons/button_1.png', itemLoaded);
     assets.backImg = loadImage('assets/buttons/back.png', itemLoaded);
     assets.pauseImg = loadImage('assets/buttons/pause.png', itemLoaded);
     assets.musicOn  = loadImage('assets/buttons/music_on.png',  itemLoaded);

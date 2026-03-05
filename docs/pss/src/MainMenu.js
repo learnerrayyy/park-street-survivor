@@ -111,7 +111,12 @@ class MainMenu {
     setupButtons() {
         let centerY = height - 250;
         let spacing = 420;
-        this.buttons.push(new UIButton(width / 2 - spacing, centerY, 256, 96, "START", () => {
+        const homeBtnStyle = {
+            forceSize: true,
+            labelOffsetY: 0,
+            imageKey: 'button1Img'
+        };
+        this.buttons.push(new UIButton(width / 2 - spacing, centerY, 320, 96, "START", () => {
             // Go to difficulty selection screen
             triggerTransition(() => {
                 this.diffSelectIndex    = 1;   // default highlight on NORMAL
@@ -119,20 +124,20 @@ class MainMenu {
                 this.selectedDifficulty = -1;
                 gameState.setState(STATE_DIFF_SELECT);
             });
-        }));
-        this.buttons.push(new UIButton(width / 2, centerY, 256, 96, "HELP", () => {
+        }, 'title', 35, homeBtnStyle));
+        this.buttons.push(new UIButton(width / 2, centerY, 320, 96, "HELP", () => {
             triggerTransition(() => {
                 this.menuState = STATE_HELP;
                 gameState.currentState = STATE_HELP;
             });
-        }));
-        this.buttons.push(new UIButton(width / 2 + spacing, centerY, 256, 96, "SETTINGS", () => {
+        }, 'title', 35, homeBtnStyle));
+        this.buttons.push(new UIButton(width / 2 + spacing, centerY, 320, 96, "SETTINGS", () => {
             triggerTransition(() => {
                 this.diffToastTimer = 0;   // clear any stale difficulty toast
                 this.menuState = STATE_SETTINGS;
                 gameState.currentState = STATE_SETTINGS;
             });
-        }));
+        }, 'title', 35, homeBtnStyle));
     }
 
     // ─── DISPLAY ─────────────────────────────────────────────────────────────
@@ -176,7 +181,15 @@ class MainMenu {
      * Renders the home screen: logo and the three main action buttons.
      */
     drawHomeScreen() {
-        drawLogoPlaceholder(width / 2, 320);
+        // Keep a compact title on home menu.
+        // The large animated title remains exclusive to splash ("Click to continue").
+        if (typeof drawSplitTitle === 'function') {
+            push();
+            translate(width / 2, height * 0.33);
+            drawSplitTitle("PARK STREET", 210, -70, 10);
+            drawSplitTitle("SURVIVOR", 190, 100, 10);
+            pop();
+        }
 
         let anyHover = false;
         for (let i = 0; i < this.buttons.length; i++) {

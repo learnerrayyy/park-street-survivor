@@ -838,10 +838,4 @@ function drawCinematicEnding() {
         text(_endingLines[i], width / 2, startY + i * lineHeight);
     }
 
-    if (_currentLine >= _endingLines.length) {
-        fill(255, 100 + sin(frameCount * 0.1) * 100);
-        textSize(18 * s);
-        text("Click to continue", width / 2, height - 60 * s);
-    }
-    pop();
 }

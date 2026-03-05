@@ -2,11 +2,14 @@
 // Responsibility: UIButton with Vector Icon support and smooth Lerp scaling.
 
 class UIButton {
-    constructor(x, y, w, h, label, onClick) {
+    constructor(x, y, w, h, label, onClick, fontKey = 'body', labelSize = null, style = null) {
         this.x = x; this.y = y;
         this.w = w; this.h = h;
         this.label = label;
         this.onClick = onClick;
+        this.fontKey = fontKey;
+        this.labelSize = labelSize;
+        this.style = style || {};
 
         // Animation State: Current and Target scale for smooth feedback
         this.currentScale = 1.0;
@@ -32,10 +35,14 @@ class UIButton {
         translate(this.x, this.y);
         scale(this.currentScale);  // lerp scale handles the zoom effect
 
+        const labelFont = (typeof fonts !== 'undefined' && fonts[this.fontKey])
+            ? fonts[this.fontKey]
+            : ((typeof fonts !== 'undefined') ? fonts.body : null);
+
         imageMode(CENTER);
         rectMode(CENTER);
         textAlign(CENTER, CENTER);
-        textFont(fonts.body);
+        if (labelFont) textFont(labelFont);
 
         if (this.label === "BACK_ARROW") {
             // Back arrow — back.png, 2× render size, no tint
@@ -44,25 +51,73 @@ class UIButton {
             }
         } else {
             // Standard button — fixed uniform size, drag corners in dev mode to resize
-            let bW = (typeof devMenuBtnW !== 'undefined') ? devMenuBtnW : (assets.btnImg ? assets.btnImg.width  : 240);
-            let bH = (typeof devMenuBtnH !== 'undefined') ? devMenuBtnH : (assets.btnImg ? assets.btnImg.height : 60);
-            let ts = (typeof devMenuTextSize !== 'undefined') ? devMenuTextSize : 24;
+            const useCustomSize = !!this.style.forceSize;
+            let bW = useCustomSize
+                ? this.w
+                : ((typeof devMenuBtnW !== 'undefined') ? devMenuBtnW : (assets.btnImg ? assets.btnImg.width  : this.w));
+            let bH = useCustomSize
+                ? this.h
+                : ((typeof devMenuBtnH !== 'undefined') ? devMenuBtnH : (assets.btnImg ? assets.btnImg.height : this.h));
+            let ts = (this.labelSize !== null)
+                ? this.labelSize
+                : ((typeof devMenuTextSize !== 'undefined') ? devMenuTextSize : 24);
+            const labelOffsetY = (typeof this.style.labelOffsetY === 'number') ? this.style.labelOffsetY : -10;
             // Store dims for corner-drag hit detection (world space, unscaled)
             this._bW = bW;
             this._bH = bH;
-            if (assets.btnImg) {
-                image(assets.btnImg, 0, 0, bW, bH);
+            const btnImage = (this.style.imageKey && assets[this.style.imageKey])
+                ? assets[this.style.imageKey]
+                : assets.btnImg;
+            if (btnImage) {
+                if (this.style.shape === 'roundedRect') {
+                    const ctx = drawingContext;
+                    const r = this.style.radius || 15;
+                    if (ctx && typeof ctx.save === 'function' && typeof ctx.clip === 'function') {
+                        try {
+                            ctx.save();
+                            ctx.beginPath();
+                            if (typeof ctx.roundRect === 'function') {
+                                ctx.roundRect(-bW / 2, -bH / 2, bW, bH, r);
+                            } else {
+                                ctx.rect(-bW / 2, -bH / 2, bW, bH);
+                            }
+                            ctx.clip();
+                            image(btnImage, 0, 0, bW, bH);
+                            ctx.restore();
+                        } catch (e) {
+                            if (ctx && typeof ctx.restore === 'function') ctx.restore();
+                            image(btnImage, 0, 0, bW, bH);
+                        }
+                    } else {
+                        image(btnImage, 0, 0, bW, bH);
+                    }
+                } else {
+                    image(btnImage, 0, 0, bW, bH);
+                }
             }
-            textFont(fonts.body);
+
+            // Optional outer outline (used by main menu buttons)
+            if (this.style.outlineWeight && this.style.outlineWeight > 0) {
+                noFill();
+                stroke(this.style.outlineColor || 0);
+                strokeWeight(this.style.outlineWeight);
+                if (this.style.shape === 'roundedRect') {
+                    rect(0, 0, bW, bH, this.style.radius || 15);
+                } else {
+                    rect(0, 0, bW, bH);
+                }
+            }
+
+            if (labelFont) textFont(labelFont);
             textSize(ts);
             textAlign(CENTER, CENTER);
             stroke(0, 0, 0, 180);
             strokeWeight(5);
             fill(255, 215, 0);
-            text(this.label, 0, -10);
+            text(this.label, 0, labelOffsetY);
             noStroke();
             fill(255, 215, 0);
-            text(this.label, 0, -10);
+            text(this.label, 0, labelOffsetY);
         }
         pop();
 
@@ -120,8 +175,8 @@ class UIButton {
      */
     checkMouse(mx, my) {
         // Use actual rendered button dimensions for hit detection
-        let hw = (typeof devMenuBtnW !== 'undefined') ? devMenuBtnW / 2 : this.w * 0.65;
-        let hh = (typeof devMenuBtnH !== 'undefined') ? devMenuBtnH / 2 : this.h * 0.65;
+        let hw = this._bW ? this._bW / 2 : ((typeof devMenuBtnW !== 'undefined') ? devMenuBtnW / 2 : this.w * 0.65);
+        let hh = this._bH ? this._bH / 2 : ((typeof devMenuBtnH !== 'undefined') ? devMenuBtnH / 2 : this.h * 0.65);
         return (mx > this.x - hw && mx < this.x + hw &&
                 my > this.y - hh && my < this.y + hh);
     }
