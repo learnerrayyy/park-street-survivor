@@ -41,6 +41,93 @@ class ObstacleManager {
             durationFrames: this.secondsToFrames(1.2),
             displayText: ""
         };
+        const globalSafetyDefaults = (GLOBAL_CONFIG && GLOBAL_CONFIG.spawnTuning && GLOBAL_CONFIG.spawnTuning.safety) || {};
+        const globalCenterLaneFlowDefaults = (GLOBAL_CONFIG && GLOBAL_CONFIG.spawnTuning && GLOBAL_CONFIG.spawnTuning.centerLaneFlow) || {};
+        const globalEmergencyCoffeeDefaults = (GLOBAL_CONFIG && GLOBAL_CONFIG.spawnTuning && GLOBAL_CONFIG.spawnTuning.emergencyCoffee) || {};
+        const globalSpawnDirectorDefaults = (GLOBAL_CONFIG && GLOBAL_CONFIG.spawnTuning && GLOBAL_CONFIG.spawnTuning.spawnDirector) || {};
+        const globalRhythmDefaults = (GLOBAL_CONFIG && GLOBAL_CONFIG.spawnTuning && GLOBAL_CONFIG.spawnTuning.hazardRhythm) || {};
+        this.spawnSafetyDefaults = {
+            topBandY: 520,
+            laneGapHazard: 220,
+            laneGapBuff: 130,
+            laneGapSameTypeExtra: 70,
+            safeLaneLookaheadY: 760,
+            movingHazardMinScrollMultiplier: 1.10,
+            ...globalSafetyDefaults
+        };
+        this.hazardRhythmDefaults = {
+            densityMultiplier: 0.88,
+            intervalJitter: 0.35,
+            minIntervalFrames: 10,
+            maxIntervalFrames: 180,
+            spawnRetryFramesWhenBlocked: 8,
+            diversityRerollChance: 0.72,
+            sameTypePenaltyImmediate: 0.22,
+            sameTypePenaltyRecent1: 0.62,
+            sameTypePenaltyRecent2Plus: 0.38,
+            recentTypeWindowSize: 4,
+            laneRepeatBlockTypes: ["FANTASY_COFFEE"],
+            centerLaneCoverageLookaheadY: 760,
+            centerLaneCoverageMinBlocking: 1,
+            centerLaneTypeBoostWhenSparse: 1.65,
+            nonCenterLaneTypePenaltyWhenSparse: 0.72,
+            centerLaneSpawnBiasWhenSparse: 2.10,
+            edgeLaneSpawnPenaltyWhenSparse: 0.78,
+            ...globalRhythmDefaults
+        };
+        this.spawnSafety = { ...this.spawnSafetyDefaults };
+        this.hazardRhythmConfig = { ...this.hazardRhythmDefaults };
+        this.hazardWeightMultiplier = {};
+        this.centerLaneFlowDefaults = {
+            enabled: false,
+            smallCarType: "SMALL_CAR",
+            largeCarType: "LARGE_CAR",
+            largeCarChance: 0.22,
+            alternateLanes: [2, 3],
+            requireCenterSparse: true,
+            triggerChanceWhenSparse: 1.0,
+            minFramesBetweenFlowSpawns: 8,
+            forceEveryHazardSpawn: false,
+            ...globalCenterLaneFlowDefaults
+        };
+        this.centerLaneFlowConfig = { ...this.centerLaneFlowDefaults };
+        this.centerLaneFlowState = { nextLaneIndex: 0, cooldownFrames: 0 };
+        this.emergencyCoffeeDefaults = {
+            enabled: false,
+            enabledDays: [1, 2, 3],
+            coffeeType: "COFFEE",
+            healthThresholdRatio: 0.30,
+            maxSpawnsPerRun: 2,
+            minFramesBetweenEmergencySpawns: 300,
+            retryFramesWhenBlocked: 20,
+            ...globalEmergencyCoffeeDefaults
+        };
+        this.emergencyCoffeeConfig = { ...this.emergencyCoffeeDefaults };
+        this.emergencyCoffeeState = {
+            spawnedCount: 0,
+            pending: false,
+            cooldownFrames: 0
+        };
+        this.spawnDirectorDefaults = {
+            enabled: true,
+            minLaneGapHazard: 130,
+            minLaneGapBuff: 95,
+            sameTypeExtraGap: 40,
+            speedGapPerUnit: 28,
+            minOpenLanesAhead: 1,
+            parallelLookaheadY: 700,
+            parallelBandY: 130,
+            parallelPenaltyPerObstacle: 0.6,
+            speedVarietyPenaltySameClass: 0.82,
+            speedVarietyBoostDifferentClass: 1.08,
+            ...globalSpawnDirectorDefaults
+        };
+        this.spawnDirectorConfig = { ...this.spawnDirectorDefaults };
+        this.lastHazardType = null;
+        this.lastHazardLane = null;
+        this.recentHazardTypes = [];
+        this.fantasyCoffeeRunFrames = null;
+        this.fantasyCoffeeRunFramesKey = "";
     }
 
 
@@ -49,8 +136,239 @@ class ObstacleManager {
         console.log("[ObstacleManager] Level config set:", difficultyConfig.description);
         this.elapsedSpawnFrames = 0;
         this.typeLastSpawnFrame = {};
+        this.lastHazardType = null;
+        this.lastHazardLane = null;
+        this.recentHazardTypes = [];
+        this.applyDayRuntimeTuning();
         this.initializeModeCycleState(difficultyConfig);
         this.initializeBuffControlState(difficultyConfig);
+    }
+
+    applyDayRuntimeTuning() {
+        const dayID = this.getActiveDayID();
+        const dayCfg = (typeof DAYS_CONFIG !== "undefined" && DAYS_CONFIG) ? DAYS_CONFIG[dayID] : null;
+        const safetyOverride = (dayCfg && dayCfg.spawnSafetyConfig && typeof dayCfg.spawnSafetyConfig === "object")
+            ? dayCfg.spawnSafetyConfig
+            : {};
+        const rhythmOverride = (dayCfg && dayCfg.hazardRhythmConfig && typeof dayCfg.hazardRhythmConfig === "object")
+            ? dayCfg.hazardRhythmConfig
+            : {};
+        const weightMulOverride = (dayCfg && dayCfg.hazardWeightMultiplier && typeof dayCfg.hazardWeightMultiplier === "object")
+            ? dayCfg.hazardWeightMultiplier
+            : {};
+        const centerLaneFlowOverride = (dayCfg && dayCfg.centerLaneFlowConfig && typeof dayCfg.centerLaneFlowConfig === "object")
+            ? dayCfg.centerLaneFlowConfig
+            : {};
+        const emergencyCoffeeOverride = (dayCfg && dayCfg.emergencyCoffeeConfig && typeof dayCfg.emergencyCoffeeConfig === "object")
+            ? dayCfg.emergencyCoffeeConfig
+            : {};
+        const spawnDirectorOverride = (dayCfg && dayCfg.spawnDirectorConfig && typeof dayCfg.spawnDirectorConfig === "object")
+            ? dayCfg.spawnDirectorConfig
+            : {};
+
+        this.spawnSafety = { ...this.spawnSafetyDefaults, ...safetyOverride };
+        this.hazardRhythmConfig = { ...this.hazardRhythmDefaults, ...rhythmOverride };
+        this.hazardWeightMultiplier = { ...weightMulOverride };
+        this.centerLaneFlowConfig = { ...this.centerLaneFlowDefaults, ...centerLaneFlowOverride };
+        this.centerLaneFlowState = { nextLaneIndex: 0, cooldownFrames: 0 };
+        this.emergencyCoffeeConfig = { ...this.emergencyCoffeeDefaults, ...emergencyCoffeeOverride };
+        this.emergencyCoffeeState = { spawnedCount: 0, pending: false, cooldownFrames: 0 };
+        this.spawnDirectorConfig = { ...this.spawnDirectorDefaults, ...spawnDirectorOverride };
+        if (!Array.isArray(this.hazardRhythmConfig.laneRepeatBlockTypes)) {
+            this.hazardRhythmConfig.laneRepeatBlockTypes = [...(this.hazardRhythmDefaults.laneRepeatBlockTypes || [])];
+        }
+    }
+
+    isEmergencyCoffeeEnabledForCurrentDay() {
+        const cfg = this.emergencyCoffeeConfig || {};
+        if (!cfg.enabled) return false;
+        const day = this.getActiveDayID();
+        const enabledDays = Array.isArray(cfg.enabledDays) ? cfg.enabledDays.map(v => Number(v)) : [];
+        if (enabledDays.length === 0) return true;
+        return enabledDays.includes(day);
+    }
+
+    hasObstacleTypeOnScreen(type) {
+        if (!type) return false;
+        return this.obstacles.some(o => o && o.type === type);
+    }
+
+    tryEmergencyCoffeeSpawning(canSpawn, playerRef) {
+        const cfg = this.emergencyCoffeeConfig || {};
+        const state = this.emergencyCoffeeState || { spawnedCount: 0, pending: false, cooldownFrames: 0 };
+        this.emergencyCoffeeState = state;
+        if (!this.isEmergencyCoffeeEnabledForCurrentDay()) return false;
+        if (!playerRef) return false;
+
+        if (state.cooldownFrames > 0) state.cooldownFrames--;
+
+        const maxSpawns = Math.max(0, Math.floor(Number(cfg.maxSpawnsPerRun ?? 2)));
+        if (state.spawnedCount >= maxSpawns) return false;
+
+        const maxHealth = Math.max(1, Number(playerRef.maxHealth || PLAYER_DEFAULTS.baseHealth || 100));
+        const curHealth = Math.max(0, Number(playerRef.health || 0));
+        const ratio = curHealth / maxHealth;
+        const threshold = constrain(Number(cfg.healthThresholdRatio ?? 0.30), 0, 1);
+
+        if (ratio < threshold && state.cooldownFrames <= 0) {
+            state.pending = true;
+        }
+        if (!state.pending) return false;
+        if (!canSpawn) return false;
+
+        const coffeeType = String(cfg.coffeeType || "COFFEE");
+        if (this.hasObstacleTypeOnScreen(coffeeType)) return false;
+
+        const spawned = this.spawnObstacle({ obstacleType: coffeeType });
+        if (spawned) {
+            state.spawnedCount++;
+            state.pending = false;
+            state.cooldownFrames = Math.max(
+                0,
+                Math.floor(Number(cfg.minFramesBetweenEmergencySpawns ?? 300))
+            );
+            return true;
+        }
+
+        state.cooldownFrames = Math.max(
+            0,
+            Math.floor(Number(cfg.retryFramesWhenBlocked ?? 20))
+        );
+        return false;
+    }
+
+    getCenterLaneFlowSpawnRequest() {
+        const cfg = this.centerLaneFlowConfig || {};
+        if (!cfg.enabled) return null;
+
+        const lanePattern = Array.isArray(cfg.alternateLanes) && cfg.alternateLanes.length > 0
+            ? cfg.alternateLanes.filter(v => Number(v) >= 1 && Number(v) <= 4).map(v => Number(v))
+            : [2, 3];
+        if (lanePattern.length === 0) return null;
+
+        if (this.centerLaneFlowState && Number(this.centerLaneFlowState.cooldownFrames || 0) > 0) {
+            this.centerLaneFlowState.cooldownFrames--;
+            return null;
+        }
+
+        const requireSparse = cfg.requireCenterSparse !== false;
+        const centerState = this.getCenterLaneCoverageState();
+        if (requireSparse && !centerState.sparse) return null;
+        if (!cfg.forceEveryHazardSpawn) {
+            const chance = constrain(Number(cfg.triggerChanceWhenSparse ?? 1.0), 0, 1);
+            if (Math.random() > chance) return null;
+        }
+
+        const smallType = String(cfg.smallCarType || "SMALL_CAR");
+        const largeType = String(cfg.largeCarType || "LARGE_CAR");
+        const largeChance = constrain(Number(cfg.largeCarChance ?? 0.28), 0, 1);
+
+        const available = this.getHazardObstacleTypes(this.currentLevelConfig.availableObstacles || []);
+        const chooseLarge = Math.random() < largeChance;
+        let obstacleType = chooseLarge ? largeType : smallType;
+        if (!available.includes(obstacleType)) {
+            obstacleType = available.includes(smallType) ? smallType : (available.includes(largeType) ? largeType : null);
+        }
+        if (!obstacleType) return null;
+
+        const laneIdx = this.centerLaneFlowState.nextLaneIndex % lanePattern.length;
+        const primaryLane = lanePattern[laneIdx];
+        const fallbackLanes = lanePattern.filter(v => v !== primaryLane);
+        return { obstacleType, primaryLane, fallbackLanes };
+    }
+
+    getEffectiveHazardWeights(modeWeights, dynamicMultipliers = null) {
+        const effective = modeWeights ? { ...modeWeights } : {};
+        const multipliers = this.hazardWeightMultiplier || {};
+        for (const key of Object.keys(multipliers)) {
+            const mul = Number(multipliers[key]);
+            if (!Number.isFinite(mul) || mul < 0) continue;
+            const base = Number(effective[key] ?? 1.0);
+            effective[key] = (Number.isFinite(base) ? Math.max(0, base) : 0) * mul;
+        }
+        if (dynamicMultipliers && typeof dynamicMultipliers === "object") {
+            for (const key of Object.keys(dynamicMultipliers)) {
+                const mul = Number(dynamicMultipliers[key]);
+                if (!Number.isFinite(mul) || mul < 0) continue;
+                const base = Number(effective[key] ?? 1.0);
+                effective[key] = (Number.isFinite(base) ? Math.max(0, base) : 0) * mul;
+            }
+        }
+        return effective;
+    }
+
+    getCenterLaneCoverageState() {
+        const lookaheadY = Number(this.hazardRhythmConfig.centerLaneCoverageLookaheadY ?? 760);
+        const minBlocking = Math.max(0, Math.floor(Number(this.hazardRhythmConfig.centerLaneCoverageMinBlocking ?? 1)));
+        let centerBlockingCount = 0;
+        for (const obs of this.obstacles) {
+            if (!this.isBlockingObstacle(obs)) continue;
+            if (!obs || obs.y > lookaheadY) continue;
+            if (obs.lane === 2 || obs.lane === 3) centerBlockingCount++;
+        }
+        return {
+            sparse: centerBlockingCount < minBlocking,
+            centerBlockingCount
+        };
+    }
+
+    getRoadCoveragePressureMultipliers(candidates) {
+        const result = {};
+        if (!Array.isArray(candidates) || candidates.length === 0) return result;
+        const centerState = this.getCenterLaneCoverageState();
+        if (!centerState.sparse) return result;
+
+        const roadTypeBoost = Math.max(0, Number(this.hazardRhythmConfig.centerLaneTypeBoostWhenSparse ?? 1.65));
+        const nonRoadPenalty = Math.max(0, Number(this.hazardRhythmConfig.nonCenterLaneTypePenaltyWhenSparse ?? 0.72));
+        for (const type of candidates) {
+            const cfg = OBSTACLE_CONFIG[type] || {};
+            const lanes = Array.isArray(cfg.allowedLanes) ? cfg.allowedLanes : [1, 2, 3, 4];
+            const canSpawnInCenter = lanes.includes(2) || lanes.includes(3);
+            result[type] = canSpawnInCenter ? roadTypeBoost : nonRoadPenalty;
+        }
+        return result;
+    }
+
+    getObstacleSpeedClassByType(type) {
+        const cfg = OBSTACLE_CONFIG[type] || {};
+        const speedCfg = cfg.speed || {};
+        const speedMax = Number(speedCfg.max ?? speedCfg.min ?? 0);
+        if (!Number.isFinite(speedMax) || speedMax <= 0.05) return "STATIC";
+        if (speedMax < 0.7) return "SLOW";
+        if (speedMax < 1.4) return "MEDIUM";
+        return "FAST";
+    }
+
+    getSpeedVarietyMultipliers(candidates) {
+        const result = {};
+        if (!Array.isArray(candidates) || candidates.length === 0) return result;
+        const lastType = this.lastHazardType;
+        if (!lastType) return result;
+        const director = this.spawnDirectorConfig || {};
+        const lastClass = this.getObstacleSpeedClassByType(lastType);
+        const samePenalty = Math.max(0, Number(director.speedVarietyPenaltySameClass ?? 0.82));
+        const diffBoost = Math.max(0, Number(director.speedVarietyBoostDifferentClass ?? 1.08));
+        for (const type of candidates) {
+            const cls = this.getObstacleSpeedClassByType(type);
+            result[type] = (cls === lastClass) ? samePenalty : diffBoost;
+        }
+        return result;
+    }
+
+    combineTypeMultipliers(candidates, maps) {
+        const result = {};
+        if (!Array.isArray(candidates) || candidates.length === 0) return result;
+        for (const type of candidates) {
+            let mul = 1;
+            for (const m of (maps || [])) {
+                if (!m || typeof m !== "object") continue;
+                const v = Number(m[type] ?? 1);
+                if (!Number.isFinite(v) || v < 0) continue;
+                mul *= v;
+            }
+            result[type] = mul;
+        }
+        return result;
     }
 
     initializeModeCycleState(difficultyConfig) {
@@ -76,8 +394,10 @@ class ObstacleManager {
             modeDisplayMap,
             elapsedFrames: 0,
             windowIndex: 0,
-            currentModeId: pattern[0]
+            currentModeId: pattern[0],
+            hazardSpawnCountdownFrames: 0
         };
+        this.scheduleNextHazardSpawn(this.getActiveModeConfig(), true);
     }
 
     updateModeCycleWindowProgress() {
@@ -93,6 +413,12 @@ class ObstacleManager {
         if (nextModeId !== state.currentModeId) {
             state.currentModeId = nextModeId;
             this.triggerModeSwitchIndicator(nextModeId);
+            const modeCfg = this.getActiveModeConfig();
+            const suggested = this.computeHazardSpawnIntervalFrames(modeCfg);
+            state.hazardSpawnCountdownFrames = Math.min(
+                Number(state.hazardSpawnCountdownFrames || suggested),
+                suggested
+            );
         }
     }
 
@@ -210,8 +536,25 @@ class ObstacleManager {
         const available = this.currentLevelConfig.availableObstacles;
         let candidates = this.getHazardObstacleTypes(available);
         candidates = this.applyModeTypeGapFilter(candidates, modeConfig);
-        const modeWeights = modeConfig && modeConfig.obWeights ? modeConfig.obWeights : null;
-        return this.pickWeightedObstacle(candidates, modeWeights);
+        const dynamicMultipliers = this.combineTypeMultipliers(candidates, [
+            this.getRoadCoveragePressureMultipliers(candidates),
+            this.getSpeedVarietyMultipliers(candidates)
+        ]);
+        const modeWeights = modeConfig && modeConfig.obWeights
+            ? this.getEffectiveHazardWeights(modeConfig.obWeights, dynamicMultipliers)
+            : this.getEffectiveHazardWeights(null, dynamicMultipliers);
+        const picked = this.pickWeightedObstacle(candidates, modeWeights, { applyRecencyPenalty: true });
+        if (!picked) return null;
+
+        // Diversity guard: when alternatives exist, avoid immediate same-type repeats most of the time.
+        if (picked === this.lastHazardType) {
+            const nonRepeatCandidates = candidates.filter(t => t !== this.lastHazardType);
+            const rerollChance = constrain(Number(this.hazardRhythmConfig.diversityRerollChance ?? 0.72), 0, 1);
+            if (nonRepeatCandidates.length > 0 && Math.random() < rerollChance) {
+                return this.pickWeightedObstacle(nonRepeatCandidates, modeWeights, { applyRecencyPenalty: true }) || picked;
+            }
+        }
+        return picked;
     }
 
     selectBuffByControlConfig() {
@@ -223,13 +566,28 @@ class ObstacleManager {
         return this.pickWeightedObstacle(buffTypes, this.buffSpawnState.buffWeights || null);
     }
 
-    pickWeightedObstacle(candidates, weightOverrides = null) {
+    pickWeightedObstacle(candidates, weightOverrides = null, options = {}) {
         if (!candidates || candidates.length === 0) return null;
         const weights = weightOverrides || (this.currentLevelConfig && this.currentLevelConfig.obstacleWeights) || {};
 
         const normalized = candidates.map(type => {
             const raw = Number(weights[type] ?? 1.0);
-            return { type, weight: Number.isFinite(raw) ? Math.max(0, raw) : 0 };
+            let weight = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+            if (options && options.applyRecencyPenalty) {
+                let penalty = 1;
+                if (type === this.lastHazardType) {
+                    penalty *= Number(this.hazardRhythmConfig.sameTypePenaltyImmediate ?? 0.22);
+                }
+                const recentCount = this.recentHazardTypes.filter(t => t === type).length;
+                if (recentCount === 1) {
+                    penalty *= Number(this.hazardRhythmConfig.sameTypePenaltyRecent1 ?? 0.62);
+                }
+                if (recentCount >= 2) {
+                    penalty *= Number(this.hazardRhythmConfig.sameTypePenaltyRecent2Plus ?? 0.38);
+                }
+                weight *= penalty;
+            }
+            return { type, weight };
         });
 
         let totalWeight = 0;
@@ -259,6 +617,184 @@ class ObstacleManager {
         return allowed[Math.floor(Math.random() * allowed.length)];
     }
 
+    shuffleArray(values) {
+        const out = [...(values || [])];
+        for (let i = out.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = out[i];
+            out[i] = out[j];
+            out[j] = tmp;
+        }
+        return out;
+    }
+
+    getActiveDayID() {
+        return Number((typeof currentDayID !== "undefined" && currentDayID) ? currentDayID : 1);
+    }
+
+    isBlockingObstacle(obs) {
+        if (!obs || !obs.config) return false;
+        if (obs.config.type === "BUFF") return false;
+        // Fantasy coffee is visual deception and non-collidable in current design.
+        if (obs.type === "FANTASY_COFFEE") return false;
+        return true;
+    }
+
+    getBlockingLanesAhead(maxY = 760) {
+        const occupied = new Set();
+        for (const obs of this.obstacles) {
+            if (!this.isBlockingObstacle(obs)) continue;
+            if (!obs.lane) continue;
+            if (obs.y <= maxY) occupied.add(obs.lane);
+        }
+        return occupied;
+    }
+
+    computeHazardSpawnIntervalFrames(modeConfig) {
+        const windowFrames = Math.max(1, Number(this.modeCycleState && this.modeCycleState.windowFrames) || this.secondsToFrames(5));
+        const rawAvgOb = Number(modeConfig && (modeConfig.avgobPerWindow ?? modeConfig.obPerWindowMean));
+        const avgOb = Number.isFinite(rawAvgOb) && rawAvgOb > 0 ? rawAvgOb : 2.2;
+        const ideal = windowFrames / avgOb;
+        const densityMultiplier = Number(this.hazardRhythmConfig.densityMultiplier ?? 0.88);
+        const interval = ideal * densityMultiplier;
+        const minFrames = Number(this.hazardRhythmConfig.minIntervalFrames ?? 10);
+        const maxFrames = Number(this.hazardRhythmConfig.maxIntervalFrames ?? 180);
+        return constrain(Math.round(interval), minFrames, maxFrames);
+    }
+
+    scheduleNextHazardSpawn(modeConfig, immediate = false) {
+        if (!this.modeCycleState) return;
+        if (immediate) {
+            this.modeCycleState.hazardSpawnCountdownFrames = 0;
+            return;
+        }
+        const base = this.computeHazardSpawnIntervalFrames(modeConfig);
+        const jitter = Math.max(0, Math.min(0.95, Number(this.hazardRhythmConfig.intervalJitter ?? 0.35)));
+        const mul = 1 + ((Math.random() * 2 - 1) * jitter);
+        this.modeCycleState.hazardSpawnCountdownFrames = Math.max(1, Math.round(base * mul));
+    }
+
+    passesSpawnLaneGap(lane, obstacleType, obstacleSize, config, spawnSpeed = 0) {
+        const newY = -obstacleSize.height;
+        const topBandY = Number(this.spawnSafety.topBandY ?? 520);
+        const director = this.spawnDirectorConfig || {};
+        const baseGap = (config && config.type === "BUFF")
+            ? Number((director.enabled ? director.minLaneGapBuff : this.spawnSafety.laneGapBuff) ?? 130)
+            : Number((director.enabled ? director.minLaneGapHazard : this.spawnSafety.laneGapHazard) ?? 220);
+        const sameTypeExtra = Number((director.enabled ? director.sameTypeExtraGap : this.spawnSafety.laneGapSameTypeExtra) ?? 70);
+        const speedGapPerUnit = Number((director.enabled ? director.speedGapPerUnit : 0) ?? 0);
+
+        for (const obs of this.obstacles) {
+            if (!obs || obs.lane !== lane) continue;
+            if (obs.y > topBandY) continue;
+
+            const speedSum = Math.max(0, Number(spawnSpeed || 0) + Number(obs.speed || 0));
+            let requiredGap = baseGap + (obstacleSize.height + (obs.height || 0)) * 0.34 + speedSum * speedGapPerUnit;
+            if (obs.type === obstacleType) requiredGap += sameTypeExtra;
+            const dy = Math.abs((obs.y || 0) - newY);
+            if (dy < requiredGap) return false;
+        }
+        return true;
+    }
+
+    passesSpawnBoundingBoxGap(lane, obstacleSize) {
+        const topBandY = Number(this.spawnSafety.topBandY || 520);
+        const newX = GLOBAL_CONFIG.lanes[`lane${lane}`];
+        const newY = -obstacleSize.height;
+        const newHalfW = obstacleSize.width * 0.5;
+        const newHalfH = obstacleSize.height * 0.5;
+        const padding = 16;
+
+        for (const obs of this.obstacles) {
+            if (!obs) continue;
+            if (obs.y > topBandY) continue;
+            const dx = Math.abs((obs.x || 0) - newX);
+            const dy = Math.abs((obs.y || 0) - newY);
+            const minX = ((obs.width || 0) * 0.5) + newHalfW + padding;
+            const minY = ((obs.height || 0) * 0.5) + newHalfH + padding;
+            if (dx < minX && dy < minY) return false;
+        }
+        return true;
+    }
+
+    breaksSafeLaneRule(lane, config) {
+        if (config && config.type === "BUFF") return false;
+        const occupied = this.getBlockingLanesAhead(Number(this.spawnSafety.safeLaneLookaheadY ?? 760));
+        occupied.add(lane);
+        const director = this.spawnDirectorConfig || {};
+        const minOpen = Math.max(1, Math.min(4, Math.floor(Number(director.minOpenLanesAhead ?? 1))));
+        return (4 - occupied.size) < minOpen;
+    }
+
+    computeParallelSpawnPenalty(lane, obstacleSize) {
+        const director = this.spawnDirectorConfig || {};
+        if (!director.enabled) return 1;
+        const lookaheadY = Number(director.parallelLookaheadY ?? 700);
+        const bandY = Math.max(1, Number(director.parallelBandY ?? 130));
+        const penaltyUnit = Math.max(0.05, Math.min(1, Number(director.parallelPenaltyPerObstacle ?? 0.6)));
+        const newY = -obstacleSize.height;
+        let nearbyParallelCount = 0;
+        for (const obs of this.obstacles) {
+            if (!this.isBlockingObstacle(obs)) continue;
+            if (obs.y > lookaheadY) continue;
+            if (obs.lane === lane) continue;
+            if (Math.abs((obs.y || 0) - newY) > bandY) continue;
+            nearbyParallelCount++;
+        }
+        return Math.pow(penaltyUnit, nearbyParallelCount);
+    }
+
+    selectSafeSpawnLane(config, obstacleType, obstacleSize, laneOptions = {}) {
+        const allowed = (config && Array.isArray(config.allowedLanes) && config.allowedLanes.length > 0)
+            ? config.allowedLanes
+            : [1, 2, 3, 4];
+        const forceLane = Number((laneOptions && laneOptions.forceLane) ?? 0);
+        const spawnSpeed = Number((laneOptions && laneOptions.spawnSpeed) ?? 0);
+        let lanePool = [...allowed];
+        if (forceLane > 0) {
+            if (!allowed.includes(forceLane)) return null;
+            lanePool = [forceLane];
+        }
+        const shuffled = this.shuffleArray(lanePool);
+        const repeatBlockTypes = Array.isArray(this.hazardRhythmConfig.laneRepeatBlockTypes)
+            ? this.hazardRhythmConfig.laneRepeatBlockTypes
+            : [];
+        const centerState = this.getCenterLaneCoverageState();
+        const centerBias = Math.max(0, Number(this.hazardRhythmConfig.centerLaneSpawnBiasWhenSparse ?? 2.10));
+        const edgePenalty = Math.max(0, Number(this.hazardRhythmConfig.edgeLaneSpawnPenaltyWhenSparse ?? 0.78));
+        const validLanes = [];
+        for (const lane of shuffled) {
+            // Avoid same-lane back-to-back repeats for configured obstacle types.
+            if (repeatBlockTypes.includes(obstacleType) &&
+                this.lastHazardType === obstacleType &&
+                this.lastHazardLane === lane) {
+                continue;
+            }
+            if (!this.passesSpawnLaneGap(lane, obstacleType, obstacleSize, config, spawnSpeed)) continue;
+            if (!this.passesSpawnBoundingBoxGap(lane, obstacleSize)) continue;
+            if (this.breaksSafeLaneRule(lane, config)) continue;
+            let score = this.computeParallelSpawnPenalty(lane, obstacleSize);
+            if (centerState.sparse) {
+                score *= (lane === 2 || lane === 3) ? centerBias : edgePenalty;
+            }
+            if (score <= 0) continue;
+            validLanes.push({ lane, score });
+        }
+        if (validLanes.length === 0) return null;
+
+        const weighted = validLanes.map(item => ({ lane: item.lane, weight: Math.max(0, Number(item.score || 0)) }));
+        let total = 0;
+        for (const item of weighted) total += item.weight;
+        if (total <= 0) return weighted[Math.floor(Math.random() * weighted.length)].lane;
+
+        let r = Math.random() * total;
+        for (const item of weighted) {
+            r -= item.weight;
+            if (r <= 0) return item.lane;
+        }
+        return weighted[weighted.length - 1].lane;
+    }
+
     resolveSpritePath(config, variant, lane) {
         if (variant && variant.spriteBySide) {
             const side = lane <= 2 ? "left" : "right";
@@ -268,39 +804,59 @@ class ObstacleManager {
     }
 
     tryModeCycleSpawning(canSpawn) {
-        if (!canSpawn) return false;
         const modeConfig = this.getActiveModeConfig();
         if (!modeConfig || !this.modeCycleState) return false;
-
-        const hazardOnScreen = this.getOnScreenCountByCategory("OBSTACLE");
-        const minOnScreen = Math.max(0, Number(modeConfig.minOnScreenOb || 0));
-        const maxOnScreen = Math.max(minOnScreen, Number(modeConfig.maxOnScreenOb || 0));
-
-        if (hazardOnScreen < minOnScreen) {
-            const forcedType = this.selectDifficultyObstacle(modeConfig);
-            if (forcedType) {
-                return this.spawnObstacle({ obstacleType: forcedType });
-            }
+        if (this.modeCycleState.hazardSpawnCountdownFrames > 0) {
+            this.modeCycleState.hazardSpawnCountdownFrames--;
             return false;
         }
+        if (!canSpawn) return false;
 
-        const windowFrames = Math.max(1, this.modeCycleState.windowFrames);
-        const rawAvgOb = Number(modeConfig.avgobPerWindow ?? modeConfig.obPerWindowMean);
-        const avgOb = Number.isFinite(rawAvgOb) ? rawAvgOb : 2.2;
-        const obChance = constrain(avgOb / windowFrames, 0, 1);
-
-        if (hazardOnScreen >= maxOnScreen) return false;
-        if (Math.random() < obChance) {
-            const hazardType = this.selectDifficultyObstacle(modeConfig);
-            if (hazardType) {
-                return this.spawnObstacle({ obstacleType: hazardType });
+        const centerFlowReq = this.getCenterLaneFlowSpawnRequest();
+        if (centerFlowReq) {
+            const spawnedByFlow = this.spawnObstacle({
+                obstacleType: centerFlowReq.obstacleType,
+                forceLane: centerFlowReq.primaryLane
+            }) || this.spawnObstacle({
+                obstacleType: centerFlowReq.obstacleType,
+                forceLane: (centerFlowReq.fallbackLanes && centerFlowReq.fallbackLanes[0]) || centerFlowReq.primaryLane
+            });
+            if (spawnedByFlow) {
+                this.centerLaneFlowState.nextLaneIndex++;
+                this.centerLaneFlowState.cooldownFrames = Math.max(
+                    0,
+                    Math.floor(Number(this.centerLaneFlowConfig.minFramesBetweenFlowSpawns ?? 8))
+                );
+                this.scheduleNextHazardSpawn(modeConfig, false);
+                return true;
             }
         }
+
+        const hazardType = this.selectDifficultyObstacle(modeConfig);
+        if (!hazardType) {
+            this.scheduleNextHazardSpawn(modeConfig, false);
+            return false;
+        }
+        const spawned = this.spawnObstacle({ obstacleType: hazardType });
+        if (spawned) {
+            this.scheduleNextHazardSpawn(modeConfig, false);
+            return true;
+        }
+        // If blocked by lane safety this frame, retry quickly.
+        this.modeCycleState.hazardSpawnCountdownFrames = Math.max(
+            1,
+            Math.floor(Number(this.hazardRhythmConfig.spawnRetryFramesWhenBlocked ?? 8))
+        );
         return false;
     }
 
-    tryBuffTimedSpawning(canSpawn) {
+    tryBuffTimedSpawning(canSpawn, playerRef) {
         if (!canSpawn) return;
+        const emergencySpawned = this.tryEmergencyCoffeeSpawning(canSpawn, playerRef);
+        if (emergencySpawned) {
+            this.scheduleNextBuffSpawn();
+            return;
+        }
         if (!this.buffSpawnState) return;
         if (this.buffSpawnState.timerFrames > 0) {
             this.buffSpawnState.timerFrames--;
@@ -333,14 +889,18 @@ class ObstacleManager {
         }
 
 
-        const lane = this.selectRandomAllowedLane(config);
-
-
         const variantId = this.getVariantForObstacle(obstacleType);
         const variant = config.variants && config.variants.length > 0
             ? config.variants[Math.floor(Math.random() * config.variants.length)]
             : config.variants?.[0];
         const obstacleSize = (variant && variant.size) ? variant.size : config.size;
+        const spawnSpeed = Number(config.speed.min) + Math.random() * (Number(config.speed.max) - Number(config.speed.min));
+        const forcedLane = Number(normalized.forceLane ?? 0);
+        const lane = this.selectSafeSpawnLane(config, obstacleType, obstacleSize, {
+            forceLane: forcedLane,
+            spawnSpeed
+        });
+        if (!lane) return false;
 
         const obstacle = {
             type: obstacleType,
@@ -350,7 +910,7 @@ class ObstacleManager {
             y: -obstacleSize.height,
             width: obstacleSize.width,
             height: obstacleSize.height,
-            speed: config.speed.min + Math.random() * (config.speed.max - config.speed.min),
+            speed: spawnSpeed,
             damage: config.damage,
             effect: config.effect,
             variant: variant,
@@ -359,22 +919,38 @@ class ObstacleManager {
             variantId: variantId
         };
 
+        if (obstacleType === "FANTASY_COFFEE") {
+            obstacle.fantasyState = "DISGUISED";
+            obstacle.escapeStartupFrames = 0;
+            obstacle.runFrame = 0;
+            obstacle.runFrameCounter = 0;
+            obstacle.escapeVx = 0;
+            obstacle.escapeVy = 0;
+            obstacle.spritePath = config.disguiseSprite || obstacle.spritePath;
+        }
+
         if (obstacleType === "HOMELESS") {
             obstacle.dialogue = this.getHomelessDialogueText(config);
         }
 
         if (obstacleType === "SCOOTER_RIDER") {
-            const intervalCfg = config.laneChangeInterval || { min: 0.5, max: 1.0 };
             obstacle.targetLane = lane;
-            obstacle.laneChangeTimer = this.secondsToFrames(this.randomRange(intervalCfg.min, intervalCfg.max));
             obstacle.laneMoveFramesTotal = 0;
             obstacle.laneMoveFramesRemaining = 0;
             obstacle.laneMoveStartX = obstacle.x;
             obstacle.laneMoveTargetX = obstacle.x;
+            obstacle.proximityLaneChangeConsumed = false;
         }
 
         this.obstacles.push(obstacle);
         this.typeLastSpawnFrame[obstacleType] = this.elapsedSpawnFrames;
+        if (config.type !== "BUFF") {
+            this.lastHazardType = obstacleType;
+            this.lastHazardLane = lane;
+            this.recentHazardTypes.push(obstacleType);
+            const recentWindowSize = Math.max(1, Math.floor(Number(this.hazardRhythmConfig.recentTypeWindowSize ?? 4)));
+            if (this.recentHazardTypes.length > recentWindowSize) this.recentHazardTypes.shift();
+        }
         console.log(`[ObstacleManager] Spawned ${obstacleType} at lane ${lane}`);
         return true;
     }
@@ -397,18 +973,24 @@ class ObstacleManager {
             lastObs.y > minObstacleInterval;
 
         const spawnedByMode = this.tryModeCycleSpawning(canSpawn);
-        this.tryBuffTimedSpawning(canSpawn && !spawnedByMode);
+        this.tryBuffTimedSpawning(canSpawn && !spawnedByMode, player);
 
         for (let i = this.obstacles.length - 1; i >= 0; i--) {
             const obs = this.obstacles[i];
 
-            this.updateDynamicLaneBehavior(obs);
+            this.updateDynamicLaneBehavior(obs, player);
 
             const baseSpeed = PLAYER_DEFAULTS.baseSpeed;
             let obsMoveSpeed = obs.speed * baseSpeed * (scrollSpeed / max(1, GLOBAL_CONFIG.scrollSpeed));
             // Stationary entities (speed=0) still need world scrolling to enter the screen.
             if (obsMoveSpeed <= 0.01) obsMoveSpeed = scrollSpeed;
+            if (obs && obs.config && obs.config.type !== "BUFF" && Number(obs.speed || 0) > 0) {
+                // Keep moving hazards visibly faster than background so they do not look frozen.
+                const minMul = Number(this.spawnSafety.movingHazardMinScrollMultiplier ?? 1.10);
+                obsMoveSpeed = Math.max(obsMoveSpeed, scrollSpeed * minMul);
+            }
             obs.y += obsMoveSpeed;
+            this.updateFantasyCoffeeBehavior(obs, player);
 
             if (obs.y > GLOBAL_CONFIG.resolutionH + 100) {
                 this.obstacles.splice(i, 1);
@@ -438,8 +1020,9 @@ class ObstacleManager {
         for (let obs of this.obstacles) {
             push();
 
-
-            if (obs.spritePath) {
+            if (obs.type === "FANTASY_COFFEE") {
+                this.displayFantasyCoffee(obs);
+            } else if (obs.spritePath) {
                 const img = this.getSpriteImage(obs.spritePath);
                 if (img) {
                     imageMode(CENTER);
@@ -628,11 +1211,18 @@ class ObstacleManager {
     }
 
     checkCollision(player, obs) {
+        if (obs && obs.type === "FANTASY_COFFEE") {
+            return false;
+        }
 
         const playerLeft = player.x - player.hitboxW / 2;
         const playerRight = player.x + player.hitboxW / 2;
         const playerTop = player.y - 20;
         const playerBottom = player.y + 20;
+
+        if (this.isMovingObstacle(obs)) {
+            return this.checkHexCollisionWithPlayerRect(obs, playerLeft, playerRight, playerTop, playerBottom);
+        }
 
         const obsLeft = obs.x - obs.width / 2;
         const obsRight = obs.x + obs.width / 2;
@@ -662,10 +1252,93 @@ class ObstacleManager {
         return false;
     }
 
+    isMovingObstacle(obs) {
+        if (!obs || !obs.config) return false;
+        if (obs.config.type === "BUFF") return false;
+        return Number(obs.speed || 0) > 0;
+    }
+
+    getObstacleHexPoints(obs) {
+        const halfW = (obs.width || 0) * 0.5;
+        const halfH = (obs.height || 0) * 0.5;
+        const insetX = halfW * 0.36;   // trim side corners
+        const neckY = halfH * 0.42;    // keep center body fatter than diamond
+        const cx = obs.x || 0;
+        const cy = obs.y || 0;
+
+        return [
+            { x: cx,             y: cy - halfH }, // top point
+            { x: cx + halfW,     y: cy - neckY },
+            { x: cx + halfW,     y: cy + neckY },
+            { x: cx,             y: cy + halfH }, // bottom point
+            { x: cx - halfW,     y: cy + neckY },
+            { x: cx - halfW,     y: cy - neckY }
+        ].map(p => ({ x: p.x + (p.x > cx ? -insetX : (p.x < cx ? insetX : 0)), y: p.y }));
+    }
+
+    getPlayerRectPoints(left, right, top, bottom) {
+        return [
+            { x: left,  y: top },
+            { x: right, y: top },
+            { x: right, y: bottom },
+            { x: left,  y: bottom }
+        ];
+    }
+
+    projectPointsOnAxis(points, axis) {
+        let min = Infinity;
+        let max = -Infinity;
+        for (const p of points) {
+            const value = p.x * axis.x + p.y * axis.y;
+            if (value < min) min = value;
+            if (value > max) max = value;
+        }
+        return { min, max };
+    }
+
+    isAxisSeparating(polyA, polyB, axis) {
+        const projA = this.projectPointsOnAxis(polyA, axis);
+        const projB = this.projectPointsOnAxis(polyB, axis);
+        return projA.max < projB.min || projB.max < projA.min;
+    }
+
+    getPolygonAxes(points) {
+        const axes = [];
+        for (let i = 0; i < points.length; i++) {
+            const a = points[i];
+            const b = points[(i + 1) % points.length];
+            const edgeX = b.x - a.x;
+            const edgeY = b.y - a.y;
+            const nx = -edgeY;
+            const ny = edgeX;
+            const len = Math.hypot(nx, ny);
+            if (len <= 1e-6) continue;
+            axes.push({ x: nx / len, y: ny / len });
+        }
+        return axes;
+    }
+
+    checkHexCollisionWithPlayerRect(obs, playerLeft, playerRight, playerTop, playerBottom) {
+        const hex = this.getObstacleHexPoints(obs);
+        const rect = this.getPlayerRectPoints(playerLeft, playerRight, playerTop, playerBottom);
+
+        const axes = [
+            ...this.getPolygonAxes(hex),
+            { x: 1, y: 0 },
+            { x: 0, y: 1 }
+        ];
+
+        for (const axis of axes) {
+            if (this.isAxisSeparating(hex, rect, axis)) return false;
+        }
+        return true;
+    }
+
 
     handleCollision(player, obs) {
         const config = obs.config;
         const isBuff = config && config.type === "BUFF";
+        const isFantasyCoffee = obs && obs.type === "FANTASY_COFFEE";
 
         // Empty scooter buff is cancelled by promoter/homeless only,
         // and no extra collision effects are applied in that hit.
@@ -687,7 +1360,7 @@ class ObstacleManager {
             return;
         }
 
-        if (typeof feedbackLayer !== "undefined" && feedbackLayer) {
+        if (!isFantasyCoffee && typeof feedbackLayer !== "undefined" && feedbackLayer) {
             if (isBuff && typeof feedbackLayer.onBuffPickup === "function") {
                 feedbackLayer.onBuffPickup(obs.type, {
                     effect: config.effect || "",
@@ -741,6 +1414,10 @@ class ObstacleManager {
             player.applyHomelessForcedLaneSwitch(obs.lane);
         }
 
+        if (config.effect === "puddleTrap" && typeof player.applyPuddleTrap === "function") {
+            player.applyPuddleTrap(config.escapePressRequired ?? 3, config.slowMultiplier ?? 0.72);
+        }
+
         if (config.effect === "leaflet") {
             this.startPromoterInteraction(obs);
         }
@@ -759,7 +1436,11 @@ class ObstacleManager {
         this.promoterInteraction.active = true;
         this.promoterInteraction.spacePressCount = 0;
         this.promoterInteraction.spacePressRequired = config.spacePressRequired || 10;
-        const flyers = Array.isArray(config.leafletSprites) ? config.leafletSprites : [];
+        const dayID = Number((typeof currentDayID !== "undefined" && currentDayID) ? currentDayID : 1);
+        let flyers = Array.isArray(config.leafletSprites) ? config.leafletSprites : [];
+        if (config.leafletSpritesByDay && Array.isArray(config.leafletSpritesByDay[dayID])) {
+            flyers = config.leafletSpritesByDay[dayID];
+        }
         if (flyers.length > 0) {
             const randomFlyer = flyers[Math.floor(Math.random() * flyers.length)];
             this.promoterInteraction.overlaySpritePath = randomFlyer;
@@ -784,11 +1465,14 @@ class ObstacleManager {
 
     firePromoterPaperBall(player) {
         const playerLane = this.getPlayerCurrentLane(player);
-        this.clearNearestObstacleInLane(playerLane, player ? player.y : PLAYER_RUN_FOOT_Y);
+        const target = this.findNearestClearableObstacleInLane(playerLane, player ? player.y : PLAYER_RUN_FOOT_Y);
 
         this.promoterInteraction.projectile = {
             x: player ? player.x : GLOBAL_CONFIG.lanes.lane1,
             y: player ? (player.y - 36) : (PLAYER_RUN_FOOT_Y - 36),
+            lane: playerLane,
+            target: target || null,
+            hitRadius: 56,
             speed: 22,
             ttl: 42
         };
@@ -802,6 +1486,12 @@ class ObstacleManager {
         p.y += scrollSpeed * 0.35;
         p.ttl--;
 
+        const targetHit = this.tryHitPaperBallTarget(p);
+        if (targetHit) {
+            this.promoterInteraction.projectile = null;
+            return;
+        }
+
         if (p.ttl <= 0 || p.y < -40) {
             this.promoterInteraction.projectile = null;
         }
@@ -810,11 +1500,20 @@ class ObstacleManager {
     displayPromoterProjectile() {
         const p = this.promoterInteraction.projectile;
         if (!p) return;
+        const config = OBSTACLE_CONFIG.PROMOTER || {};
+        const spritePath = config.paperBallSprite;
+        const sprite = spritePath ? this.getSpriteImage(spritePath) : null;
+        const ballSize = config.paperBallSize || { width: 48, height: 48 };
 
         push();
-        textAlign(CENTER, CENTER);
-        textSize(34);
-        text("🔵", p.x, p.y);
+        imageMode(CENTER);
+        if (sprite) {
+            image(sprite, p.x, p.y, ballSize.width, ballSize.height);
+        } else {
+            fill(60, 130, 255);
+            noStroke();
+            circle(p.x, p.y, 24);
+        }
         pop();
     }
 
@@ -880,33 +1579,77 @@ class ObstacleManager {
         return nearestLane;
     }
 
-    clearNearestObstacleInLane(lane, playerY) {
-        if (!lane) return;
+    isClearableByPaperBall(obs) {
+        if (!obs || !obs.type || !obs.config) return false;
+        if (obs.type === "PROMOTER") return false;
+        if (obs.config.type === "BUFF") return false;
+        return true;
+    }
 
-        let targetIndex = -1;
+    findNearestClearableObstacleInLane(lane, originY) {
+        if (!lane) return null;
+        let target = null;
         let bestDistance = Number.POSITIVE_INFINITY;
+        const fromY = Number(originY || PLAYER_RUN_FOOT_Y);
+
         for (let i = 0; i < this.obstacles.length; i++) {
             const obs = this.obstacles[i];
-            if (!obs || obs.lane !== lane) continue;
-            if (obs.type === "PROMOTER") continue;
+            if (!this.isClearableByPaperBall(obs)) continue;
+            if (obs.lane !== lane) continue;
 
-            const forwardDistance = (playerY || PLAYER_RUN_FOOT_Y) - obs.y;
+            const forwardDistance = fromY - Number(obs.y || 0);
             if (forwardDistance < 0) continue;
             if (forwardDistance < bestDistance) {
                 bestDistance = forwardDistance;
-                targetIndex = i;
+                target = obs;
+            }
+        }
+        return target;
+    }
+
+    removeObstacleInstance(targetObs) {
+        if (!targetObs) return false;
+        const idx = this.obstacles.indexOf(targetObs);
+        if (idx < 0) return false;
+        this.obstacles.splice(idx, 1);
+        return true;
+    }
+
+    tryHitPaperBallTarget(projectile) {
+        if (!projectile) return false;
+        const target = projectile.target;
+        const radius = Math.max(1, Number(projectile.hitRadius || 56));
+
+        // Prefer locked target if it still exists.
+        if (target && this.obstacles.includes(target)) {
+            const dx = Number(target.x || 0) - Number(projectile.x || 0);
+            const dy = Number(target.y || 0) - Number(projectile.y || 0);
+            if (Math.hypot(dx, dy) <= radius) {
+                return this.removeObstacleInstance(target);
             }
         }
 
-        if (targetIndex >= 0) this.obstacles.splice(targetIndex, 1);
+        // Fallback: hit any clearable obstacle near the projectile in the same lane.
+        const lane = Number(projectile.lane || 0);
+        for (let i = 0; i < this.obstacles.length; i++) {
+            const obs = this.obstacles[i];
+            if (!this.isClearableByPaperBall(obs)) continue;
+            if (lane && obs.lane !== lane) continue;
+            const dx = Number(obs.x || 0) - Number(projectile.x || 0);
+            const dy = Number(obs.y || 0) - Number(projectile.y || 0);
+            if (Math.hypot(dx, dy) <= radius) {
+                this.obstacles.splice(i, 1);
+                return true;
+            }
+        }
+        return false;
     }
 
-    updateDynamicLaneBehavior(obs) {
+    updateDynamicLaneBehavior(obs, playerRef) {
         if (!obs || obs.type !== "SCOOTER_RIDER") return;
 
         const cfg = obs.config || {};
         const laneCount = 4;
-        const intervalCfg = cfg.laneChangeInterval || { min: 0.5, max: 1.0 };
         const durationCfg = cfg.laneChangeDuration || { min: 0.18, max: 0.28 };
 
         // Linear lane switch in progress
@@ -919,25 +1662,155 @@ class ObstacleManager {
             if (obs.laneMoveFramesRemaining <= 0) {
                 obs.x = obs.laneMoveTargetX;
                 obs.lane = obs.targetLane;
-                obs.laneChangeTimer = this.secondsToFrames(this.randomRange(intervalCfg.min, intervalCfg.max));
             }
             return;
         }
 
-        // Waiting between lane changes
-        obs.laneChangeTimer = (obs.laneChangeTimer || 0) - 1;
-        if (obs.laneChangeTimer <= 0) {
-            const step = Math.random() < 0.5 ? -1 : 1;
-            let nextLane = (obs.targetLane || obs.lane || 1) + step;
-            if (nextLane < 1 || nextLane > laneCount) nextLane = (obs.targetLane || obs.lane || 1) - step;
-            nextLane = constrain(nextLane, 1, laneCount);
+        // One-time proximity-triggered lane change.
+        if (obs.proximityLaneChangeConsumed) return;
+        if (!playerRef) return;
 
-            obs.targetLane = nextLane;
-            obs.laneMoveStartX = obs.x;
-            obs.laneMoveTargetX = GLOBAL_CONFIG.lanes[`lane${nextLane}`];
-            obs.laneMoveFramesTotal = this.secondsToFrames(this.randomRange(durationCfg.min, durationCfg.max));
-            obs.laneMoveFramesRemaining = obs.laneMoveFramesTotal;
+        const triggerRadius = Math.max(1, Number(cfg.proximityLaneChangeRadius ?? 600));
+        const dx = Number(playerRef.x || 0) - Number(obs.x || 0);
+        const dy = Number(playerRef.y || 0) - Number(obs.y || 0);
+        const distance = Math.hypot(dx, dy);
+        if (distance > triggerRadius) return;
+
+        const currentLane = Number(obs.targetLane || obs.lane || 1);
+        const candidates = [];
+        if (currentLane - 1 >= 1) candidates.push(currentLane - 1);
+        if (currentLane + 1 <= laneCount) candidates.push(currentLane + 1);
+        if (candidates.length === 0) {
+            obs.proximityLaneChangeConsumed = true;
+            return;
         }
+
+        const nextLane = candidates[Math.floor(Math.random() * candidates.length)];
+        obs.targetLane = nextLane;
+        obs.laneMoveStartX = obs.x;
+        obs.laneMoveTargetX = GLOBAL_CONFIG.lanes[`lane${nextLane}`];
+        obs.laneMoveFramesTotal = this.secondsToFrames(this.randomRange(durationCfg.min, durationCfg.max));
+        obs.laneMoveFramesRemaining = obs.laneMoveFramesTotal;
+        obs.proximityLaneChangeConsumed = true;
+    }
+
+    updateFantasyCoffeeBehavior(obs, playerRef) {
+        if (!obs || obs.type !== "FANTASY_COFFEE") return;
+        if (!playerRef) return;
+        const cfg = obs.config || {};
+
+        if (obs.fantasyState === "DISGUISED") {
+            const dx = playerRef.x - obs.x;
+            const dy = playerRef.y - obs.y;
+            const distance = Math.hypot(dx, dy);
+            const triggerRadius = Math.max(1, Number(cfg.escapeTriggerRadius ?? 300));
+            if (distance > triggerRadius) return;
+
+            const startup = Math.max(0, Math.floor(Number(cfg.escapeStartupFrames ?? 12)));
+            obs.fantasyState = "STARTUP";
+            obs.escapeStartupFrames = startup;
+
+            const angleDeg = Number(cfg.escapeAngleDeg ?? 76);
+            const angleRad = angleDeg * Math.PI / 180;
+            const speed = Math.abs(Number(cfg.escapeSpeed ?? 3.4));
+            obs.escapeVx = speed * Math.cos(angleRad);
+            obs.escapeVy = speed * Math.sin(angleRad);
+            obs.spritePath = cfg.runSpriteSheet || obs.spritePath;
+            return;
+        }
+
+        if (obs.fantasyState === "STARTUP") {
+            if (obs.escapeStartupFrames > 0) {
+                obs.escapeStartupFrames--;
+                return;
+            }
+            obs.fantasyState = "ESCAPING";
+        }
+
+        if (obs.fantasyState === "ESCAPING") {
+            obs.x += Number(obs.escapeVx || 0);
+            obs.y += Number(obs.escapeVy || 0);
+            const runFps = Math.max(1, Number(cfg.runAnimFps ?? 12));
+            const frameStep = Math.max(1, Math.floor(60 / runFps));
+            obs.runFrameCounter = (obs.runFrameCounter || 0) + 1;
+            if (obs.runFrameCounter >= frameStep) {
+                obs.runFrameCounter = 0;
+                const frames = Math.max(1, Math.floor(Number(cfg.runSpriteFrames ?? 6)));
+                obs.runFrame = ((obs.runFrame || 0) + 1) % frames;
+            }
+        }
+    }
+
+    displayFantasyCoffee(obs) {
+        if (!obs) return;
+        const cfg = obs.config || {};
+        const state = obs.fantasyState || "DISGUISED";
+
+        if (state === "ESCAPING" || state === "STARTUP") {
+            const frames = this.getFantasyCoffeeRunFrames(cfg);
+            const frameCount = Array.isArray(frames) ? frames.length : 0;
+            if (frameCount > 0) {
+                const frame = constrain(Math.floor(obs.runFrame || 0), 0, frameCount - 1);
+                const frameImg = frames[frame];
+                imageMode(CENTER);
+                if (state === "STARTUP") {
+                    const startupTotal = Math.max(1, Math.floor(Number(cfg.escapeStartupFrames ?? 12)));
+                    const t = 1 - (Number(obs.escapeStartupFrames || 0) / startupTotal);
+                    const scaleMul = 1 + 0.16 * t;
+                    image(frameImg, obs.x, obs.y, obs.width * scaleMul, obs.height * scaleMul);
+                } else {
+                    image(frameImg, obs.x, obs.y, obs.width, obs.height);
+                }
+                return;
+            }
+        }
+
+        if (obs.spritePath) {
+            const img = this.getSpriteImage(obs.spritePath);
+            if (img) {
+                imageMode(CENTER);
+                image(img, obs.x, obs.y, obs.width, obs.height);
+                return;
+            }
+        }
+        this.drawMissingSpritePlaceholder(obs);
+    }
+
+    getFantasyCoffeeRunFrames(cfg) {
+        const sheetPath = cfg && cfg.runSpriteSheet ? String(cfg.runSpriteSheet) : "";
+        const totalFrames = Math.max(1, Math.floor(Number((cfg && cfg.runSpriteFrames) ?? 6)));
+        const cacheKey = `${sheetPath}::${totalFrames}`;
+        if (this.fantasyCoffeeRunFrames && this.fantasyCoffeeRunFramesKey === cacheKey) {
+            return this.fantasyCoffeeRunFrames;
+        }
+
+        const sheet = sheetPath ? this.getSpriteImage(sheetPath) : null;
+        if (!sheet || !sheet.width || !sheet.height) return null;
+
+        const sw = Math.floor(sheet.width / totalFrames);
+        const sh = sheet.height;
+        if (sw <= 0 || sh <= 0) return null;
+
+        const frames = [];
+        for (let i = 0; i < totalFrames; i++) {
+            const frameImg = createImage(sw, sh);
+            frameImg.copy(sheet, i * sw, 0, sw, sh, 0, 0, sw, sh);
+            frameImg.loadPixels();
+            for (let p = 0; p < frameImg.pixels.length; p += 4) {
+                const r = frameImg.pixels[p];
+                const g = frameImg.pixels[p + 1];
+                const b = frameImg.pixels[p + 2];
+                if (r >= 245 && g >= 245 && b >= 245) {
+                    frameImg.pixels[p + 3] = 0;
+                }
+            }
+            frameImg.updatePixels();
+            frames.push(frameImg);
+        }
+
+        this.fantasyCoffeeRunFrames = frames;
+        this.fantasyCoffeeRunFramesKey = cacheKey;
+        return frames;
     }
 
     secondsToFrames(seconds) {

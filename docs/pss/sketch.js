@@ -8,6 +8,8 @@ let endScreenManager;
 let testingPanel;
 let feedbackLayer;
 let tutorialDialogue;   // global dialogue box for tutorial page explanations
+let __sfxFrame = -1;
+let __sfxCounts = Object.create(null);
 
 // ─── GAME PROGRESS STATE ─────────────────────────────────────────────────────
 let currentUnlockedDay = 1;
@@ -42,7 +44,7 @@ let assets = {
     }
 };
 let fonts = {};
-let bgm, sfxSelect, sfxClick, sfxScold;
+let sfxSelect, sfxClick, sfxScold;
 let sfxDialogue, sfxHitBigCar, sfxHitSmallCar, sfxPickupCoffee, sfxPickupScooter;
 
 // ─── AUDIO VOLUME CONTROLS ───────────────────────────────────────────────────
@@ -148,115 +150,191 @@ let showStoryRecap = false;
 let storyRecapDay = 1;
 let storyScrollOffset = 0;  // scroll offset within current day's text
 
+// Save-choice screen state (STATE_SAVE_CHOICE)
+let _saveChoiceIndex = 0;  // 0 = CONTINUE, 1 = NEW GAME
+// True once the player has pressed START at least once this page load.
+// Prevents repeated save-load prompts when returning to menu mid-session.
+let _sessionStarted = false;
+
 // ─── STORY RECAP CONTENT ──────────────────────────────────────────────────────
 /**
- * Story summary text for each day's recap panel.
- * Each entry has a title (shown above the cloud) and lines[] (scrollable body text).
+ * Returns the story recap for a given day.
+ * Branches narrative based on _playerChoices where meaningful.
+ * Each return value: { title, lines[] }
  */
-const STORY_RECAPS = {
-    1: {
-        title: "Day 1 — Monday",
-        lines: [
-            "First day of term.",
-            "The alarm went off at 8:15.",
-            "",
-            "You threw on your hoodie, grabbed your",
-            "laptop, and sprinted out the door.",
-            "",
-            "Park Street looked deceptively calm.",
-            "Then the buses came.",
-            "",
-            "You wove between parked scooters,",
-            "ducked past a leaflet-handing promoter,",
-            "and somehow made it to the Arts Complex",
-            "with two minutes to spare.",
-            "",
-            "You rewarded yourself with a coffee.",
-            "It helped. A little."
-        ]
-    },
-    2: {
-        title: "Day 2 — Tuesday",
-        lines: [
-            "Seminar at 9:00.",
-            "You left at 8:48.",
-            "",
-            "The hill felt steeper than yesterday.",
-            "A scooter nearly clipped your shoulder.",
-            "",
-            "You spotted an empty scooter by the kerb",
-            "and hopped on for a short burst —",
-            "probably not legal, definitely worth it.",
-            "",
-            "You arrived breathless but present.",
-            "The lecturer hadn't even started yet.",
-            "",
-            "Small victories."
-        ]
-    },
-    3: {
-        title: "Day 3 — Wednesday",
-        lines: [
-            "Midweek. The city felt busier.",
-            "",
-            "A street vendor was handing out flyers",
-            "right in the middle of the pavement.",
-            "You pressed SPACE ten times and",
-            "launched a paper ball to clear the path.",
-            "",
-            "A homeless man stepped out unexpectedly",
-            "and bumped you into the wrong lane.",
-            "You recovered. Barely.",
-            "",
-            "The coffee from Tuesday was wearing off.",
-            "You found another one on the kerb.",
-            "",
-            "Somehow, you kept moving."
-        ]
-    },
-    4: {
-        title: "Day 4 — Thursday",
-        lines: [
-            "It was raining.",
-            "",
-            "Your rain boots kept your feet dry",
-            "through three separate puddles.",
-            "Your headphones blocked out the noise",
-            "of two separate promoters.",
-            "",
-            "The large car came out of nowhere.",
-            "You felt it before you saw it.",
-            "",
-            "You stumbled. Lost momentum.",
-            "But you kept running.",
-            "",
-            "The library was in sight.",
-            "It always felt further in the rain."
-        ]
-    },
-    5: {
-        title: "Day 5 — Friday",
-        lines: [
-            "Final submission day.",
-            "",
-            "Your laptop was heavy in the bag.",
-            "Your Student ID was clipped to your jacket.",
-            "Everything you needed was with you.",
-            "",
-            "The street threw everything at you.",
-            "Buses. Scooters. Promoters. Rain.",
-            "",
-            "You used every skill you'd picked up",
-            "across the week.",
-            "",
-            "And then — the Arts Complex doors.",
-            "Open. Waiting.",
-            "",
-            "You made it.",
-            "You actually made it."
-        ]
+function getStoryRecap(day) {
+    // Helper: get recorded choice for a day+line
+    const ch = (lineIdx) =>
+        (typeof _playerChoices !== 'undefined' && _playerChoices[day + '_' + lineIdx])
+            ? _playerChoices[day + '_' + lineIdx].choiceIdx
+            : null;
+
+    // ── Prologue (day 0) — the news broadcast before everything began ──
+    if (day === 0) {
+        return {
+            title: "Prologue",
+            lines: [
+                "NEWSREADER: Breaking news.",
+                "NEWSREADER: A car crash near Blackfriars Underpass.",
+                "NEWSREADER: A woman, late 20s, struck by a car at 18:00.",
+                "NEWSREADER: Emergency services rushed her to hospital.",
+                "NEWSREADER: She is in critical condition.",
+                "NEWSREADER: Circumstances of the crash remain unclear.",
+                "NEWSREADER: Witnesses say she may have acted intentionally.",
+            ]
+        };
     }
-};
+
+    if (day === 1) {
+        const greeted = ch(1);   // 0 = "Wiola… Hi", 1 = "Hey girl"
+        const thanked = ch(9);   // 0 = "you've always got my back", 1 = "You're a life saver"
+        return {
+            title: "Day 1 — Monday",
+            lines: [
+                "Iris woke at 8:00, feeling oddly rested.",
+                "The sunny morning — too good to waste.",
+                "",
+                "On Park Street, she ran into Wiola.",
+                "WIOLA: Heyy Iris! Long time no see!",
+                greeted === 1
+                    ? "IRIS: Hey girl, it's been ages!"
+                    : "IRIS: Wiola... hi, it's so nice to see you.",
+                "",
+                "WIOLA: Have you prepared for today's lecture?",
+                "WIOLA: Just sit with me — I'll talk you through it.",
+                "",
+                thanked === 1
+                    ? "IRIS: You're a life saver!"
+                    : "IRIS: Thanks — you've always got my back.",
+                "",
+                "Wiola had vitamin gummies — orange flavour.",
+                "Iris's favourite. She accepted them gratefully.",
+                "",
+                "For a Monday morning, things felt almost okay."
+            ]
+        };
+    }
+
+    if (day === 2) {
+        const chicken = ch(12);  // 0 = "no regrets", 1 = "fried chicken is my life"
+        return {
+            title: "Day 2 — Tuesday",
+            lines: [
+                "Another bright day. Another steep hill.",
+                "LAYLA: You alright? You look like you ran a marathon!",
+                "",
+                "IRIS: Ha, money's tight — no bus fare.",
+                "IRIS: Besides, it's good for my health.",
+                "",
+                "Layla teased her about Ji's Chicken.",
+                chicken === 1
+                    ? "IRIS: Fried chicken is my life!"
+                    : "IRIS: I eat fried chicken with no regrets!",
+                "",
+                "Layla gave Iris a purple tangle toy.",
+                "LAYLA: I remember you mentioning your ADHD.",
+                "Iris was genuinely touched.",
+                "",
+                "They headed into uni together, smiling."
+            ]
+        };
+    }
+
+    if (day === 3) {
+        const travel = ch(5);  // 0 = "I admire how you balance…", 1 = "Next time let's go together"
+        return {
+            title: "Day 3 — Wednesday",
+            lines: [
+                "The alarm barely registered. Body aching.",
+                "Gloomy weather. She hoped it wouldn't rain.",
+                "",
+                "Raymond was waiting near the top of the hill.",
+                "IRIS: Hi Ray, so glad to see you.",
+                "RAYMOND: I've been travelling, catching up.",
+                travel === 1
+                    ? "IRIS: Next time let's go together!"
+                    : "IRIS: I admire how you balance it all.",
+                "",
+                "Then Iris swayed. Nearly blacked out.",
+                "RAYMOND: IRIS OMG, WAKE UP!",
+                "IRIS: Just dizzy. The hill always gets me.",
+                "",
+                "Raymond stayed by her side all the way.",
+                "He gave her headphones from his travels.",
+                "RAYMOND: Let's go before you faint again.",
+                "Iris smiled — grateful he was there."
+            ]
+        };
+    }
+
+    if (day === 4) {
+        const help    = ch(4);   // 0 = "give me a sec", 1 = "DON'T TOUCH ME"
+        const confide = ch(13);  // 0 = confide, 1 = push away
+
+        return {
+            title: "Day 4 — Thursday",
+            lines: [
+                "Legs trembling. Pouring rain.",
+                "",
+                "Yuki found her sitting on the wet ground.",
+                "YUKI: IRIS! Hey, what are you doing? It's wet!",
+                help === 1
+                    ? "IRIS: STOP! DON'T TOUCH ME!"
+                    : "IRIS: Ughh… yeah, give me a sec.",
+                "",
+                "Then everything went black.",
+                "YUKI: You almost DIED, Iris. What happened?!",
+                "",
+                confide === 1
+                    ? "IRIS: Go away! You won't understand!"
+                    : "IRIS: I've been having these episodes...",
+                confide === 1
+                    ? "YUKI: I'm just trying to be a good friend."
+                    : "YUKI: Let's go to the GP on the weekend.",
+                "",
+                "Iris followed Yuki inside. Silently grateful."
+            ]
+        };
+    }
+
+    if (day === 5) {
+        const voices  = ch(3);   // 0 = continue listening, 1 = snap out
+        const who     = ch(21);  // 0 = keep listening to voices, 1 = listen to Charlotte
+        const ending  = ch(36);  // 0 = "No… I can't keep running", 1 = "Okayy…"
+
+        return {
+            title: "Day 5 — Friday",
+            lines: [
+                "Something felt different today.",
+                "IRIS: UUUUUGGGHHHH......",
+                "She woke gasping. The dream again.",
+                "",
+                voices === 1
+                    ? "She shook her head. The voices faded."
+                    : "She let the voices wash over her.",
+                "",
+                "Charlotte was waving. Balloons filled the sky.",
+                "Iris could barely hear her. Everything felt slow.",
+                "",
+                who === 1
+                    ? "IRIS: Charlotte... (she turned to face her)"
+                    : "Unknown voices pulled at her. Hard to look away.",
+                "CHARLOTTE: We're all going clubbing. SZPITAL.",
+                "CHARLOTTE: No arguments.",
+                "",
+                ending === 0
+                    ? "IRIS: No… I can't keep running from my problems."
+                    : "IRIS: Okayy… I don't know if I'll have the strength.",
+                "",
+                ending === 0
+                    ? "She faced what came next. No more running."
+                    : "Rain on her face — washing something away."
+            ]
+        };
+    }
+
+    return { title: `Day ${day}`, lines: ['No recap available.'] };
+}
 
 // ─── TUTORIAL HINT SYSTEM ─────────────────────────────────────────────────────
 /**
@@ -331,11 +409,11 @@ function preload() {
     assets.menuBg = loadImage('assets/background/cbg.png', itemLoaded);
     assets.otherBg = loadImage('assets/background/other_bg.png', itemLoaded);
     assets.roomBg = loadImage('assets/background/room.png', itemLoaded);
+    assets.csHospitalBg = loadImage('assets/background/hospital.png', itemLoaded);
     assets.inventoryBg = loadImage('assets/inventory/table.png', itemLoaded);
     assets.backpackImg = loadImage('assets/inventory/backpack.png', itemLoaded);
     assets.studentCardImg = loadImage('assets/inventory/student_card.png', itemLoaded);
     assets.computerImg    = loadImage('assets/inventory/computer.png', itemLoaded);
-    assets.portraitPlayerNormal = loadImage('assets/characters/portrait/main.png', itemLoaded);
     assets.vitaminImg     = loadImage('assets/inventory/vitamin.png', itemLoaded);
     assets.tangleImg      = loadImage('assets/inventory/tangle.png', itemLoaded);
     assets.headphoneImg   = loadImage('assets/inventory/headphone.png', itemLoaded);
@@ -373,7 +451,15 @@ function preload() {
 
     // Audio
     soundFormats('mp3', 'wav');
-    bgm = loadSound('assets/audio/music/MainTheme.wav', itemLoaded);
+    bgms.Main = loadSound('assets/audio/music/MainTheme.wav', itemLoaded);
+    bgms.TimeRoom = loadSound('assets/audio/music/TimeRoom.mp3', itemLoaded);
+    bgms.Level12 = loadSound('assets/audio/music/Level12.mp3', itemLoaded);
+    bgms.Level34 = loadSound('assets/audio/music/Level34.mp3', itemLoaded);
+    bgms.Level5 = loadSound('assets/audio/music/Level5.mp3', itemLoaded);
+    bgms.Library = loadSound('assets/audio/music/Library.wav', itemLoaded);
+    bgms.EndL = loadSound('assets/audio/music/LifeEnding.mp3', itemLoaded);
+    bgms.EndD = loadSound('assets/audio/music/DeathEnding.mp3', itemLoaded);
+
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
     sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
     sfxDialogue      = loadSound('assets/audio/effects/DIalogue.mp3',   itemLoaded);
@@ -430,6 +516,15 @@ function preload() {
     assets.previews['empty_scooter'] = loadImage('assets/power_up/powerup_scooter.png');
     assets.previews['powerup_scooter'] = assets.previews['empty_scooter'];
 
+    const portraitPath = 'assets/characters/portrait/';
+
+    assets.portraitPlayerNormal = loadImage(portraitPath + 'portrait_iris.png', itemLoaded);
+    assets.portraitWiola        = loadImage(portraitPath + 'portrait_wiola.png', itemLoaded);
+    assets.portraitLayla        = loadImage(portraitPath + 'portrait_layla.png', itemLoaded);
+    assets.portraitRaymond      = loadImage(portraitPath + 'portrait_raymond.png', itemLoaded);
+    assets.portraitYuki         = loadImage(portraitPath + 'portrait_yuki.png', itemLoaded);
+    assets.portraitCharlotte     = loadImage(portraitPath + 'portrait_charlotte.png', itemLoaded);
+
     // Player directional frame animation (uses authored frame PNGs directly)
     assets.playerAnim = {};
     const dirs = ['north', 'south', 'west', 'east'];
@@ -470,7 +565,6 @@ function preload() {
     });
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 2: ENGINE LIFECYCLE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -499,9 +593,11 @@ function setup() {
     tutorialDialogue.timerMax = 300;   // 5 s — long enough to read tutorial page explanations
 
     textFont(fonts.body);
-    gameState.currentState = STATE_LOADING;
+    gameState.setState(STATE_LOADING);
 
     if (developerMode) devApplyStartupSkip();
+
+    //debugHookBGMCalls();
 }
 
 /**
@@ -536,6 +632,9 @@ function draw() {
             case STATE_LEVEL_SELECT:
             case STATE_SETTINGS:
             case STATE_HELP:
+            case STATE_DIFF_SELECT:
+            case STATE_DIFF_CONFIRM:
+            case STATE_LOAD_GAME:
                 if (mainMenu) {
                     mainMenu.menuState = gameState.currentState;
                     // Auto-colorize once the entrance animation finishes — keeps visible gray period
@@ -629,6 +728,10 @@ function draw() {
                 }
 
                 break;
+
+            case STATE_SAVE_CHOICE:
+                drawSaveChoiceScreen();
+                break;
         }
     } catch (e) {
         console.error("[Core Systems] Runtime Exception:", e);
@@ -638,6 +741,9 @@ function draw() {
         feedbackLayer.update();
         feedbackLayer.display();
     }
+
+    // Auto-save tick (fires every 3 s during active gameplay states)
+    if (typeof SaveSystem !== 'undefined') SaveSystem.tick();
 
     renderGlobalFade();
 
@@ -684,54 +790,81 @@ function runGameLoop() {
             _winCutscenePending = true;
             let day = currentDayID;
             console.log(`[runGameLoop] Settlement → NPC cutscene Day ${day}`);
-
-            if (day === 5) {
-                // Day 5: Charlotte dialogue → player choice → credits
-                let day5Choices = [
-                    { label: "Don't Stay", cb: () => {
-                        triggerTransition(() => startCutscene('library', CS_DAY5_LEAVE, () => {
-                            triggerTransition(() => {
-                                _day5Ending = 'leave';
-                                resetCredits();
-                                gameState.setState(STATE_CREDITS);
-                            });
-                        }));
-                    }},
-                    { label: "Stay", cb: () => {
-                        triggerTransition(() => {
-                            _day5Ending = 'stay';
-                            resetCredits();
-                            gameState.setState(STATE_CREDITS);
-                        });
-                    }}
-                ];
-                triggerTransition(() => startCutscene('library', CS_DAY_NPC[5], null, day5Choices));
-
-            } else {
-                // Days 1–4: NPC dialogue → success end screen
-                triggerTransition(() => startCutscene('library', CS_DAY_NPC[day], () => {
-                    triggerTransition(() => gameState.setState(STATE_WIN));
-                }));
+            triggerTransition(() => startCutscene('library', CS_DAY_NPC[day], () => {
+                triggerTransition(() => gameState.setState(STATE_WIN));
+            }));
             }
         }
     }
-}
 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 3: AUDIO
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─── SFX ANTI-SPAM / ANTI-LAYER ─────────────────────────────────────────────
+const _sfxCooldownUntil = Object.create(null);  // {id: timestamp}
+
 /**
- * Plays a sound effect at the global SFX volume level.
+ * Plays a sound effect with global volume + anti-spam protection.
  */
-function playSFX(sound) {
-    if (sound) {
-        sound.setVolume(masterVolumeSFX);
-        sound.play();
+function playSFX(sound, opt = {}) {
+    try {
+        
+        // 1. basic check
+        if (!sound || typeof sound.isLoaded !== 'function' || !sound.isLoaded()) {
+            return; 
+        }
+
+        // 2. Ensure ID and attribute
+        const id = opt.id || sound._url || 'SFX';
+        const isUI = !!opt.ui || sound === sfxSelect || sound === sfxClick;
+
+        // Inside the `playSFX(){try}, add the following before the cooldown check:
+        if (__sfxFrame !== frameCount) {
+            // Clear at the beginning of each frame
+            __sfxFrame = frameCount;
+            __sfxCounts = Object.create(null);
+        }
+
+        __sfxCounts[id] = (__sfxCounts[id] || 0) + 1;
+
+        // 3. cooldownMs logic
+        const cooldownMs = (typeof opt.cooldownMs === 'number') ? opt.cooldownMs : (isUI ? 80 : 150);
+        const now = performance.now();
+        if (now < (_sfxCooldownUntil[id] || 0)) return;
+        _sfxCooldownUntil[id] = now + cooldownMs;
+
+        // 4. Mono/overlay logic processing
+        const monophonic = (typeof opt.monophonic === 'boolean') ? opt.monophonic : (!isUI);
+
+        if (monophonic && typeof sound.isPlaying === 'function' && sound.isPlaying()) {
+            // Optimization: Use jump(0) to reduce the overhead of reconnecting nodes.
+            try { 
+                sound.jump(0); 
+            } catch (jumpErr) { 
+                sound.stop(); 
+                sound.play(); 
+            }
+        } else {
+            // 5. Adjust volume and play.
+            const vol = (typeof masterVolumeSFX === 'number') ? masterVolumeSFX : 0.5;
+            sound.setVolume(vol);
+            sound.play();
+        }
+
+    } catch (e) {
+        // Capture all potential errors to prevent audio issues from crashing the game logic.
+        console.warn('[SFX] playSFX internal error:', e);
+    }
+    if (frameCount % 30 === 0) {
+        let topId = null, topN = 0;
+        for (const k in __sfxCounts) {
+            if (__sfxCounts[k] > topN) { topN = __sfxCounts[k]; topId = k; }
+        }
+        if (topN > 3) console.warn("[AUDIO] top playSFX calls:", topId, topN, __sfxCounts);
     }
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 4: TRANSITIONS
@@ -760,7 +893,13 @@ function renderGlobalFade() {
 
     if (globalFade.dir === 1 && globalFade.alpha >= 255) {
         globalFade.alpha = 255;
-        if (globalFade.callback) globalFade.callback();
+        if (globalFade.callback) {
+        try {
+            globalFade.callback();
+        } catch (e) {
+            console.error('[Transition] callback crashed:', e);
+        }
+    }
         globalFade.dir = -1;
     }
     if (globalFade.dir === -1 && globalFade.alpha <= 0) {
@@ -797,6 +936,19 @@ function keyPressed() {
     // Cutscene: Enter/Space advances dialogue
     if (state === STATE_CUTSCENE) {
         if (keyCode === ENTER || keyCode === 13 || key === ' ') csAdvance();
+        return;
+    }
+
+    // Save-choice screen navigation
+    if (state === STATE_SAVE_CHOICE) {
+        if (keyCode === UP_ARROW || keyCode === 87 || keyCode === DOWN_ARROW || keyCode === 83) {
+            _saveChoiceIndex = (_saveChoiceIndex + 1) % 2;
+            if (typeof playSFX === 'function') playSFX(sfxSelect);
+        } else if (key === 'e' || key === 'E') {
+            _onSaveChoiceExecute(0);
+        } else if (keyCode === ENTER || keyCode === 13) {
+            _onSaveChoiceExecute(_saveChoiceIndex);
+        }
         return;
     }
 
@@ -848,7 +1000,8 @@ function keyPressed() {
             state !== STATE_SPLASH && state !== STATE_INVENTORY &&
             state !== STATE_WARNING &&
             state !== STATE_CREDITS &&
-            state !== STATE_CUTSCENE) {
+            state !== STATE_CUTSCENE &&
+            state !== STATE_DIFF_SELECT && state !== STATE_DIFF_CONFIRM && state !== STATE_LOAD_GAME) {
             playSFX(sfxClick);
             playSFX(sfxClick);
             togglePause();
@@ -864,16 +1017,16 @@ function keyPressed() {
         if (showStoryRecap) {
             // story recap arrow keys / ESC handled in story recap section
             if (keyCode === UP_ARROW || keyCode === 87) {
-                if (storyScrollOffset <= 0 && storyRecapDay > 1) {
+                if (storyScrollOffset <= 0 && storyRecapDay > 0) {
                     storyRecapDay--;
-                    let prevRecap = STORY_RECAPS[storyRecapDay];
+                    let prevRecap = getStoryRecap(storyRecapDay);
                     storyScrollOffset = max(0, prevRecap.lines.length - 10);
                 } else {
                     storyScrollOffset = max(0, storyScrollOffset - 1);
                 }
                 if (typeof playSFX === 'function') playSFX(sfxSelect);
             } else if (keyCode === DOWN_ARROW || keyCode === 83) {
-                let recap = STORY_RECAPS[storyRecapDay];
+                let recap = getStoryRecap(storyRecapDay);
                 if (recap) {
                     let maxScroll = max(0, recap.lines.length - 10);
                     if (storyScrollOffset >= maxScroll && storyRecapDay + 1 <= 5) {
@@ -925,6 +1078,13 @@ function keyPressed() {
     }
 
     // Promoter leaflet interaction: SPACE is consumed by obstacle system while active.
+    if (state === STATE_DAY_RUN && player &&
+        typeof player.handlePuddleEscapePress === 'function' &&
+        (keyCode === 32 || key === ' ')) {
+        if (player.handlePuddleEscapePress()) return false;
+    }
+
+    // Promoter leaflet interaction: SPACE is consumed by obstacle system while active.
     if (state === STATE_DAY_RUN && obstacleManager &&
         typeof obstacleManager.handlePromoterSpacePress === 'function' &&
         (keyCode === 32 || key === ' ')) {
@@ -933,7 +1093,8 @@ function keyPressed() {
 
     // Menu navigation
     if (state === STATE_MENU || state === STATE_LEVEL_SELECT ||
-        state === STATE_SETTINGS || state === STATE_HELP) {
+        state === STATE_SETTINGS || state === STATE_HELP ||
+        state === STATE_DIFF_SELECT || state === STATE_DIFF_CONFIRM || state === STATE_LOAD_GAME) {
         if (mainMenu) mainMenu.handleKeyPress(key, keyCode);
     }
     // Room navigation + inventory toggle (E key handled inside roomScene — desk-proximity gated)
@@ -983,7 +1144,7 @@ function handlePauseSelection() {
             tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
         showStoryRecap = true;
-        storyRecapDay = 1;
+        storyRecapDay = 0;   // open at Prologue (day 0); Days 1-5 follow
         storyScrollOffset = 0;
     } else if (selected === "SETTINGS") {
         // Tutorial first-pause: mark done then open settings
@@ -1062,6 +1223,14 @@ function handleRestartChoice() {
  * Dispatches mouse press events; also unlocks the Web Audio context on first click.
  */
 function mousePressed() {
+    
+        if (frameCount % 60 === 0) {
+            const ctx = (typeof getAudioContext === 'function') ? getAudioContext() : null;
+            if (ctx && ctx.state !== 'running') {
+                ctx.resume().catch(e => console.warn('[SFX] Context resume failed', e));
+            }
+        }
+    
     if (globalFade.isFading || !gameState) return;
 
     // Dev corner-drag: intercept before everything else
@@ -1096,8 +1265,19 @@ function mousePressed() {
         return;
     }
 
+    // Save-choice screen: click selects option
+    if (state === STATE_SAVE_CHOICE) {
+        _saveChoiceHitTest(mouseX, mouseY, true);
+        return;
+    }
+
     // Credits screen: click skips scroll/pause → poem, or exits poem → menu
     if (state === STATE_CREDITS) {
+        if (_creditPhase === 'scroll' || _creditPhase === 'pause') {
+            console.log("[Credits] Scrolling... interaction locked.");
+            return; 
+        }
+
         if (_creditPhase === 'poem' && _creditPoemAlpha >= 255) {
             if (_day5Ending === 'stay') {
                 _day5Ending = null;
@@ -1107,9 +1287,7 @@ function mousePressed() {
             } else {
                 triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
             }
-        } else if (_creditPhase !== 'poem') {
-            _creditPhase = 'poem'; _creditPoemAlpha = 0;
-        }
+        } 
         return;
     }
 
@@ -1117,10 +1295,7 @@ function mousePressed() {
     if (state === STATE_SPLASH) {
         if (getAudioContext().state !== 'running') getAudioContext().resume();
         playSFX(sfxClick);
-        if (bgm && !bgm.isPlaying()) {
-            bgm.setVolume(masterVolumeBGM);
-            bgm.loop();
-        }
+
         triggerTransition(() => gameState.setState(STATE_MENU));
         return;
     }
@@ -1148,27 +1323,27 @@ function mousePressed() {
             let arrowX   = width - 90;
             let centerY  = height / 2;
             let arrowGap = 90;
-            if (storyRecapDay >= 1 && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35) {
+            if (storyRecapDay > 0 && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35) {
                 storyRecapDay--;
                 storyScrollOffset = 0;
                 if (typeof playSFX === 'function') playSFX(sfxSelect);
                 return;
             }
-            if (storyRecapDay <= 5 && dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35) {
+            if (storyRecapDay < 5 && dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35) {
                 storyRecapDay++;
                 storyScrollOffset = 0;
                 if (typeof playSFX === 'function') playSFX(sfxSelect);
                 return;
             }
-            // story recap sidebar clicks
+            // story recap sidebar clicks (items 0=Prologue, 1-5=Days)
             let sidebarX = width * 0.16;
             let sidebarBaseY = height * 0.45;
-            for (let i = 0; i < 5; i++) {
-                let diff = i - (storyRecapDay - 1);
+            for (let i = 0; i < 6; i++) {
+                let diff = i - storyRecapDay;
                 let cardY = sidebarBaseY + diff * 130;
                 if (mouseX > sidebarX - 120 && mouseX < sidebarX + 120 &&
                     mouseY > cardY - 40 && mouseY < cardY + 40) {
-                    storyRecapDay = i + 1;
+                    storyRecapDay = i;
                     storyScrollOffset = 0;
                     if (typeof playSFX === 'function') playSFX(sfxSelect);
                     return;
@@ -1182,7 +1357,8 @@ function mousePressed() {
     }
 
     if (state === STATE_MENU || state === STATE_LEVEL_SELECT ||
-        state === STATE_SETTINGS || state === STATE_HELP) {
+        state === STATE_SETTINGS || state === STATE_HELP ||
+        state === STATE_DIFF_SELECT || state === STATE_DIFF_CONFIRM || state === STATE_LOAD_GAME) {
         if (mainMenu) mainMenu.handleClick(mouseX, mouseY);
     } else if (state === STATE_FAIL || state === STATE_WIN) {
         if (endScreenManager) endScreenManager.handleClick(mouseX, mouseY);
@@ -1243,6 +1419,9 @@ function mouseMoved() {
     if (gameState.currentState === STATE_CUTSCENE) {
         csMoveHover(mouseX, mouseY);
     }
+    if (gameState.currentState === STATE_SAVE_CHOICE) {
+        _saveChoiceHitTest(mouseX, mouseY, false);
+    }
     if (gameState.currentState === STATE_FAIL || gameState.currentState === STATE_WIN) {
         if (endScreenManager) endScreenManager.handleMouseMove(mouseX, mouseY);
     }
@@ -1273,6 +1452,9 @@ function togglePause() {
 function setupRun(dayID) {
     currentDayID = dayID;
     _winCutscenePending = false;  // reset so the NPC cutscene can fire this run
+
+    // Unlock all characters/story up to this day (supports testing panel access)
+    currentUnlockedDay = Math.max(currentUnlockedDay, dayID);
 
     player.applyLevelStats(dayID);
     player.x = GLOBAL_CONFIG.lanes.lane1;
@@ -1308,6 +1490,8 @@ function setupRun(dayID) {
             gameState.setState(STATE_ROOM);
         });
     } else {
+        // Room position must be set even when cutscene is skipped on retry
+        if (player) { player.x = 940; player.y = 550; }
         gameState.setState(STATE_ROOM);
     }
 }
@@ -2120,28 +2304,38 @@ function drawEndScreen() {
  *   L5  Up/Down arrows          — always on top, fully clickable
  */
 function renderStoryRecap() {
-    let dayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
-    let isUnlocked = (storyRecapDay < currentUnlockedDay) ||
-                     (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-    let recap = STORY_RECAPS[storyRecapDay];
+    // chapter 0 = Prologue, chapters 1-5 = Days 1-5
+    let chapterNums   = ["P", "01", "02", "03", "04", "05"];
+    let chapterLabels = ["PROLOGUE", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
 
-    // ── L2a: Left sidebar — skewed day cards (moved right slightly) ──
-    let sidebarX     = width * 0.16;   // was 0.12 — shifted right
+    // Unlock logic: Prologue always visible; Day N needs Day N complete (currentUnlockedDay >= N+1)
+    let debugAll = (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
+    let isUnlocked;
+    if (storyRecapDay === 0) {
+        isUnlocked = (currentUnlockedDay >= 1) || debugAll;
+    } else {
+        isUnlocked = (storyRecapDay < currentUnlockedDay) || debugAll;
+    }
+    let recap = getStoryRecap(storyRecapDay);
+
+    // ── L2a: Left sidebar — skewed chapter cards (Prologue + Days 1-5) ──
+    let sidebarX     = width * 0.16;
     let sidebarBaseY = height * 0.45;
     let cardSpacing  = 130;
 
     push();
     translate(sidebarX, sidebarBaseY);
-    for (let i = 0; i < 5; i++) {
-        let day  = i + 1;
-        let diff = i - (storyRecapDay - 1);
+    for (let i = 0; i < 6; i++) {
+        let diff = i - storyRecapDay;
         let distFromCenter = abs(diff);
         let cardY = diff * cardSpacing;
         let cardX = distFromCenter * 30;
 
-        let dayUnlocked = (day <= currentUnlockedDay) ||
-                          (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
-        let isSelected = (day === storyRecapDay);
+        // Prologue (i=0) always unlocked; Day i unlocked when currentUnlockedDay >= i+1 → i < currentUnlockedDay
+        let itemUnlocked = (i === 0)
+            ? ((currentUnlockedDay >= 1) || debugAll)
+            : ((i < currentUnlockedDay) || debugAll);
+        let isSelected = (i === storyRecapDay);
         let alpha = map(distFromCenter, 0, 2, 255, 50);
         let s     = map(distFromCenter, 0, 1, 1.15, 0.8);
 
@@ -2151,7 +2345,7 @@ function renderStoryRecap() {
         scale(constrain(s, 0.5, 1.4));
 
         noStroke();
-        fill(dayUnlocked
+        fill(itemUnlocked
             ? (isSelected ? [255, 20, 147, alpha] : [70, 20, 90, alpha * 0.6])
             : [30, 30, 45, alpha * 0.7]);
 
@@ -2161,14 +2355,14 @@ function renderStoryRecap() {
         endShape(CLOSE);
 
         textAlign(LEFT, CENTER);
-        textFont(fonts.title); textSize(40);
+        textFont(fonts.title); textSize(i === 0 ? 28 : 40);
         fill(isSelected ? color(255, 215, 0, alpha) : color(255, alpha));
-        text(day.toString().padStart(2, '0'), -90, 4);
+        text(chapterNums[i], -90, 4);
 
-        textFont(fonts.body); textSize(18);
-        if (dayUnlocked) {
+        textFont(fonts.body); textSize(i === 0 ? 14 : 18);
+        if (itemUnlocked) {
             fill(isSelected ? color(255, 215, 0, alpha) : color(255, 215, 0, alpha * 0.8));
-            text(dayNames[i], -10, 8);
+            text(chapterLabels[i], -10, 8);
         } else {
             fill(180, 60, 60, alpha); textSize(14);
             text("LOCKED", -10, 8);
@@ -2202,11 +2396,12 @@ function renderStoryRecap() {
         drawingContext.rect(textX - textW / 2, textY - textH / 2, textW, textH);
         drawingContext.clip();
 
-        // Content lines only (title is drawn separately above the cloud)
-        textFont(fonts.body); textSize(25); textAlign(CENTER, CENTER);
-        let lineH      = 32;
-        let contentTop = textY - textH / 2 + 24;   // start near top of clip box
-        let maxScroll  = max(0, recap.lines.length - 10);
+        // Content lines — LEFT-aligned, "SPEAKER: text" format with colour-coded speaker names
+        textFont(fonts.body); textSize(22); textAlign(LEFT, CENTER);
+        let lineH      = 30;
+        let lineLeft   = textX - textW / 2 + 16;   // left edge with padding
+        let contentTop = textY - textH / 2 + 20;   // start near top of clip box
+        let maxScroll  = max(0, recap.lines.length - 14);
         storyScrollOffset = constrain(storyScrollOffset, 0, maxScroll);
 
         for (let j = 0; j < recap.lines.length; j++) {
@@ -2222,10 +2417,26 @@ function renderStoryRecap() {
             if (ly > botEdge) edgeFade = map(ly, botEdge, textY + textH / 2, 255, 0);
             edgeFade = constrain(edgeFade, 0, 255);
 
-            stroke(0, 0, 0, edgeFade * 0.6); strokeWeight(3); fill(255, 240, 220, edgeFade);
-            text(lineText, textX, ly);
-            noStroke(); fill(255, 240, 220, edgeFade);
-            text(lineText, textX, ly);
+            // Detect "SPEAKER: dialogue" format — speaker is ALL-CAPS word(s) before ': '
+            let speakerMatch = lineText.match(/^([A-Z]+(?:\s[A-Z]+)?): /);
+            if (speakerMatch) {
+                let speakerStr = speakerMatch[0];          // e.g. "IRIS: "
+                let dialogueStr = lineText.substring(speakerStr.length);
+                // Draw speaker name in gold
+                stroke(0, 0, 0, edgeFade * 0.5); strokeWeight(2);
+                fill(255, 215, 0, edgeFade);
+                text(speakerStr, lineLeft, ly);
+                // Draw dialogue text in warm white immediately after
+                noStroke();
+                fill(255, 240, 220, edgeFade);
+                text(dialogueStr, lineLeft + textWidth(speakerStr), ly);
+            } else {
+                // Narrative line — soft lavender-white
+                stroke(0, 0, 0, edgeFade * 0.4); strokeWeight(2);
+                fill(210, 200, 230, edgeFade);
+                text(lineText, lineLeft, ly);
+                noStroke();
+            }
         }
 
         drawingContext.restore();
@@ -2294,8 +2505,8 @@ function renderStoryRecap() {
     let arrowGap = 90;
 
     if (assets.backImg) {
-        // Up arrow (previous day)
-        let canGoUp  = storyRecapDay > 1;
+        // Up arrow (previous chapter — Prologue is 0)
+        let canGoUp  = storyRecapDay > 0;
         let upHover  = canGoUp && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35;
         push();
         translate(arrowX, centerY - arrowGap);
@@ -2307,18 +2518,18 @@ function renderStoryRecap() {
         noTint();
         pop();
 
-        // Day indicator between arrows
+        // Chapter indicator between arrows
+        let chapterLabel = storyRecapDay === 0 ? "PROLOGUE" : "DAY " + storyRecapDay;
         push();
-        textFont(fonts.title); textSize(20); textAlign(CENTER, CENTER);
+        textFont(fonts.title); textSize(storyRecapDay === 0 ? 14 : 20); textAlign(CENTER, CENTER);
         stroke(0, 0, 0, 150); strokeWeight(3); fill(255, 215, 0);
-        text("DAY " + storyRecapDay, arrowX, centerY);
+        text(chapterLabel, arrowX, centerY);
         noStroke(); fill(255, 215, 0);
-        text("DAY " + storyRecapDay, arrowX, centerY);
+        text(chapterLabel, arrowX, centerY);
         pop();
 
-        // Down arrow (next day)
-        let nextDay   = storyRecapDay + 1;
-        let canGoDown = nextDay <= 5;
+        // Down arrow (next chapter)
+        let canGoDown = storyRecapDay < 5;
         let downHover = canGoDown && dist(mouseX, mouseY, arrowX, centerY + arrowGap) < 35;
 
         push();
@@ -2388,4 +2599,163 @@ function printStoryDebugData() {
     console.log("[DEV] Current storyDebugData:");
     console.log(JSON.stringify(storyDebugData, null, 2));
 
+}
+
+function drawSaveChoiceScreen() {
+    drawOtherBgWithOverlay();
+
+    const save = SaveSystem.load();
+    const W = width, H = height;
+    const cx = W / 2;
+    const s  = min(W / 1920, H / 1080);
+
+    push();
+
+    // ── Title ────────────────────────────────────────────────────────────────
+    let fT = (typeof fonts !== 'undefined') ? (fonts.title || fonts.body) : null;
+    let fB = (typeof fonts !== 'undefined') ? fonts.body : null;
+    if (fT) textFont(fT);
+    textAlign(CENTER, CENTER);
+    textSize(72 * s);
+    fill(255, 220, 80);
+    noStroke();
+    text('CONTINUE ADVENTURE?', cx, H * 0.22);
+
+    // ── Save info card ────────────────────────────────────────────────────────
+    if (fB) textFont(fB);
+    const cardW = 680 * s, cardH = 160 * s;
+    const cardX = cx - cardW / 2, cardY = H * 0.33;
+    fill(30, 20, 60, 220);
+    stroke(180, 140, 80); strokeWeight(2 * s);
+    rectMode(CORNER);
+    rect(cardX, cardY, cardW, cardH, 14 * s);
+    noStroke();
+
+    if (save) {
+        textSize(30 * s);
+        fill(200, 180, 140);
+        text('LAST SAVED  ' + SaveSystem.formatTime(save.savedAt), cx, cardY + cardH * 0.32);
+        textSize(36 * s);
+        fill(255);
+        text('DAY ' + save.currentDayID + '   |   UP TO DAY ' + save.currentUnlockedDay + ' UNLOCKED', cx, cardY + cardH * 0.72);
+    } else {
+        textSize(30 * s);
+        fill(180, 160, 120);
+        text('No save data found', cx, cardY + cardH * 0.55);
+    }
+
+    // ── Option buttons (assets.btnImg, 2× integer scale: 240×60 → 480×120) ──
+    const btnW      = 480 * s;   // 240 native × 2
+    const btnH      = 120 * s;   // 60  native × 2
+    const optLabels = ['[E]  CONTINUE', '[ENTER]  NEW GAME'];
+    const optY      = [H * 0.615, H * 0.760];
+
+    if (fT) textFont(fT);
+    for (let i = 0; i < 2; i++) {
+        const bx      = cx - btnW / 2;
+        const by      = optY[i] - btnH / 2;
+        const isHover = _saveChoiceIndex === i;
+
+        // Draw button image (tint dims unselected option)
+        imageMode(CORNER);
+        if (assets.btnImg) {
+            if (isHover) { tint(255); } else { tint(180, 180, 180, 200); }
+            image(assets.btnImg, bx, by, btnW, btnH);
+            noTint();
+        }
+
+        // Text — style matches UIComponent (gold + black outline, slightly above centre)
+        const textY = optY[i] - 8 * s;
+        textSize(24 * s);
+        textAlign(CENTER, CENTER);
+        stroke(0, 0, 0, 180);
+        strokeWeight(5 * s);
+        fill(isHover ? color(255, 215, 0) : color(200, 185, 150));
+        text(optLabels[i], cx, textY);
+        noStroke();
+        fill(isHover ? color(255, 215, 0) : color(200, 185, 150));
+        text(optLabels[i], cx, textY);
+    }
+
+    // ── Hint ─────────────────────────────────────────────────────────────────
+    if (fB) textFont(fB);
+    textSize(22 * s);
+    fill(160, 140, 110, 200);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    text('↑ ↓  to navigate  ·  E = continue  ·  ENTER = new game', cx, H * 0.88);
+
+    pop();
+}
+
+/**
+ * Hit-test for save-choice screen buttons.
+ * click=true → execute on hit; click=false → update hover index only.
+ */
+function _saveChoiceHitTest(mx, my, click) {
+    const W = width, H = height;
+    const cx = W / 2;
+    const s  = min(W / 1920, H / 1080);
+    const btnW = 480 * s;
+    const btnH = 120 * s;
+    const optY = [H * 0.615, H * 0.760];
+
+    for (let i = 0; i < 2; i++) {
+        const bx = cx - btnW / 2;
+        const by = optY[i] - btnH / 2;
+        if (mx >= bx && mx <= bx + btnW && my >= by && my <= by + btnH) {
+            if (click) {
+                _onSaveChoiceExecute(i);
+            } else {
+                _saveChoiceIndex = i;
+            }
+            return;
+        }
+    }
+}
+
+/**
+ * Executes the save-choice action for option index i (0=Continue, 1=New Game).
+ */
+function _onSaveChoiceExecute(i) {
+    if (typeof playSFX === 'function') playSFX(sfxClick);
+    if (i === 0) {
+        // CONTINUE — restore save
+        if (typeof SaveSystem !== 'undefined' && SaveSystem.hasSave()) {
+            triggerTransition(() => SaveSystem.applyAndResume());
+        } else {
+            // No save — fall back to new game
+            _onSaveChoiceExecute(1);
+        }
+    } else {
+        // NEW GAME — clear save, start from Day 1
+        if (typeof SaveSystem !== 'undefined') SaveSystem.clear();
+        if (typeof _playerChoices !== 'undefined') _playerChoices = {};
+        triggerTransition(() => {
+            gameState.resetFlags();
+            currentDayID = 1;
+            currentUnlockedDay = 1;
+            if (typeof _prologueSeen !== 'undefined' && !_prologueSeen &&
+                typeof CS_PROLOGUE !== 'undefined') {
+                _prologueSeen = true;
+                startCutscene('news', CS_PROLOGUE, () => {
+                    triggerTransition(() => {
+                        if (mainMenu) {
+                            mainMenu.menuState = STATE_LEVEL_SELECT;
+                            mainMenu.timeWheel.bgAlpha = 0;
+                            mainMenu.timeWheel.triggerEntrance();
+                        }
+                        gameState.setState(STATE_LEVEL_SELECT);
+                    });
+                });
+            } else {
+                if (mainMenu) {
+                    mainMenu.menuState = STATE_LEVEL_SELECT;
+                    mainMenu.timeWheel.bgAlpha = 0;
+                    mainMenu.timeWheel.triggerEntrance();
+                }
+                gameState.setState(STATE_LEVEL_SELECT);
+            }
+        });
+    }
 }

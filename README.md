@@ -23,8 +23,8 @@
 
 <div align="center">
 
-[![Project Site](https://img.shields.io/badge/Project%20Site-eebbc3?style=for-the-badge&logoColor=white)](https://uob-comsm0166.github.io/2026-group-7/)
-[![Play Game](https://img.shields.io/badge/Play%20Game-7c3aed?style=for-the-badge&logoColor=white)](https://uob-comsm0166.github.io/2026-group-7/pss/)
+[![Project Site](https://img.shields.io/badge/Project%20Site-eebbc3?style=for-the-badge&logoColor=white)](https://uob-comsm0166.github.io/2026-group-7/docs/)
+[![Play Game](https://img.shields.io/badge/Play%20Game-7c3aed?style=for-the-badge&logoColor=white)](https://uob-comsm0166.github.io/2026-group-7/docs/pss/)
 
 </div>
 
@@ -75,7 +75,7 @@
 | 04 | [Implementation](#implementation) | Key technical challenges |
 | 05 | [Evaluation](#evaluation) | Qualitative & quantitative testing |
 | 06 | [Process](#process) | Team workflow & reflection |
-| 07 | [Conclusion](#conclusion) | Lessons learnt & future work |
+| 07 | [Evaluation](#conclusion) | Lessons learnt & future work |
 | 08 | [Contribution](#contribution) | Individual contributions |
 
 </div>
@@ -95,12 +95,7 @@
 |:---:|:---|:---:|
 | 01 | **Lab 1: List of Game Ideas** | [📂 ReadMe](./docs/Labs/Week_1_List_of_Ideas/README.md) |
 | 02 | **Lab 2: Paint System & Game Brainstorming** | [📂 ReadMe](./docs/Labs/Week_2_Paint_App/README.md) |
-| 03 | **Lab 3: Sprite Animation** | [📂 ReadMe](./Labs/Week3/README.md) |
-| 04 | **Lab 4: Game Physics** | [📂 ReadMe](./Labs/Week4/README.md) |
-| 05 | **Lab 5: Collision Detection** | [📂 ReadMe](./Labs/Week5/README.md) |
-| 06 | **Lab 6: Sound & Assets** | [📂 ReadMe](./Labs/Week6/README.md) |
-| 07 | **Lab 7: Testing & Refactoring** | [📂 ReadMe](./Labs/Week7/README.md) |
-| 08 | **Lab 8: Final Polish** | [📂 ReadMe](./Labs/Week8/README.md) |
+| 07 | **Lab 7: Think Aloud Study & Heuristic Evaluation** | [📂 ReadMe](./docs/Labs/Week_7_Evaluation/README.md) |
 
 </div>
 

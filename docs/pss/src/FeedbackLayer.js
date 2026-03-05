@@ -44,35 +44,57 @@ class FeedbackLayer {
 
             collision_generic: (payload) => {
                 const baseType = payload.type;
+
                 if (baseType === "SMALL_CAR" && typeof sfxHitSmallCar !== "undefined" && sfxHitSmallCar) {
-                    playSFX(sfxHitSmallCar);
+                    playSFX(sfxHitSmallCar, {
+                        id: 'collision_small_car',
+                        cooldownMs: 140,
+                        monophonic: true
+                    });
                     return;
                 }
+
                 // LARGE_CAR or unknown: use BigCar as generic fallback
                 if (typeof sfxHitBigCar !== "undefined" && sfxHitBigCar) {
-                    playSFX(sfxHitBigCar);
+                    playSFX(sfxHitBigCar, {
+                        id: 'collision_big_car',
+                        cooldownMs: 160,
+                        monophonic: true
+                    });
                     return;
                 }
             },
 
             pickup_buff: (payload) => {
                 const baseType = payload.type;
+
                 if (baseType === "COFFEE" && typeof sfxPickupCoffee !== "undefined" && sfxPickupCoffee) {
-                    playSFX(sfxPickupCoffee);
+                    playSFX(sfxPickupCoffee, {
+                        id: 'pickup_coffee',
+                        cooldownMs: 120,
+                        monophonic: true
+                    });
                     return;
                 }
                 if (baseType === "EMPTY_SCOOTER" && typeof sfxPickupScooter !== "undefined" && sfxPickupScooter) {
-                    playSFX(sfxPickupScooter);
+                    playSFX(sfxPickupScooter, {
+                        id: 'pickup_scooter',
+                        cooldownMs: 120,
+                        monophonic: true
+                    });
                     return;
                 }
             },
 
             collision_small_business: (payload) => {
                 if (typeof sfxSmallBusiness !== "undefined" && sfxSmallBusiness) {
-                    playSFX(sfxSmallBusiness);
+                    playSFX(sfxSmallBusiness, {
+                        id: 'collision_small_business',
+                        cooldownMs: 200,
+                        monophonic: true
+                    });
                 }
             }
-
         };
     }
 

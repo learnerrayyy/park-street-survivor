@@ -15,9 +15,13 @@ const STATE_LOADING = 8;
 const STATE_SPLASH = 9;
 const STATE_HELP = 10;
 const STATE_INVENTORY = 11;
-const STATE_WARNING  = 12;
-const STATE_CREDITS  = 13;
+const STATE_WARNING = 12;
+const STATE_CREDITS = 13;
 const STATE_CUTSCENE = 14;
+const STATE_SAVE_CHOICE = 15;
+const STATE_DIFF_SELECT  = 16;   // Difficulty selection screen
+const STATE_DIFF_CONFIRM = 17;   // Difficulty confirmation screen
+const STATE_LOAD_GAME    = 18;   // New game / continue screen
 
 /**
  * Core canvas resolution, world-space boundaries, and scroll physics.
@@ -27,6 +31,68 @@ const GLOBAL_CONFIG = {
     resolutionW: 1920,
     resolutionH: 1080,
     scrollSpeed: 12, // Base velocity for world-space translation
+    spawnTuning: {
+        safety: {
+            topBandY: 520,
+            laneGapHazard: 220,
+            laneGapBuff: 130,
+            laneGapSameTypeExtra: 70,
+            safeLaneLookaheadY: 760,
+            movingHazardMinScrollMultiplier: 1.10
+        },
+        centerLaneFlow: {
+            enabled: true,
+            smallCarType: "SMALL_CAR",
+            largeCarType: "LARGE_CAR",
+            largeCarChance: 0.22,
+            alternateLanes: [2, 3],
+            requireCenterSparse: true,
+            triggerChanceWhenSparse: 1.0,
+            minFramesBetweenFlowSpawns: 8,
+            forceEveryHazardSpawn: false
+        },
+        emergencyCoffee: {
+            enabled: true,
+            enabledDays: [1, 2, 3],
+            coffeeType: "COFFEE",
+            healthThresholdRatio: 0.30,
+            maxSpawnsPerRun: 2,
+            minFramesBetweenEmergencySpawns: 300,
+            retryFramesWhenBlocked: 20
+        },
+        spawnDirector: {
+            enabled: true,
+            minLaneGapHazard: 130,
+            minLaneGapBuff: 95,
+            sameTypeExtraGap: 40,
+            speedGapPerUnit: 28,
+            minOpenLanesAhead: 1,
+            parallelLookaheadY: 700,
+            parallelBandY: 130,
+            parallelPenaltyPerObstacle: 0.6,
+            speedVarietyPenaltySameClass: 0.82,
+            speedVarietyBoostDifferentClass: 1.08
+        },
+        hazardRhythm: {
+            densityMultiplier: 0.88,
+            intervalJitter: 0.35,
+            minIntervalFrames: 10,
+            maxIntervalFrames: 180,
+            spawnRetryFramesWhenBlocked: 8,
+            diversityRerollChance: 0.72,
+            sameTypePenaltyImmediate: 0.22,
+            sameTypePenaltyRecent1: 0.62,
+            sameTypePenaltyRecent2Plus: 0.38,
+            recentTypeWindowSize: 4,
+            laneRepeatBlockTypes: ["FANTASY_COFFEE"],
+            centerLaneCoverageLookaheadY: 760,
+            centerLaneCoverageMinBlocking: 1,
+            centerLaneTypeBoostWhenSparse: 1.65,
+            nonCenterLaneTypePenaltyWhenSparse: 0.72,
+            centerLaneSpawnBiasWhenSparse: 2.10,
+            edgeLaneSpawnPenaltyWhenSparse: 0.78
+        }
+    },
 
     // THE 2-2-2 LAYOUT INFRASTRUCTURE
     // Strict coordinate boundaries for scenery, sidewalks, and the road network.
@@ -65,9 +131,9 @@ const PLAYER_DEFAULTS = {
 const DAYS_CONFIG = {
     1: {
         description: "Day 1 - Learn the Basics",
-        totalDistance: 1500,
+        totalDistance: 1000,
         obstacleSpawnInterval: 60,
-        baseScrollSpeed: 15,
+        baseScrollSpeed: 14,
         basePlayerSpeed: 10,
         healthDecay: 0.02,
         buffControlConfig: {
@@ -75,62 +141,116 @@ const DAYS_CONFIG = {
             respawnJitter: 0.5,
             buffWeights: { COFFEE: 1.0, EMPTY_SCOOTER: 1.0 }
         },
+        spawnSafetyConfig: {},
+        hazardRhythmConfig: {
+            densityMultiplier: 0.90,
+            intervalJitter: 0.30
+        },
+        hazardWeightMultiplier: {},
+        centerLaneFlowConfig: {},
+        emergencyCoffeeConfig: {},
+        spawnDirectorConfig: {},
         type: "NORMAL"
     },
     2: {
         description: "Day 2 - Running Late",
-        totalDistance: 2500,
+        totalDistance: 1500,
         obstacleSpawnInterval: 60,
         baseScrollSpeed: 15,
-        basePlayerSpeed: 18,
+        basePlayerSpeed: 17,
         healthDecay: 0.04,
         buffControlConfig: {
             avgRespawnSec: 3.5,
             respawnJitter: 0.2,
             buffWeights: { COFFEE: 0.7, EMPTY_SCOOTER: 0.5 }
         },
+        spawnSafetyConfig: {},
+        hazardRhythmConfig: {
+            densityMultiplier: 0.84,
+            intervalJitter: 0.32
+        },
+        hazardWeightMultiplier: {},
+        centerLaneFlowConfig: {},
+        emergencyCoffeeConfig: {},
+        spawnDirectorConfig: {},
         type: "NORMAL"
     },
     3: {
         description: "Day 3 - Midweek Rush",
-        totalDistance: 3500,
+        totalDistance: 2500,
         obstacleSpawnInterval: 60,
-        baseScrollSpeed: 18,
-        basePlayerSpeed: 23,
+        baseScrollSpeed: 16,
+        basePlayerSpeed: 17,
         healthDecay: 0.04,
         buffControlConfig: {
-            avgRespawnSec: 4.0,
+            avgRespawnSec: 4.2,
             respawnJitter: 0.3,
-            buffWeights: { COFFEE: 1.0, EMPTY_SCOOTER: 0.65 }
+            buffWeights: { COFFEE: 0.85, EMPTY_SCOOTER: 0.45 }
         },
+        spawnSafetyConfig: {},
+        hazardRhythmConfig: {
+            // Day 3 focuses on variety: fewer immediate repeats and less lane spam.
+            densityMultiplier: 0.6,
+            intervalJitter: 0.34,
+            diversityRerollChance: 0.82,
+            sameTypePenaltyImmediate: 0.18,
+            sameTypePenaltyRecent1: 0.52,
+            sameTypePenaltyRecent2Plus: 0.30,
+            recentTypeWindowSize: 5,
+            laneRepeatBlockTypes: ["FANTASY_COFFEE", "SMALL_BUSINESS", "SMALL_CAR"]
+        },
+        hazardWeightMultiplier: {
+            FANTASY_COFFEE: 0.62
+        },
+        centerLaneFlowConfig: {},
+        emergencyCoffeeConfig: {},
+        spawnDirectorConfig: {},
         type: "NORMAL"
     },
     4: {
         description: "Day 4 - Deadline Pressure",
         totalDistance: 4500,
         obstacleSpawnInterval: 60,
-        baseScrollSpeed: 23,
-        basePlayerSpeed: 25,
+        baseScrollSpeed: 17,
+        basePlayerSpeed: 19,
         healthDecay: 0.08,
         buffControlConfig: {
             avgRespawnSec: 5.0,
             respawnJitter: 0.25,
             buffWeights: { COFFEE: 1.0, EMPTY_SCOOTER: 0.45 }
         },
+        spawnSafetyConfig: {},
+        hazardRhythmConfig: {
+            densityMultiplier: 0.74,
+            intervalJitter: 0.34
+        },
+        hazardWeightMultiplier: {},
+        centerLaneFlowConfig: {},
+        emergencyCoffeeConfig: {},
+        spawnDirectorConfig: {},
         type: "NORMAL"
     },
     5: {
         description: "Day 5 - Final Challenge",
         totalDistance: 5500,
         obstacleSpawnInterval: 60,
-        baseScrollSpeed: 25,
-        basePlayerSpeed: 28,
+        baseScrollSpeed: 18,
+        basePlayerSpeed: 20,
         healthDecay: 0.10,
         buffControlConfig: {
             avgRespawnSec: 5.5,
             respawnJitter: 0.35,
             buffWeights: { COFFEE: 1.0, EMPTY_SCOOTER: 0.4 }
         },
+        spawnSafetyConfig: {},
+        hazardRhythmConfig: {
+            densityMultiplier: 0.72,
+            intervalJitter: 0.35
+        },
+        hazardWeightMultiplier: {},
+        centerLaneFlowConfig: {},
+        emergencyCoffeeConfig: {},
+        spawnDirectorConfig: {},
         type: "NORMAL"
     }
 };

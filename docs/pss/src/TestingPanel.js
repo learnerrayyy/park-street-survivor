@@ -165,7 +165,7 @@ function setupRunTestMode(dayOverride) {
     }
     if (obstacleManager) obstacleManager = new ObstacleManager();
     if (levelController) levelController.initializeLevel(dayID);
-    gameState.currentState = STATE_DAY_RUN;
+    gameState.setState(STATE_DAY_RUN);
 }
 
 /**
@@ -234,10 +234,6 @@ function devApplyStartupSkip() {
         console.log("[DEV] Opening Inventory screen directly");
     }
 
-    if (bgm && !bgm.isPlaying()) {
-        bgm.loop();
-        bgm.setVolume(masterVolumeBGM);
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1082,7 +1078,7 @@ class TestingPanel {
                 if (gameState && typeof gameState.setState === "function") {
                     gameState.setState(STATE_DAY_RUN);
                 } else if (gameState) {
-                    gameState.currentState = STATE_DAY_RUN;
+                    gameState.setState(STATE_DAY_RUN);;
                 }
             } catch (fallbackErr) {
                 console.error("[DEV] runDayDirect fallback failed:", fallbackErr);
@@ -1092,6 +1088,11 @@ class TestingPanel {
         if (actionId === "restart_current") {
             const day = Number((levelController && levelController.currentDayID) || currentDayID || this.selectedDay || 1);
             runDayDirect(day);
+            return;
+        }
+
+        if (actionId === "run_selected_day_full") {
+            runDayDirect(this.selectedDay);
             return;
         }
 
@@ -1141,6 +1142,77 @@ class TestingPanel {
             if (typeof resetCredits === "function") resetCredits();
             if (gameState) gameState.setState(STATE_CREDITS);
             this.visible = false;
+            return;
+        }
+
+        if (actionId === "unlock_all") {
+            if (typeof devUnlockAllDays === "function") devUnlockAllDays();
+            return;
+        }
+
+        // ── Cutscene jump buttons ──────────────────────────────────────────
+        if (actionId === "cs_prologue") {
+            this.visible = false;
+            if (typeof triggerTransition === "function" && typeof startCutscene === "function") {
+                triggerTransition(() => startCutscene('news', CS_PROLOGUE, () => {
+                    triggerTransition(() => {
+                        if (typeof gameState !== 'undefined') gameState.setState(STATE_MENU);
+                    });
+                }));
+            }
+            return;
+        }
+
+        const roomMatch = actionId.match(/^cs_room_(\d)$/);
+        if (roomMatch) {
+            const day = parseInt(roomMatch[1]);
+            this.visible = false;
+            if (typeof triggerTransition === "function" && typeof startCutscene === "function"
+                && typeof CS_DAY_ROOM !== 'undefined' && CS_DAY_ROOM[day]) {
+                triggerTransition(() => startCutscene('room', CS_DAY_ROOM[day], () => {
+                    triggerTransition(() => {
+                        if (typeof gameState !== 'undefined') gameState.setState(STATE_ROOM);
+                    });
+                }));
+            }
+            return;
+        }
+
+        const npcMatch = actionId.match(/^cs_npc_(\d)$/);
+        if (npcMatch) {
+            const day = parseInt(npcMatch[1]);
+            this.visible = false;
+            if (typeof triggerTransition === "function" && typeof startCutscene === "function"
+                && typeof CS_DAY_NPC !== 'undefined' && CS_DAY_NPC[day]) {
+                triggerTransition(() => startCutscene('library', CS_DAY_NPC[day], () => {
+                    triggerTransition(() => {
+                        if (typeof gameState !== 'undefined') gameState.setState(STATE_WIN);
+                    });
+                }));
+            }
+            return;
+        }
+
+        if (actionId === "cs_good_end") {
+            this.visible = false;
+            if (typeof triggerTransition === "function" && typeof startCutscene === "function"
+                && typeof CS_AWAKENING_REALITY !== 'undefined') {
+                triggerTransition(() => startCutscene('hospital', CS_AWAKENING_REALITY, () => {
+                    if (typeof startCinematicEnding === "function"
+                        && typeof TEXT_GOOD_ENDING !== 'undefined') {
+                        startCinematicEnding(TEXT_GOOD_ENDING);
+                    }
+                }));
+            }
+            return;
+        }
+
+        if (actionId === "cs_bad_end") {
+            this.visible = false;
+            if (typeof startCinematicEnding === "function"
+                && typeof TEXT_BAD_ENDING !== 'undefined') {
+                triggerTransition(() => startCinematicEnding(TEXT_BAD_ENDING));
+            }
             return;
         }
 
@@ -1242,8 +1314,10 @@ class TestingPanel {
         }
         cursorY += sectionGap;
 
-        this.drawDevActions(sectionX, cursorY + 6, sectionW, 84);
-        cursorY += 90;
+        this.drawDevActions(sectionX, cursorY + 6, sectionW, 170);
+        cursorY += 176;
+        const devActionsH = this.drawDevActions(sectionX, cursorY + 6, sectionW, 84);
+        cursorY += devActionsH + 6;
         pop();
     }
 
@@ -1800,9 +1874,11 @@ class TestingPanel {
         textSize(22);
         text("Dev Actions", x + 12, y + 14);
 
-        const buttons = [
+        // ── Row 1: gameplay shortcuts ──────────────────────────────────────
+        const row1Buttons = [
             { id: "restart_current", label: "Restart Current" },
-            { id: "run_selected_day", label: `Run Day ${this.selectedDay} (M${this.selectedModeId})` },
+            { id: "run_selected_day_full", label: `Run Day ${this.selectedDay} Full` },
+            { id: "run_selected_day", label: `Run Day ${this.selectedDay} Mode M${this.selectedModeId}` },
             { id: "goto_room", label: "Go Room" },
             { id: "goto_pause", label: "Open Pause" },
             { id: "refill", label: "Refill HP" },
@@ -1811,31 +1887,62 @@ class TestingPanel {
             { id: "fail_hit_bus", label: "Fail HIT_BUS" },
             { id: "fail_late", label: "Fail LATE" },
             { id: "story_recap", label: "Story Recap" },
-            { id: "credits", label: "Credits" }
+            { id: "credits", label: "Credits" },
+            { id: "unlock_all", label: "Unlock All Days" }
         ];
 
         const btnGap = 8;
-        const btnW = floor((w - 16 - (buttons.length - 1) * btnGap) / buttons.length);
-        const btnH = 38;
         const startX = x + 8;
-        const btnY = y + 28;
+        const btnH = 38;
+        const r1BtnW = floor((w - 16 - (row1Buttons.length - 1) * btnGap) / row1Buttons.length);
+        const r1Y = y + 28;
 
-        for (let i = 0; i < buttons.length; i++) {
-            const b = buttons[i];
-            const bx = startX + i * (btnW + btnGap);
-
-            stroke(0);
-            strokeWeight(1.2);
-            fill(255);
-            rect(bx, btnY, btnW, btnH, 6);
-            noStroke();
-            fill(0);
-            textAlign(CENTER, CENTER);
-            textStyle(BOLD);
-            textSize(19);
-            text(b.label, bx + btnW / 2, btnY + btnH / 2 + 1);
-
-            this.devButtons.push({ id: b.id, x: bx, y: btnY, w: btnW, h: btnH });
+        for (let i = 0; i < row1Buttons.length; i++) {
+            const b = row1Buttons[i];
+            const bx = startX + i * (r1BtnW + btnGap);
+            stroke(0); strokeWeight(1.2); fill(255);
+            rect(bx, r1Y, r1BtnW, btnH, 6);
+            noStroke(); fill(0);
+            textAlign(CENTER, CENTER); textStyle(BOLD); textSize(17);
+            text(b.label, bx + r1BtnW / 2, r1Y + btnH / 2 + 1);
+            this.devButtons.push({ id: b.id, x: bx, y: r1Y, w: r1BtnW, h: btnH });
         }
+
+        // ── Row 2: cutscene jump buttons ───────────────────────────────────
+        noStroke(); fill(80); textAlign(LEFT, CENTER); textStyle(BOLD); textSize(18);
+        const r2LabelY = r1Y + btnH + 10;
+        text("Cutscene Jump:", x + 12, r2LabelY + 8);
+
+        const csButtons = [
+            { id: "cs_prologue",  label: "Prologue" },
+            { id: "cs_room_1",    label: "Room D1" },
+            { id: "cs_room_2",    label: "Room D2" },
+            { id: "cs_room_3",    label: "Room D3" },
+            { id: "cs_room_4",    label: "Room D4" },
+            { id: "cs_room_5",    label: "Room D5" },
+            { id: "cs_npc_1",     label: "NPC D1" },
+            { id: "cs_npc_2",     label: "NPC D2" },
+            { id: "cs_npc_3",     label: "NPC D3" },
+            { id: "cs_npc_4",     label: "NPC D4" },
+            { id: "cs_npc_5",     label: "NPC D5" },
+            { id: "cs_good_end",  label: "Good End" },
+            { id: "cs_bad_end",   label: "Bad End" }
+        ];
+
+        const r2BtnW = floor((w - 16 - (csButtons.length - 1) * btnGap) / csButtons.length);
+        const r2Y = r2LabelY + 20;
+
+        for (let i = 0; i < csButtons.length; i++) {
+            const b = csButtons[i];
+            const bx = startX + i * (r2BtnW + btnGap);
+            stroke(0, 120); strokeWeight(1); fill(230, 240, 255);
+            rect(bx, r2Y, r2BtnW, btnH, 6);
+            noStroke(); fill(20, 40, 120);
+            textAlign(CENTER, CENTER); textStyle(BOLD); textSize(16);
+            text(b.label, bx + r2BtnW / 2, r2Y + btnH / 2 + 1);
+            this.devButtons.push({ id: b.id, x: bx, y: r2Y, w: r2BtnW, h: btnH });
+        }
+
+        return r2Y + btnH + 16;
     }
 }

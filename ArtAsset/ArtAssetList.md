@@ -16,9 +16,8 @@ All background assets are standard **1920x1080** resolution unless otherwise spe
 ## Dialogue & UI Backgrounds
 | **Asset Name**  | **Dimensions** | Description**                                                    | Path                        |
 | --------------- | -------------- | ---------------------------------------------------------------- | --------------------------- |
-| **bg_game_end** | N/A            | A icon of Iris celebrating.                                      |                             |
 | **bg_bedroom**  | 1920x1080      | A cluttered student dormitory interior.                          | ArtAsset\Background\Bedroom |
-| **bg_hospital** | 1920x1080      | Interior view of a hospital ceiling featuring surgical lighting. |                             |
+| **bg_hospital** | 1920x1080      | Interior view of a hospital ceiling featuring surgical lighting. | ArtAsset\Background\Bedroom          |
 # 2. Character Assets
 ## Portraits
 | **Asset Name**         | **Dimensions** | **Description**                                                              | Path                                    |
@@ -50,7 +49,7 @@ The gameplay area is divided into four lanes: Lanes 1 & 4 (Sidewalks, 200px) and
 | **obstacle_scooter**   | 110x230        | A motorized scooter operated by a driver.                                  | ArtAsset\Obstacle |
 | **obstacle_kebab**    | 320x230        | Kebab stall on side-walk.| ArtAsset\Obstacle |
 | **obstacle_scoop**    | 270x311        | Ice cream stall on side-walk.| ArtAsset\Obstacle |
-| **obstacle_puddle**    | 260x120        | Environmental hazard; appears exclusively during rainy weather conditions. | ArtAsset\Obstacle |
+| **obstacle_puddle**    | 170x80        | Environmental hazard; appears exclusively during rainy weather conditions. | ArtAsset\Obstacle |
 ## Sidewalk Obstacles (Lanes 1 & 4)
 | **Asset Name**        | **Dimensions** | **Description**                                                 | Path              |
 | --------------------- | -------------- | --------------------------------------------------------------- | ----------------- |
@@ -75,4 +74,4 @@ The gameplay area is divided into four lanes: Lanes 1 & 4 (Sidewalks, 200px) and
 | ----------------- | -------------- | ---------------------- | ----------------- |
 | **icon_success**   | 300x300        | Iris celebrating. Used in success page.    | ArtAsset\UI |
 | **Frame**    | 1920x1080        | Story background frame            | ArtAsset\UI |
-| **dialog_box**    | 510x200        | In-game dialogue box.            | ArtAsset\UI |
+| **dialog_box**    | 550x200        | In-game dialogue box.            | ArtAsset\UI |

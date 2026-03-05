@@ -59,6 +59,10 @@ class Player {
         this.activeSpeedMultiplier = 1;
         this.baseRunScrollSpeed = null;
         this.wasSpeedBoostActive = false;
+        this.puddleTrapActive = false;
+        this.puddleEscapePressCount = 0;
+        this.puddleEscapePressRequired = 3;
+        this.puddleSlowMultiplier = 0.72;
 
         // ── PERFORMANCE: Clock display cache ──
         this._clockStr     = "08:30:00";
@@ -97,6 +101,10 @@ class Player {
         this.activeSpeedMultiplier = 1;
         this.baseRunScrollSpeed = null;
         this.wasSpeedBoostActive = false;
+        this.puddleTrapActive = false;
+        this.puddleEscapePressCount = 0;
+        this.puddleEscapePressRequired = 3;
+        this.puddleSlowMultiplier = 0.72;
         // In DAY_RUN, default forward-running view should be back-facing.
         this.dir = 'north';
     }
@@ -287,6 +295,21 @@ class Player {
             if (imgToDraw) {
                 let visualPadding = 35;
                 let drawY = this.y - (this.height / 2) + visualPadding;
+
+                if (this.puddleTrapActive) {
+                    const puddlePath = OBSTACLE_CONFIG &&
+                        OBSTACLE_CONFIG.PUDDLE &&
+                        OBSTACLE_CONFIG.PUDDLE.sprite;
+                    let puddleImg = null;
+                    if (puddlePath && obstacleManager && typeof obstacleManager.getSpriteImage === "function") {
+                        puddleImg = obstacleManager.getSpriteImage(puddlePath);
+                    }
+                    if (puddleImg) {
+                        imageMode(CENTER);
+                        image(puddleImg, this.x, this.y + 8, 170, 80);
+                    }
+                }
+
                 image(imgToDraw, this.x, drawY, this.width, this.height);
 
                 if (developerMode) {
@@ -313,9 +336,6 @@ class Player {
      */
     drawTopBar() {
         push();
-        /*fill(56, 39, 96);
-        noStroke();
-        rect(0, 0, width, 170);*/
 
         this.drawHealthBar(165, 65);
         this.drawBackpackIcon(98, 85);
@@ -476,11 +496,12 @@ class Player {
             this.baseRunScrollSpeed = GLOBAL_CONFIG.scrollSpeed;
         }
 
+        const puddleMul = this.puddleTrapActive ? this.puddleSlowMultiplier : 1;
         if (this.speedBoostFramesRemaining > 0) {
-            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed * this.activeSpeedMultiplier;
+            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed * this.activeSpeedMultiplier * puddleMul;
             this.wasSpeedBoostActive = true;
-        } else if (this.wasSpeedBoostActive) {
-            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed;
+        } else if (this.wasSpeedBoostActive || this.puddleTrapActive) {
+            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed * puddleMul;
             this.wasSpeedBoostActive = false;
         }
     }
@@ -504,11 +525,12 @@ class Player {
             this.baseRunScrollSpeed = GLOBAL_CONFIG.scrollSpeed;
         }
 
+        const puddleMul = this.puddleTrapActive ? this.puddleSlowMultiplier : 1;
         if (this.speedBoostFramesRemaining > 0) {
-            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed * this.activeSpeedMultiplier;
+            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed * this.activeSpeedMultiplier * puddleMul;
             this.wasSpeedBoostActive = true;
-        } else if (this.wasSpeedBoostActive) {
-            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed;
+        } else if (this.wasSpeedBoostActive || this.puddleTrapActive) {
+            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed * puddleMul;
             this.wasSpeedBoostActive = false;
         }
     }
@@ -608,6 +630,28 @@ class Player {
             this.hpLockFramesRemaining = max(this.hpLockFramesRemaining, floor((hpLockDurationSec || 3.0) * fps));
             this.hpLockValue = this.health;
         }
+    }
+
+    applyPuddleTrap(escapePressRequired, slowMultiplier) {
+        this.puddleTrapActive = true;
+        this.puddleEscapePressCount = 0;
+        this.puddleEscapePressRequired = max(1, floor(escapePressRequired || 3));
+        this.puddleSlowMultiplier = constrain(Number(slowMultiplier || 0.72), 0.4, 0.95);
+    }
+
+    handlePuddleEscapePress() {
+        if (!this.puddleTrapActive) return false;
+        this.puddleEscapePressCount++;
+        if (this.puddleEscapePressCount >= this.puddleEscapePressRequired) {
+            this.puddleTrapActive = false;
+            this.puddleEscapePressCount = 0;
+            this.puddleEscapePressRequired = 3;
+            this.puddleSlowMultiplier = 0.72;
+            if (this.baseRunScrollSpeed !== null) {
+                GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed;
+            }
+        }
+        return true;
     }
 
     isInvincibleActive() {

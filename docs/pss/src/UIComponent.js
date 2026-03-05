@@ -729,9 +729,7 @@ class UISlider {
             let mousePos = constrain(mouseX, this.x - this.w / 2, this.x + this.w / 2);
             this.value = map(mousePos, this.x - this.w / 2, this.x + this.w / 2, this.minVal, this.maxVal);
 
-            if (typeof bgm !== 'undefined' && bgm) {
-                bgm.setVolume(this.value);
-            }
+            if (typeof BGM !== 'undefined') BGM.syncVolume();
         }
     }
 

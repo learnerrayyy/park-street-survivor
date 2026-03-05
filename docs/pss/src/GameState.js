@@ -22,6 +22,7 @@ class GameState {
      * Handles the switching of scenes and manages state history for the pause mechanism.
      */
     setState(newState) {
+        if (newState === this.currentState) return;
         // Logic: Backup current state before pausing to allow for later resumption
         if (newState === STATE_PAUSED) {
             this.previousState = this.currentState;
@@ -40,6 +41,9 @@ class GameState {
 
         // Finalize state update
         this.currentState = newState;
+        if (typeof BGM !== 'undefined' && BGM && typeof BGM.onStateChanged === 'function') {
+            BGM.onStateChanged(this.currentState);
+        }  
 
         // End-screen input should not be blocked by an open debug panel.
         if ((newState === STATE_FAIL || newState === STATE_WIN) &&
@@ -55,6 +59,7 @@ class GameState {
                 endScreenManager.activateSuccess();
             }
         }
+        
     }
 
     /**

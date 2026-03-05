@@ -91,6 +91,7 @@ const OBSTACLE_CONFIG = {
       // Lane-change behaviour on road (dynamic space pressure)
       laneChangeInterval: { min: 0.45, max: 0.95 },  // seconds between lane decisions
       laneChangeDuration: { min: 0.18, max: 0.28 },  // linear move duration per lane switch
+      proximityLaneChangeRadius: 600,                // Trigger one lane change when player enters this radius
       //less is fast if switching from lane 
 
       // Generation constraints
@@ -167,12 +168,20 @@ const OBSTACLE_CONFIG = {
       // Leaflet interaction parameters
       leafletWidth: 810,
       leafletHeight: 970,
-      spacePressRequired: 10,        // Press SPACE 10 times
+      spacePressRequired: 5,        // Press SPACE 10 times
       clearNearestObstacle: true,    // Clear the first obstacle in the current lane
       leafletSprites: [
          "assets/obstacles/obstacle_flyer1.png",
          "assets/obstacles/obstacle_flyer2.png"
       ],
+      leafletSpritesByDay: {
+         3: [
+            "assets/obstacles/obstacle_flyer3.png",
+            "assets/obstacles/obstacle_flyer4.png"
+         ]
+      },
+      paperBallSprite: "assets/obstacles/obstacle_paperball.png",
+      paperBallSize: { width: 48, height: 48 },
 
       // Cooldown mechanism: Cooldown time after hitting the promoter
       interactionCooldown: 5.0,      // 5 seconds cooldown after interaction
@@ -236,33 +245,42 @@ const OBSTACLE_CONFIG = {
    },
 
    /**
-    * Fantasy Coffee (TODO)
-    * Characteristics: 10 damage + full-screen distortion effect
-    * NOTE: Visual distortion pipeline is not implemented yet.
+    * Fantasy Coffee
+    * Characteristics: Disguises as normal coffee; when player is in adjacent lane and close enough,
+    * it "grows legs" and runs away toward a 45-degree south direction off-screen.
     */
    FANTASY_COFFEE: {
       baseType: "FANTASY_COFFEE",
       type: "HAZARD",
       name: "Fantasy Coffee",
-      description: "TODO: Deals 10 damage and distorts the whole screen",
+      description: "Disguises as coffee, then runs away at 45-degree south when approached from adjacent lane",
 
       // Physical parameters
       speed: { min: 0, max: 0 },  // Stationary pickup-like hazard
       size: { width: 110, height: 120 },
 
       // Damage / effect parameters
-      damage: 10,
+      damage: 0,
       instantKill: false,
-      effect: "screenDistortion",
-      distortionDuration: 2.5,     // seconds
-      distortionIntensity: 1.0,    // TODO visual parameter
+      effect: "illusionEscape",
 
       // Generation constraints
-      allowedLanes: [1, 4],        // Sidewalk spawn by default
+      allowedLanes: [1],           // Spawn only on lane1
       mutualExclusion: [],
 
-      // TODO art placeholder path (asset not provided yet)
-      sprite: "assets/obstacles/obstacle_fantasy_coffee.png"
+      // Visual behavior:
+      // 1) Spawn disguised as normal coffee
+      // 2) Trigger when player enters a radial range around coffee
+      // 3) Play running sprite-sheet and escape diagonally (south 45°) off-screen
+      disguiseSprite: "assets/power_up/powerup_coffee.png",
+      runSpriteSheet: "assets/obstacles/obstacle_coffee_spritesheet.png",
+      runSpriteFrames: 6,
+      runAnimFps: 12,
+      escapeTriggerRadius: 500,
+      escapeStartupFrames: 10,
+      escapeAngleDeg: 76,
+      escapeSpeed: 4.8,
+      sprite: "assets/power_up/powerup_coffee.png"
    },
 
    /**
@@ -273,21 +291,23 @@ const OBSTACLE_CONFIG = {
       baseType: "PUDDLE",
       type: "ENVIRONMENTAL",
       name: "Puddle",
-      description: "Environmental obstacle - Minor damage",
+      description: "Deals 20 damage, sticks to player and slows run until SPACE x3",
 
       // Physical parameters
       speed: { min: 0, max: 0 },  // Stationary
-      size: { width: 260, height: 120 },
+      size: { width: 170, height: 80 },
 
       // Damage parameters
-      damage: 10,
-      effect: "none",
+      damage: 20,
+      effect: "puddleTrap",
+      escapePressRequired: 3,
+      slowMultiplier: 0.72,
 
       // Generation constraints
       allowedLanes: [2, 3],  // Only on the road
       mutualExclusion: [],
 
-      sprite: null
+      sprite: "assets/obstacles/obstacle_puddle.png"
    },
 
    // ===== BUFF Items =====
@@ -350,7 +370,8 @@ const OBSTACLE_CONFIG = {
       // Variants
       variants: [
          { name: "Scooter", sprite: "assets/power_up/powerup_scooter.png", weight: 1 },
-         { name: "Motorcycle", sprite: "assets/power_up/powerup_motorcycle.png", weight: 1 }
+         { name: "Motorcycle", sprite: "assets/power_up/powerup_motorcycle.png", weight: 1 },
+         { name: "Empty Scooter", sprite: "assets/power_up/scooter_empty.png", weight: 1 }
       ]
    }
 };

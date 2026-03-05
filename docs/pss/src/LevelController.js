@@ -79,14 +79,53 @@ class LevelController {
       console.log(`[LevelController] Loading backgrounds for Day ${dayID}`);
 
       try {
+         const dayBackgrounds = {
+            1: {
+               run: [
+                  "assets/background/bg_sunny/bg_sunny_A.png",
+                  "assets/background/bg_sunny/bg_sunny_B.png",
+                  "assets/background/bg_sunny/bg_sunny_C.png"
+               ],
+               destination: "assets/background/bg_sunny/bg_sunny_destination.png"
+            },
+            2: {
+               run: [
+                  "assets/background/bg_sunny/bg_sunny_A.png",
+                  "assets/background/bg_sunny/bg_sunny_B.png",
+                  "assets/background/bg_sunny/bg_sunny_C.png"
+               ],
+               destination: "assets/background/bg_sunny/bg_sunny_destination.png"
+            },
+            3: {
+               run: [
+                  "assets/background/bg_sunny/bg_sunny_A.png",
+                  "assets/background/bg_sunny/bg_sunny_B.png",
+                  "assets/background/bg_sunny/bg_sunny_C.png"
+               ],
+               destination: "assets/background/bg_sunny/bg_sunny_destination.png"
+            },
+            4: {
+               run: [
+                  "assets/background/bg_light_rain/bg_light_rain_A.png",
+                  "assets/background/bg_light_rain/bg_light_rain_B.png",
+                  "assets/background/bg_light_rain/bg_light_rain_C.png"
+               ],
+               destination: "assets/background/bg_light_rain/bg_light_rain_destination.png"
+            },
+            5: {
+               run: [
+                  "assets/background/bg_heavy_rain/bg_heavy_rain_A.png",
+                  "assets/background/bg_heavy_rain/bg_heavy_rain_B.png",
+                  "assets/background/bg_heavy_rain/bg_heavy_rain_C.png"
+               ],
+               destination: "assets/background/bg_heavy_rain/bg_heavy_rain_destination.png"
+            }
+         };
+         const selectedBackground = dayBackgrounds[dayID] || dayBackgrounds[1];
+
          // Load running background cycle (A/B/C). Keep current scroll logic unchanged;
          // only tile image source varies.
-         const sunnyRunPaths = [
-            "assets/background/bg_sunny/bg_sunny_A.png",
-            "assets/background/bg_sunny/bg_sunny_B.png",
-            "assets/background/bg_sunny/bg_sunny_C.png"
-         ];
-         const shuffledRunPaths = [...sunnyRunPaths].sort(() => Math.random() - 0.5);
+         const shuffledRunPaths = [...selectedBackground.run].sort(() => Math.random() - 0.5);
          env.defaultBgCycle = [];
          env.defaultBgHeadIndex = 0;
          for (const p of shuffledRunPaths) {
@@ -100,10 +139,7 @@ class LevelController {
          env.defaultBg = env.defaultBgCycle[0] || null;
 
          // Load destination/victory background
-         let destinationBgPath = `assets/background/day${dayID}_destination.png`;
-         if (dayID >= 1 && dayID <= 3) destinationBgPath = "assets/background/bg_sunny/bg_sunny_destination.png";
-         if (dayID === 4) destinationBgPath = "assets/background/bg_light_rain/bg_light_rain_destination.png";
-         if (dayID === 5) destinationBgPath = "assets/background/bg_heavy_rain/bg_heavy_rain_destination.png";
+         const destinationBgPath = selectedBackground.destination;
 
          env.destinationBg = loadImage(destinationBgPath,
             () => console.log(`[LevelController] ✓ Loaded destination background: ${destinationBgPath}`),

@@ -45,7 +45,7 @@ const MODE_PRESETS = {
       SMALL_BUSINESS: 2.1,
       FANTASY_COFFEE: 0.8,
     },
-    minOnScreenOb: 5,
+    minOnScreenOb: 6,
     maxOnScreenOb: 7
   },
   4: {
@@ -125,7 +125,7 @@ const DIFFICULTY_PROGRESSION = {
     spawnConfig: {
       minObstacleInterval: 40
     },
-    difficultyModeCycleConfig: createModeCycleConfig([1, 2, 2, 2, 3, 3, 2, 2, 3, 1, 2, 1, 2, 3, 1, 1, 1], MODE_PRESETS, 5),
+    difficultyModeCycleConfig: createModeCycleConfig([1, 2, 2, 3, 3, 3, 2, 2, 3, 1, 2, 1, 2, 3, 1, 1, 1], MODE_PRESETS, 5),
     variants: {}
   },
 
