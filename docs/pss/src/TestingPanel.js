@@ -1151,6 +1151,13 @@ class TestingPanel {
         }
 
         // ── Cutscene jump buttons ──────────────────────────────────────────
+        if (actionId === "cs_main_menu") {
+            this.visible = false;
+            if (typeof gameState !== "undefined") gameState.setState(STATE_MENU);
+            if (typeof mainMenu !== "undefined" && mainMenu) mainMenu.menuState = STATE_MENU;
+            return;
+        }
+
         if (actionId === "cs_prologue") {
             this.visible = false;
             if (typeof triggerTransition === "function" && typeof startCutscene === "function") {
@@ -1914,6 +1921,7 @@ class TestingPanel {
         text("Cutscene Jump:", x + 12, r2LabelY + 8);
 
         const csButtons = [
+            { id: "cs_main_menu", label: "Main Menu" },
             { id: "cs_prologue",  label: "Prologue" },
             { id: "cs_room_1",    label: "Room D1" },
             { id: "cs_room_2",    label: "Room D2" },
