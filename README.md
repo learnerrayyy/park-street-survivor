@@ -177,7 +177,39 @@ Describe implementation of your game, in particular highlighting the **TWO** are
 
 <p align="center"><i>15% &nbsp;·&nbsp; ~750 words</i></p>
 
-Teamwork. How did you work together, what tools and methods did you use? Did you define team roles? Reflection on how you worked together. Be honest — we want to hear about what didn't work as well as what did, and importantly how your team adapted throughout the project.
+    <h3>Team Structure and Role Definition</h3>
+    <p>
+        At the project's inception, we recognized that a clear division of labor was essential to prevent overlapping efforts and ensure accountability. We adopted a specialized role structure, ensuring each member had "ownership" over a specific pillar of the game’s development:
+    </p>
+
+    <ul>
+        <li><strong>Charlotte Yu (Core Mechanism Design):</strong> Focused on the physics engine, character movement, and the implementation of the unique health-depletion system.</li>
+        <li><strong>Lucca Zhou (Aesthetic Design):</strong> Responsible for the 3D environmental assets, character models, and ensuring a cohesive visual identity across all levels.</li>
+        <li><strong>Ray Wang (Level Design):</strong> Tasked with the architectural flow of the five levels, balancing the difficulty of obstacle placement with the frequency of power-ups.</li>
+        <li><strong>Layla Pei (UI/UX & Audio):</strong> Developed the head-up display (HUD), menu navigation, and the soundscape that provides feedback for health loss and coffee collection.</li>
+        <li><strong>Keyu Zhou (Scripts Design):</strong> Wrote and integrated the narrative sequences that bridge the gap between levels, ensuring the story resonated with the gameplay.</li>
+    </ul>
+
+    <h3>Methodology: Agile and Jira Integration</h3>
+    <p>
+        To manage our workflow, we adopted an <strong>Agile methodology</strong> centered around two-week sprints. Our primary command center was <strong>Jira</strong>, where we utilized a Kanban board to visualize the lifecycle of every task.
+    </p>
+
+    
+
+    <p>
+        The process began with a comprehensive <strong>Product Backlog</strong>, where we listed every requirement—ranging from "Implement Swipe Input" to "Draft Level 3 Script." During our sprint planning sessions, we moved high-priority "User Stories" from the backlog into the active sprint. This systematic approach allowed us to:
+    </p>
+
+    <ul>
+        <li><strong>Identify Bottlenecks:</strong> We could immediately see if Aesthetic Design was lagging behind Level Design, which prevented the placement of finalized assets into the game engine.</li>
+        <li><strong>Maintain Transparency:</strong> Every team member had real-time visibility into their peers' progress, significantly reducing the need for redundant status-update meetings.</li>
+    </ul>
+
+    <p>
+        <strong>Our Kanban Board:</strong> 
+        <a href="" target="_blank">View our Jira Project here</a>
+    </p>
 
 <br>
 
