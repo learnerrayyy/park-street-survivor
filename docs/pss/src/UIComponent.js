@@ -62,6 +62,15 @@ class UIButton {
                 ? this.labelSize
                 : ((typeof devMenuTextSize !== 'undefined') ? devMenuTextSize : 24);
             const labelOffsetY = (typeof this.style.labelOffsetY === 'number') ? this.style.labelOffsetY : -10;
+            const useDepthLayer = !!this.style.useDepthLayer;
+            const blackShadow = this.style.shadowBlackOffset || { x: 1.5, y: 1.5 };
+            const purpleShadow = this.style.shadowPurpleOffset || { x: 1, y: 1 };
+            const hoverLift = this.style.hoverLiftOffset || { x: -0.5, y: -0.5 };
+            const activePress = this.style.activePressOffset || { x: 1, y: 1 };
+            const isActive = useDepthLayer && this.isFocused && typeof mouseIsPressed !== 'undefined' && mouseIsPressed;
+            const frontOffset = isActive
+                ? activePress
+                : (this.isFocused ? hoverLift : { x: 0, y: 0 });
             // Store dims for corner-drag hit detection (world space, unscaled)
             this._bW = bW;
             this._bH = bH;
@@ -69,6 +78,23 @@ class UIButton {
                 ? assets[this.style.imageKey]
                 : assets.btnImg;
             if (btnImage) {
+                if (useDepthLayer) {
+                    // Back-to-front depth stack: black rear shadow, purple mid shadow, then button face.
+                    push();
+                    tint(0, 0, 0, 200);
+                    image(btnImage, blackShadow.x, blackShadow.y, bW, bH);
+                    noTint();
+                    pop();
+
+                    push();
+                    tint(83, 52, 131, 230);
+                    image(btnImage, purpleShadow.x, purpleShadow.y, bW, bH);
+                    noTint();
+                    pop();
+                }
+
+                const drawX = frontOffset.x;
+                const drawY = frontOffset.y;
                 if (this.style.shape === 'roundedRect') {
                     const ctx = drawingContext;
                     const r = this.style.radius || 15;
@@ -77,22 +103,22 @@ class UIButton {
                             ctx.save();
                             ctx.beginPath();
                             if (typeof ctx.roundRect === 'function') {
-                                ctx.roundRect(-bW / 2, -bH / 2, bW, bH, r);
+                                ctx.roundRect(drawX - bW / 2, drawY - bH / 2, bW, bH, r);
                             } else {
-                                ctx.rect(-bW / 2, -bH / 2, bW, bH);
+                                ctx.rect(drawX - bW / 2, drawY - bH / 2, bW, bH);
                             }
                             ctx.clip();
-                            image(btnImage, 0, 0, bW, bH);
+                            image(btnImage, drawX, drawY, bW, bH);
                             ctx.restore();
                         } catch (e) {
                             if (ctx && typeof ctx.restore === 'function') ctx.restore();
-                            image(btnImage, 0, 0, bW, bH);
+                            image(btnImage, drawX, drawY, bW, bH);
                         }
                     } else {
-                        image(btnImage, 0, 0, bW, bH);
+                        image(btnImage, drawX, drawY, bW, bH);
                     }
                 } else {
-                    image(btnImage, 0, 0, bW, bH);
+                    image(btnImage, drawX, drawY, bW, bH);
                 }
             }
 
@@ -102,22 +128,27 @@ class UIButton {
                 stroke(this.style.outlineColor || 0);
                 strokeWeight(this.style.outlineWeight);
                 if (this.style.shape === 'roundedRect') {
-                    rect(0, 0, bW, bH, this.style.radius || 15);
+                    rect(frontOffset.x, frontOffset.y, bW, bH, this.style.radius || 15);
                 } else {
-                    rect(0, 0, bW, bH);
+                    rect(frontOffset.x, frontOffset.y, bW, bH);
                 }
             }
 
             if (labelFont) textFont(labelFont);
             textSize(ts);
             textAlign(CENTER, CENTER);
-            stroke(0, 0, 0, 180);
-            strokeWeight(5);
+            const useLabelStroke = !this.style.noLabelStroke;
+            if (useLabelStroke) {
+                stroke(0, 0, 0, 180);
+                strokeWeight(5);
+            } else {
+                noStroke();
+            }
             fill(255, 215, 0);
-            text(this.label, 0, labelOffsetY);
+            text(this.label, frontOffset.x, frontOffset.y + labelOffsetY);
             noStroke();
             fill(255, 215, 0);
-            text(this.label, 0, labelOffsetY);
+            text(this.label, frontOffset.x, frontOffset.y + labelOffsetY);
         }
         pop();
 

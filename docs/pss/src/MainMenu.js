@@ -114,7 +114,13 @@ class MainMenu {
         const homeBtnStyle = {
             forceSize: true,
             labelOffsetY: 0,
-            imageKey: 'button1Img'
+            imageKey: 'button1Img',
+            noLabelStroke: true,
+            useDepthLayer: true,
+            shadowBlackOffset: { x: 1.5, y: 1.5 },
+            shadowPurpleOffset: { x: 1, y: 1 },
+            hoverLiftOffset: { x: -0.5, y: -0.5 },
+            activePressOffset: { x: 1, y: 1 }
         };
         this.buttons.push(new UIButton(width / 2 - spacing, centerY, 320, 96, "START", () => {
             // Go to difficulty selection screen
@@ -1086,21 +1092,19 @@ class MainMenu {
         // Prominent prompt bar at bottom
         const promptY = H - 72;
         const promptText = "\u2191\u2193 to select  \u00b7  [ENTER] to confirm  \u00b7  [ESC] to go back";
-        const promptW = 780, promptH = 56;
+        const promptW = W / 2, promptH = 56;
+        const promptTextY = promptY;
         rectMode(CENTER);
-        fill(15, 8, 42, 210);
-        stroke(200, 160, 255, 200); strokeWeight(1.5);
-        rect(cx, promptY, promptW, promptH, 29);
+        fill(101, 63, 191, 204); // #653FBF at 80% opacity (20% transparent)
+        stroke('#E2CAF8'); strokeWeight(3);
+        rect(cx, promptY, promptW, promptH, 15);
         noStroke();
         textAlign(CENTER, CENTER);
         textFont(fonts.body);
         textSize(28);
         stroke(0, 0, 0, 180); strokeWeight(4);
         fill(220, 185, 255);
-        text(promptText, cx, promptY);
-        noStroke();
-        fill(220, 185, 255);
-        text(promptText, cx, promptY);
+        text(promptText, cx, promptTextY);
 
         pop();
     }
