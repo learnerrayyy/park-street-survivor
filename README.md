@@ -211,7 +211,7 @@ At the project's inception, we recognized that a clear division of labor was ess
 <li><strong>Lucca Zhou (Aesthetic Design):</strong> Responsible for the 3D environmental assets, character models, and ensuring a cohesive visual identity across all levels.</li>
 <li><strong>Ray Wang (Level Design):</strong> Tasked with the architectural flow of the five levels, balancing the difficulty of obstacle placement with the frequency of power-ups.</li>
 <li><strong>Layla Pei (UI/UX & Audio):</strong> Developed the head-up display (HUD), menu navigation, and the soundscape that provides feedback for health loss and coffee collection.</li>
-<li><strong>Keyu Zhou (Scripts Design):</strong> Wrote and integrated the narrative sequences that bridge the gap between levels, ensuring the story resonated with the gameplay.</li>
+<li><strong>Keyu Zhou (TBD):</strong> TBD.</li>
 </ul>
 
 <h3>Methodology: Agile and Jira Integration</h3>
@@ -263,7 +263,7 @@ Reflect on the project as a whole. Lessons learnt. Reflect on challenges. Future
 | Lucca Zhou | Aesthetic Design | 20% |
 | Ray Wang | Level Design | 20% |
 | Layla Pei | UI/UX & Audio | 20% |
-| Keyu Zhou | Scripts Design | 20% |
+| Keyu Zhou | TBD | TBD |
 
 </div>
 
