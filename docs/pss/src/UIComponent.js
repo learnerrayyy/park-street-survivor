@@ -134,21 +134,23 @@ class UIButton {
                 }
             }
 
-            if (labelFont) textFont(labelFont);
-            textSize(ts);
-            textAlign(CENTER, CENTER);
-            const useLabelStroke = !this.style.noLabelStroke;
-            if (useLabelStroke) {
-                stroke(0, 0, 0, 180);
-                strokeWeight(5);
-            } else {
+            if (!this.style.noLabel) {
+                if (labelFont) textFont(labelFont);
+                textSize(ts);
+                textAlign(CENTER, CENTER);
+                const useLabelStroke = !this.style.noLabelStroke;
+                if (useLabelStroke) {
+                    stroke(0, 0, 0, 180);
+                    strokeWeight(5);
+                } else {
+                    noStroke();
+                }
+                fill(255, 215, 0);
+                text(this.label, frontOffset.x, frontOffset.y + labelOffsetY);
                 noStroke();
+                fill(255, 215, 0);
+                text(this.label, frontOffset.x, frontOffset.y + labelOffsetY);
             }
-            fill(255, 215, 0);
-            text(this.label, frontOffset.x, frontOffset.y + labelOffsetY);
-            noStroke();
-            fill(255, 215, 0);
-            text(this.label, frontOffset.x, frontOffset.y + labelOffsetY);
         }
         pop();
 
@@ -205,6 +207,20 @@ class UIButton {
      * Essential for mouse-to-index synchronization in MainMenu.
      */
     checkMouse(mx, my) {
+        if (this.style.hitboxOverride) {
+            const hb = this.style.hitboxOverride;
+            const ox = hb.offsetX || 0;
+            const oy = hb.offsetY || 0;
+            const w = hb.w || this._bW || this.w;
+            const h = hb.h || this._bH || this.h;
+            const hw = w / 2;
+            const hh = h / 2;
+            const cx = this.x + ox;
+            const cy = this.y + oy;
+            return (mx > cx - hw && mx < cx + hw &&
+                    my > cy - hh && my < cy + hh);
+        }
+
         // Use actual rendered button dimensions for hit detection
         let hw = this._bW ? this._bW / 2 : ((typeof devMenuBtnW !== 'undefined') ? devMenuBtnW / 2 : this.w * 0.65);
         let hh = this._bH ? this._bH / 2 : ((typeof devMenuBtnH !== 'undefined') ? devMenuBtnH / 2 : this.h * 0.65);

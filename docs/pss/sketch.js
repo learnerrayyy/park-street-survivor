@@ -507,6 +507,9 @@ function preload() {
     assets.warningImg = loadImage('assets/buttons/warning.png', itemLoaded);
     assets.btnImg = loadImage('assets/buttons/button.png', itemLoaded);
     assets.button1Img = loadImage('assets/buttons/button_1.png', itemLoaded);
+    assets.buttonStartImg = loadImage('assets/buttons/button_start.png', itemLoaded);
+    assets.buttonHelpImg = loadImage('assets/buttons/button_help.png', itemLoaded);
+    assets.buttonSettingImg = loadImage('assets/buttons/button_setting.png', itemLoaded);
     assets.backImg = loadImage('assets/buttons/back.png', itemLoaded);
     assets.pauseImg = loadImage('assets/buttons/pause.png', itemLoaded);
     assets.musicOn  = loadImage('assets/buttons/music_on.png',  itemLoaded);

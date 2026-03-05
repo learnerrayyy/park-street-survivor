@@ -109,12 +109,21 @@ class MainMenu {
      * Registers the three main-menu buttons (START, HELP, SETTINGS) and their transitions.
      */
     setupButtons() {
-        let centerY = height - 250;
-        let spacing = 420;
-        const homeBtnStyle = {
+        const spacing = 560;
+        const bottomY = height - 170;
+        const buttonScale = 0.7; // 30% smaller than original uploaded button sizes
+
+        const startW = round(530 * buttonScale);
+        const startH = round(250 * buttonScale);
+        const helpW = round(530 * buttonScale);
+        const helpH = round(250 * buttonScale);
+        const helpActiveH = round(150 * buttonScale);
+        const helpHitOffsetY = (helpH - helpActiveH) / 2;
+
+        const baseBtnStyle = {
             forceSize: true,
             labelOffsetY: 0,
-            imageKey: 'button1Img',
+            noLabel: true,
             noLabelStroke: true,
             useDepthLayer: true,
             shadowBlackOffset: { x: 1.5, y: 1.5 },
@@ -122,7 +131,25 @@ class MainMenu {
             hoverLiftOffset: { x: -0.5, y: -0.5 },
             activePressOffset: { x: 1, y: 1 }
         };
-        this.buttons.push(new UIButton(width / 2 - spacing, centerY, 320, 96, "START", () => {
+
+        const startBtnStyle = {
+            ...baseBtnStyle,
+            imageKey: 'buttonStartImg',
+            hitboxOverride: { w: startW, h: helpActiveH, offsetY: helpHitOffsetY }
+        };
+        const helpBtnStyle = {
+            ...baseBtnStyle,
+            imageKey: 'buttonHelpImg',
+            // button_help has a decorative top frame. Only the bottom strip is interactive.
+            hitboxOverride: { w: helpW, h: helpActiveH, offsetY: helpHitOffsetY }
+        };
+        const settingBtnStyle = {
+            ...baseBtnStyle,
+            imageKey: 'buttonSettingImg',
+            hitboxOverride: { w: startW, h: helpActiveH, offsetY: helpHitOffsetY }
+        };
+
+        this.buttons.push(new UIButton(width / 2 - spacing, bottomY - startH / 2, startW, startH, "START", () => {
             // Go to difficulty selection screen
             triggerTransition(() => {
                 this.diffSelectIndex    = 1;   // default highlight on NORMAL
@@ -130,20 +157,22 @@ class MainMenu {
                 this.selectedDifficulty = -1;
                 gameState.setState(STATE_DIFF_SELECT);
             });
-        }, 'title', 35, homeBtnStyle));
-        this.buttons.push(new UIButton(width / 2, centerY, 320, 96, "HELP", () => {
+        }, 'title', 35, startBtnStyle));
+
+        this.buttons.push(new UIButton(width / 2, bottomY - helpH / 2, helpW, helpH, "HELP", () => {
             triggerTransition(() => {
                 this.menuState = STATE_HELP;
                 gameState.currentState = STATE_HELP;
             });
-        }, 'title', 35, homeBtnStyle));
-        this.buttons.push(new UIButton(width / 2 + spacing, centerY, 320, 96, "SETTINGS", () => {
+        }, 'title', 35, helpBtnStyle));
+
+        this.buttons.push(new UIButton(width / 2 + spacing, bottomY - startH / 2, startW, startH, "SETTINGS", () => {
             triggerTransition(() => {
                 this.diffToastTimer = 0;   // clear any stale difficulty toast
                 this.menuState = STATE_SETTINGS;
                 gameState.currentState = STATE_SETTINGS;
             });
-        }, 'title', 35, homeBtnStyle));
+        }, 'title', 35, settingBtnStyle));
     }
 
     // ─── DISPLAY ─────────────────────────────────────────────────────────────
