@@ -129,8 +129,8 @@ What initially appears to be a normal routine slowly becomes something more myst
 
 <p align="center"><i>15% &nbsp;·&nbsp; ~750 words</i></p>
 
-Early stages design. Ideation process. How did you decide as a team what to develop? Use case diagrams, user stories.
-**2.1 Early Design and Ideation**
+Early stages design. Ideation process. How did you decide as a team what to develop? Use case diagrams, user stories.<br>
+**2.1 Early Design and Ideation**<br>
 
 At the beginning of the project, each team member proposed several potential game concepts, including Park Street Survivor, Pico Park, Plants vs Zombies, Tableturf Battle, and The Strongest Support. To evaluate these ideas systematically, the team developed a scoring table that assessed each proposal according to four criteria: creativity, implementation difficulty, gameplay interest, and extensibility. After several rounds of discussion and voting, Park Street Survivor (PSS) was selected as the final concept. Compared with the other proposals, PSS achieved higher scores in originality and long-term expandability, as it represented a completely original game idea rather than a direct adaptation of an existing title.
 
