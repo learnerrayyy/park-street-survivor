@@ -724,21 +724,11 @@ class MainMenu {
                 this.handleBackAction();
             }
         } else if (this.menuState === STATE_DIFF_CONFIRM) {
-            if (this.selectedDifficulty !== 1) {
-                // Coming soon screen — any key returns to diff select
-                if (keyCode === ENTER || keyCode === 13 || keyCode === ESCAPE) {
-                    this.handleBackAction();
-                }
-            } else {
-                if (keyCode === ENTER || keyCode === 13) {
-                    playSFX(sfxClick);
-                    triggerTransition(() => {
-                        this.loadGameIndex = 0;
-                        gameState.setState(STATE_LOAD_GAME);
-                    });
-                } else if (keyCode === ESCAPE) {
-                    this.handleBackAction();
-                }
+            if (keyCode === ENTER || keyCode === 13) {
+                playSFX(sfxClick);
+                this._confirmSelectedDifficulty();
+            } else if (keyCode === ESCAPE) {
+                this.handleBackAction();
             }
         } else if (this.menuState === STATE_LOAD_GAME) {
             const hasSave = typeof SaveSystem !== 'undefined' && SaveSystem.hasSave();
@@ -855,29 +845,14 @@ class MainMenu {
             // ── Difficulty confirm screen ────────────────────────────────────
             if (this.menuState === STATE_DIFF_CONFIRM) {
                 const W = width, H = height, cx = W / 2;
-                const btnW = 380, btnH = 90;
-                if (this.selectedDifficulty !== 1) {
-                    // Coming soon — single BACK button
-                    const btnY = H * 0.78;
-                    if (mx > cx - btnW / 2 && mx < cx + btnW / 2 &&
-                        my > btnY - btnH / 2 && my < btnY + btnH / 2) {
-                        playSFX(sfxClick);
-                        this.handleBackAction();
-                    }
-                } else {
-                    // Normal mode — single CONFIRM button
-                    const btnW2 = 420, btnH2 = 90;
-                    const btnY = H * 0.72;
-                    if (mx > cx - btnW2 / 2 && mx < cx + btnW2 / 2 &&
-                        my > btnY - btnH2 / 2 && my < btnY + btnH2 / 2) {
-                        playSFX(sfxClick);
-                        this.diffConfirmBtnIndex = 0;
-                        triggerTransition(() => {
-                            this.loadGameIndex = 0;
-                            gameState.setState(STATE_LOAD_GAME);
-                        });
-                        return;
-                    }
+                const btnW = 420, btnH = 90;
+                const btnY = H * 0.72;
+                if (mx > cx - btnW / 2 && mx < cx + btnW / 2 &&
+                    my > btnY - btnH / 2 && my < btnY + btnH / 2) {
+                    playSFX(sfxClick);
+                    this.diffConfirmBtnIndex = 0;
+                    this._confirmSelectedDifficulty();
+                    return;
                 }
                 return;
             }
@@ -1038,8 +1013,8 @@ class MainMenu {
 
         const diffData = [
             {
-                name: "EASY",
-                tagline: "Endless runner  \u00b7  Relaxed pace  \u00b7  No story",
+                name: "CASUAL",
+                tagline: "Endless mode  \u00b7  Day 1 pattern  \u00b7  Timer challenge",
                 recommended: false
             },
             {
@@ -1048,8 +1023,8 @@ class MainMenu {
                 recommended: true
             },
             {
-                name: "DIFFICULT",
-                tagline: "Endless runner  \u00b7  High-speed  \u00b7  No story",
+                name: "HARD",
+                tagline: "Endless mode  \u00b7  Day 5 pattern  \u00b7  High pressure",
                 recommended: false
             }
         ];
@@ -1142,16 +1117,16 @@ class MainMenu {
 
     /**
      * Renders the confirmation screen for the selected difficulty.
-     * Normal → shows CONFIRM / BACK buttons.
-     * Easy / Difficult → shows "Coming Soon" with a BACK button.
+     * All three modes are playable:
+     * - Casual/Hard: endless timer challenge
+     * - Normal: story mode with save/load flow
      */
     drawDiffConfirmScreen() {
         drawOtherBgWithOverlay();
 
         const W = width, H = height, cx = W / 2;
         const d = this.selectedDifficulty >= 0 ? this.selectedDifficulty : 1;
-        const diffNames = ["EASY", "NORMAL", "DIFFICULT"];
-        const isAvailable = d === 1;
+        const diffNames = ["CASUAL", "NORMAL", "HARD"];
 
         push();
 
@@ -1170,113 +1145,71 @@ class MainMenu {
         line(cx - 420, 168, cx + 420, 168);
         noStroke();
 
-        if (!isAvailable) {
-            // ── Coming soon ─────────────────────────────────────────────────
-            textFont(fonts.title);
-            textSize(56);
-            stroke(0, 0, 0, 200); strokeWeight(5);
-            fill(255, 200, 60);
-            text("COMING SOON", cx, 400);
-            noStroke(); fill(255, 200, 60);
-            text("COMING SOON", cx, 400);
+        // Description card (semi-transparent dark background for readability)
+        const cardW = 940, cardH = 240, cardY = 430;
+        rectMode(CENTER);
+        fill(10, 6, 30, 195);
+        stroke(180, 148, 72, 120); strokeWeight(1.5);
+        rect(cx, cardY, cardW, cardH, 14);
+        noStroke();
 
-            textFont(fonts.body);
+        textFont(fonts.body);
+        textSize(33);
+        fill(235, 225, 200);
+        textAlign(CENTER, CENTER);
+        if (d === 0) {
+            text("Endless timer challenge with Day 1 pacing.", cx, cardY - 56);
+            text("No distance victory. Survive as long as possible.", cx, cardY + 8);
             textSize(30);
-            noStroke();
-            fill(210, 195, 165);
-            textAlign(CENTER, CENTER);
-            text("This mode is currently under development.", cx, 510);
-            text("We recommend trying NORMAL mode first!", cx, 560);
-
-            // BACK button
-            const btnW = 380, btnH = 90, btnY = H * 0.76;
-            const bHov  = dist(mouseX, mouseY, cx, btnY) < btnW / 2 + 15 &&
-                          abs(mouseY - btnY) < btnH / 2 + 15;
-            if (bHov && !globalFade.isFading) this.diffConfirmBtnIndex = 0;
-
-            rectMode(CENTER);
-            fill(bHov ? color(75, 50, 135, 230) : color(20, 12, 50, 210));
-            stroke(bHov ? color(255, 215, 0) : color(160, 130, 80));
-            strokeWeight(2);
-            rect(cx, btnY, btnW, btnH, 12);
-            noStroke();
-            textAlign(CENTER, CENTER);
-            textFont(fonts.title);
-            textSize(34);
-            fill(bHov ? color(255, 215, 0) : color(200, 185, 150));
-            text("\u2190 GO BACK", cx, btnY);
-
-            rectMode(CENTER);
-            fill(15, 8, 42, 210);
-            stroke(200, 160, 255, 200); strokeWeight(1.5);
-            rect(cx, H - 72, 680, 56, 28);
-            noStroke();
-            textFont(fonts.body);
-            textSize(28);
-            textAlign(CENTER, CENTER);
-            stroke(0, 0, 0, 180); strokeWeight(3);
-            fill(220, 185, 255);
-            text("[ESC] or [ENTER] to go back", cx, H - 72);
-            noStroke();
-            fill(220, 185, 255);
-            text("[ESC] or [ENTER] to go back", cx, H - 72);
-
-        } else {
-            // ── Normal mode confirmation ─────────────────────────────────────
-
-            // Description card (semi-transparent dark background for readability)
-            const cardW = 940, cardH = 230, cardY = 430;
-            rectMode(CENTER);
-            fill(10, 6, 30, 195);
-            stroke(180, 148, 72, 120); strokeWeight(1.5);
-            rect(cx, cardY, cardW, cardH, 14);
-            noStroke();
-
-            textFont(fonts.body);
-            textSize(33);
-            fill(235, 225, 200);
-            textAlign(CENTER, CENTER);
+            fill(255, 215, 0);
+            text("Settlement shows survival time and hit count.", cx, cardY + 72);
+        } else if (d === 1) {
             text("Story-driven parkour across 5 days.", cx, cardY - 56);
             text("Difficulty increases as you progress through each day.", cx, cardY + 8);
-
             textSize(31);
             fill(255, 215, 0);
             text("\u2605 Recommended for first-time players!", cx, cardY + 72);
-
-            // Single CONFIRM button centered
-            const btnW = 420, btnH = 90, btnY = H * 0.72;
-            const cHov = !globalFade.isFading &&
-                         abs(mouseX - cx) < btnW / 2 + 10 &&
-                         abs(mouseY - btnY) < btnH / 2 + 10;
-            if (cHov) this.diffConfirmBtnIndex = 0;
-
-            rectMode(CENTER);
-            fill(cHov ? color(75, 50, 135, 230) : color(20, 12, 50, 210));
-            stroke(cHov ? color(255, 215, 0) : color(120, 100, 170));
-            strokeWeight(2);
-            rect(cx, btnY, btnW, btnH, 12);
-            noStroke();
-            textAlign(CENTER, CENTER);
-            textFont(fonts.title);
-            textSize(36);
-            fill(cHov ? color(255, 215, 0) : color(200, 185, 150));
-            text("CONFIRM", cx, btnY);
-
-            rectMode(CENTER);
-            fill(15, 8, 42, 210);
-            stroke(200, 160, 255, 200); strokeWeight(1.5);
-            rect(cx, H - 72, 680, 56, 28);
-            noStroke();
-            textFont(fonts.body);
-            textSize(28);
-            textAlign(CENTER, CENTER);
-            stroke(0, 0, 0, 180); strokeWeight(3);
-            fill(220, 185, 255);
-            text("[ENTER] to confirm  \u00b7  [ESC] to go back", cx, H - 72);
-            noStroke();
-            fill(220, 185, 255);
-            text("[ENTER] to confirm  \u00b7  [ESC] to go back", cx, H - 72);
+        } else {
+            text("Endless timer challenge with Day 5 intensity.", cx, cardY - 56);
+            text("No distance victory. Higher pressure obstacle flow.", cx, cardY + 8);
+            textSize(30);
+            fill(255, 215, 0);
+            text("Settlement shows survival time and hit count.", cx, cardY + 72);
         }
+
+        // Single CONFIRM button centered
+        const btnW = 420, btnH = 90, btnY = H * 0.72;
+        const cHov = !globalFade.isFading &&
+                        abs(mouseX - cx) < btnW / 2 + 10 &&
+                        abs(mouseY - btnY) < btnH / 2 + 10;
+        if (cHov) this.diffConfirmBtnIndex = 0;
+
+        rectMode(CENTER);
+        fill(cHov ? color(75, 50, 135, 230) : color(20, 12, 50, 210));
+        stroke(cHov ? color(255, 215, 0) : color(120, 100, 170));
+        strokeWeight(2);
+        rect(cx, btnY, btnW, btnH, 12);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title);
+        textSize(36);
+        fill(cHov ? color(255, 215, 0) : color(200, 185, 150));
+        text("CONFIRM", cx, btnY);
+
+        rectMode(CENTER);
+        fill(15, 8, 42, 210);
+        stroke(200, 160, 255, 200); strokeWeight(1.5);
+        rect(cx, H - 72, 680, 56, 28);
+        noStroke();
+        textFont(fonts.body);
+        textSize(28);
+        textAlign(CENTER, CENTER);
+        stroke(0, 0, 0, 180); strokeWeight(3);
+        fill(220, 185, 255);
+        text("[ENTER] to confirm  \u00b7  [ESC] to go back", cx, H - 72);
+        noStroke();
+        fill(220, 185, 255);
+        text("[ENTER] to confirm  \u00b7  [ESC] to go back", cx, H - 72);
 
         pop();
     }
@@ -1429,6 +1362,25 @@ class MainMenu {
                 this.timeWheel.triggerEntrance();
                 gameState.setState(STATE_LEVEL_SELECT);
             }
+        });
+    }
+
+    _confirmSelectedDifficulty() {
+        const d = this.selectedDifficulty >= 0 ? this.selectedDifficulty : 1;
+        gameDifficulty = d;
+        if (d === 1) {
+            triggerTransition(() => {
+                this.loadGameIndex = 0;
+                gameState.setState(STATE_LOAD_GAME);
+            });
+            return;
+        }
+
+        const day = (d === 0) ? 1 : 5;
+        const mode = (d === 0) ? RUN_MODE_ENDLESS_EASY : RUN_MODE_ENDLESS_HARD;
+        triggerTransition(() => {
+            gameState.resetFlags();
+            setupRunDirectly(day, mode);
         });
     }
 }

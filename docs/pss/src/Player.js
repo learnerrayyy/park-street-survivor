@@ -145,14 +145,14 @@ class Player {
 
             this.playTimeFrames++;
 
-            // Fail condition 2: time limit exceeded (08:30 → 09:00 = 1800s = 108,000 frames at 60 FPS)
-            if (this.playTimeFrames > 108000) {
+            // Story mode only: fail if time limit exceeded (08:30 -> 09:00).
+            if (!isEndlessRunMode() && this.playTimeFrames > 108000) {
                 this.triggerGameOver("LATE");
             }
 
             // Win condition: distance goal reached → trigger victory phase
             let targetDist = DAYS_CONFIG[currentDayID].totalDistance;
-            if (this.distanceRun >= targetDist && this.health > 0) {
+            if (!isEndlessRunMode() && this.distanceRun >= targetDist && this.health > 0) {
                 if (levelController && levelController.getLevelPhase() === "RUNNING") {
                     levelController.triggerVictoryPhase();
                 }
@@ -342,7 +342,9 @@ class Player {
         
         const leftMargin = 70;
         const topBarH = 170;
-        this.drawProgressBar(leftMargin, topBarH + 100);
+        if (!isEndlessRunMode()) {
+            this.drawProgressBar(leftMargin, topBarH + 100);
+        }
 
         pop();
     }

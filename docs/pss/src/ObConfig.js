@@ -171,8 +171,8 @@ const OBSTACLE_CONFIG = {
       spacePressRequired: 5,        // Press SPACE 10 times
       clearNearestObstacle: true,    // Clear the first obstacle in the current lane
       leafletSprites: [
-         "assets/obstacles/obstacle_flyer1.png",
-         "assets/obstacles/obstacle_flyer2.png"
+         "assets/obstacles/obstacle_flyer3.png",
+         "assets/obstacles/obstacle_flyer4.png"
       ],
       leafletSpritesByDay: {
          3: [

@@ -57,9 +57,21 @@ let masterVolumeBGM = 0.25;
 let masterVolumeSFX = 0.7;
 
 // ─── DIFFICULTY SETTING ──────────────────────────────────────────────────────
-// 0 = EASY (locked), 1 = NORMAL (default), 2 = HARD (locked)
+// 0 = CASUAL (endless day 1), 1 = NORMAL (story), 2 = HARD (endless day 5)
 let gameDifficulty = 1;
-const DIFFICULTY_LABELS = ["EASY", "NORMAL", "HARD"];
+const DIFFICULTY_LABELS = ["CASUAL", "NORMAL", "HARD"];
+const RUN_MODE_STORY = "STORY";
+const RUN_MODE_ENDLESS_EASY = "ENDLESS_EASY";
+const RUN_MODE_ENDLESS_HARD = "ENDLESS_HARD";
+let currentRunMode = RUN_MODE_STORY;
+
+function isStoryRunMode() {
+    return currentRunMode === RUN_MODE_STORY;
+}
+
+function isEndlessRunMode() {
+    return currentRunMode === RUN_MODE_ENDLESS_EASY || currentRunMode === RUN_MODE_ENDLESS_HARD;
+}
 
 // ─── WIN-CUTSCENE GUARD ───────────────────────────────────────────────────────
 // Prevents checkSettlementPoint() from triggering the NPC cutscene more than once.
@@ -799,18 +811,21 @@ function runGameLoop() {
 
     if (levelController) { levelController.display(); }
 
-    // Win condition: settlement point reached → NPC cutscene then win
-    if (!freezeGameplay && levelController && levelController.checkSettlementPoint()) {
-        if (!_winCutscenePending) {
-            _winCutscenePending = true;
-            let day = currentDayID;
-            console.log(`[runGameLoop] Settlement → NPC cutscene Day ${day}`);
-            triggerTransition(() => startCutscene('library', CS_DAY_NPC[day], () => {
-                triggerTransition(() => gameState.setState(STATE_WIN));
-            }));
+    // Settlement reached in story mode -> WIN cutscene.
+    if (!freezeGameplay && levelController) {
+        const settlementResult = levelController.checkSettlementPoint();
+        if (settlementResult === "WIN") {
+            if (!_winCutscenePending) {
+                _winCutscenePending = true;
+                let day = currentDayID;
+                console.log(`[runGameLoop] Settlement -> NPC cutscene Day ${day}`);
+                triggerTransition(() => startCutscene('library', CS_DAY_NPC[day], () => {
+                    triggerTransition(() => gameState.setState(STATE_WIN));
+                }));
             }
         }
     }
+}
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1466,6 +1481,7 @@ function togglePause() {
  */
 function setupRun(dayID) {
     currentDayID = dayID;
+    currentRunMode = RUN_MODE_STORY;
     _winCutscenePending = false;  // reset so the NPC cutscene can fire this run
 
     // Unlock all characters/story up to this day (supports testing panel access)
@@ -1514,8 +1530,10 @@ function setupRun(dayID) {
 /**
  * Starts a run directly on the street, skipping the room scene.
  */
-function setupRunDirectly(dayID) {
+function setupRunDirectly(dayID, runMode = RUN_MODE_STORY) {
     currentDayID = dayID;
+    currentRunMode = runMode;
+    _winCutscenePending = false;
     player.applyLevelStats(dayID);
 
     // Set position at lane 1 matching standard run spawn

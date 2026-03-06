@@ -288,6 +288,16 @@ class FailScreen extends EndScreenBase {
     }
 
     display() {
+        const endlessMode = (typeof isEndlessRunMode === "function") && isEndlessRunMode();
+        if (endlessMode) {
+            this.mainOptions = ["RETRY", "EXIT"];
+            this.options = this.mainOptions;
+            this.stateStep = "MAIN";
+        } else {
+            this.mainOptions = ["NEW GAME", "EXIT"];
+            if (this.stateStep === "MAIN") this.options = this.mainOptions;
+        }
+
         this.drawOverlay();
         let box = this.drawBox(assets.bbg);
         let cx  = box.x + box.w / 2;
@@ -306,12 +316,22 @@ class FailScreen extends EndScreenBase {
         textFont(fonts.body);
         textSize(22);
         fill(200);
-        // Moved towards the center (from 0.35 to 0.38)
-        text(this._getReasonText(), cx, box.y + box.h * 0.38);
+        if (endlessMode) {
+            const survivalSec = player ? floor(player.playTimeFrames / 60) : 0;
+            const hits = player ? player.carHitCount : 0;
+            text("Survival Time: " + this._formatDuration(survivalSec), cx, box.y + box.h * 0.35);
+            text("You outperformed 99% of players!", cx, box.y + box.h * 0.43);
+            text("Collisions: " + hits, cx, box.y + box.h * 0.51);
+        } else {
+            // Moved towards the center (from 0.35 to 0.38)
+            text(this._getReasonText(), cx, box.y + box.h * 0.38);
+        }
         pop();
 
-        // Moved towards the center (from 0.48 to 0.55)
-        this.drawProgressBar(cx, box.y + box.h * 0.55, box.w * 0.6);
+        if (!endlessMode) {
+            // Moved towards the center (from 0.48 to 0.55)
+            this.drawProgressBar(cx, box.y + box.h * 0.55, box.w * 0.6);
+        }
         }
         this.drawButtons(cx, this._getButtonStartY()); 
 
@@ -338,11 +358,28 @@ class FailScreen extends EndScreenBase {
         }
     }
 
+    _formatDuration(totalSec) {
+        const sec = Math.max(0, Math.floor(totalSec || 0));
+        const mm = Math.floor(sec / 60);
+        const ss = sec % 60;
+        const h = Math.floor(mm / 60);
+        const m = mm % 60;
+        if (h > 0) {
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+        }
+        return `${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    }
+
     executeSelection() {
         let option = this.options[this.selectedIndex];
+        const endlessMode = (typeof isEndlessRunMode === "function") && isEndlessRunMode();
 
         if (this.stateStep === "MAIN") {
-            if (option === "NEW GAME") {
+            if (option === "RETRY" && endlessMode) {
+                triggerTransition(() => {
+                    setupRunDirectly(currentDayID, currentRunMode);
+                });
+            } else if (option === "NEW GAME") {
                 // Show the BACK TO ROOM / START RUN sub-menu
                 this.stateStep = "MODE_SELECT";
                 this.options = this.modeOptions;

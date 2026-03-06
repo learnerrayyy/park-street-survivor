@@ -23,6 +23,8 @@ class LevelController {
       this.victoryPreRollDistance = 0; // Pixels to finish current run tile before destination enters
       this.victoryZoneFrames = 0; // Frames spent in victory zone (1.5s = 90 frames)
       this.victoryZoneStartY = 0; // Y position of victory bg when entering VICTORY_ZONE
+      this.failSettlementPending = false;
+      this.pendingFailReason = "";
    }
 
    /**
@@ -64,6 +66,8 @@ class LevelController {
       this.victoryPreRollDistance = 0;
       this.victoryZoneFrames = 0;
       this.victoryZoneStartY = 0;
+      this.failSettlementPending = false;
+      this.pendingFailReason = "";
 
       if (typeof env !== "undefined" && env) {
          env.scrollPos = 0;
@@ -304,6 +308,16 @@ class LevelController {
    }
 
    /**
+    * FAIL SETTLEMENT: in endless runs we still scroll into destination before showing results.
+    */
+   triggerFailSettlement(reason) {
+      if (this.failSettlementPending || this.levelPhase !== "RUNNING") return;
+      this.failSettlementPending = true;
+      this.pendingFailReason = reason || "EXHAUSTED";
+      this.triggerVictoryPhase();
+   }
+
+   /**
     * VICTORY PHASE: CHECK TRANSITION COMPLETION & HANDLE SETTLEMENT
     * Monitors if victory background has fully scrolled in and displays for 1.5 seconds.
     */
@@ -333,12 +347,23 @@ class LevelController {
          console.log(`[checkSettlementPoint] ZONE: frames=${this.victoryZoneFrames}/90`);
 
          if (this.victoryZoneFrames >= 90) {
+            if (this.failSettlementPending) {
+               console.log(`[LevelController] ✨ 1.5 seconds elapsed. Triggering FAIL settlement.`);
+               return "FAIL";
+            }
             console.log(`[LevelController] ✨ 1.5 seconds elapsed. Triggering WIN!`);
-            return true;
+            return "WIN";
          }
       }
 
       return false;
+   }
+
+   consumePendingFailReason() {
+      const reason = this.pendingFailReason || "EXHAUSTED";
+      this.failSettlementPending = false;
+      this.pendingFailReason = "";
+      return reason;
    }
 
 

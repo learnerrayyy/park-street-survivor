@@ -184,7 +184,7 @@ class ProceduralLevel {
   update() {
     // Procedural level update logic
     this.frameCounter++;
-    if (player.distanceRun >= this.config.totalDistance && player.health > 0) {
+    if (!isEndlessRunMode() && player.distanceRun >= this.config.totalDistance && player.health > 0) {
       // Only trigger once
       if (levelController.getLevelPhase() === "RUNNING") {
         console.log(`[ProceduralLevel] Victory condition met! Distance: ${player.distanceRun}, Target: ${this.config.totalDistance}`);
