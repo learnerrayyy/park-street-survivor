@@ -83,21 +83,21 @@ class MainMenu {
                 name: "YUKI",
                 unlockDay: 4,
                 portraitKey: "portraitYuki",
-                mbti: "ISFJ",
-                mbtiLabel: "The Defender",
-                description: "Quiet, dependable, observant. Deeply caring but rarely shows it outwardly. Notices things others miss and remembers small details about the people she cares about. Prefers small gatherings over loud social events. Has a deep appreciation for Japanese street food culture — her idea of travelling involves finding the perfect ramen shop. She is calm under pressure, the kind of person who quietly fixes things before anyone realises they were broken.",
-                signature: "Hand cream  ·  Onigiri  ·  Mini succulent plant",
-                story: "Yuki met Iris in their second year at university, through a mutual friend. She was initially the quietest of the group — the one most likely to disappear mid-party and be found feeding stray cats outside. But once she let you in, she was completely loyal. She was also the first to notice when something was genuinely wrong with Iris — long before anyone else said anything aloud. [Story details to be added soon...]"
+                mbti: "ESFJ",
+                mbtiLabel: "The Provider",
+                description: "Friendly, Outgoing, Philanthropist. Loves to integrate with the community and aid in organisational events. In combination with her tech skills, she has a passion for managing big institutions and ethics in her future. On a personal note, she enjoys creating music, soundtracks and background music- that is also one of her current side hustles. She creates new tracks in her studio into the late hours of the night. All of her music profits she dedicates to buying pop-mark figurines. She collects them obsessively and changes her key rings on a daily basis to impress with her vast collection.",
+                signature: "Labubu  ·  AirPods  ·  Chanel perfume",
+                story: "Iris and Yuki met very coincidentally, on one of the breezy summer evenings. Iris was going for a walk around Brandon Hill and spotted that Yuki was frantically retracing her steps after losing something. After helping her find her lost Airpod, the two continued their walk together. After chatting and getting to know each other, Iris discovered Yuki’s musical talent and immediately wanted to discover more. During next year’s summer, Iris and Yuki created their own “Festival Music Network”  that was presented during Bristol Harbourside Festival."
             },
             {
                 name: "CHARLOTTE",
                 unlockDay: 5,
                 portraitKey: "portraitCharlotte",
-                mbti: "ENTJ",
-                mbtiLabel: "The Commander",
-                description: "Decisive, passionate, resourceful. Charlotte commands any room she walks into — not because she demands attention but because she genuinely gives it. She is fiercely protective of the people she loves and doesn't shy away from saying the hard things. She's currently working at a theatre production company and is often found either stress-buying candles or spontaneously planning group trips nobody asked for.",
-                signature: "Planner notebook  ·  Lavender candle  ·  Vintage film camera",
-                story: "Charlotte and Iris first crossed paths during a group study session in the library — Iris had taken the last power socket, and Charlotte had politely but firmly asked her to share it. That was Year 1. By Year 2 they were inseparable. Charlotte became the planner, the organiser, the one who made sure the group actually showed up to things. During Iris's hardest year, Charlotte was the one who refused to stop checking in — even when nothing she said seemed to land. [Story details to be added soon...]"
+                mbti: "ENTP",
+                mbtiLabel: "The Visionary",
+                description: "Inventive, strategic, versatile, enjoys new ideas and challenges. Extremely energy efficient - will only dedicate time and energy to things she considers valuable or fun. One of those things is her study, where she only completes tasks to the highest degree of perfection. She is also intelligent, hence reinforced by her winning first place in the International Mathematics Olympiad. She has a circle of close friends, whom she cares for deeply and spends a lot of time with. She is also a proud member of the wlw community. Aside from this, she is a huge foodie and cat lover.",
+                signature: "Milk tea boba  ·  Swiss army knife  ·  Kitty hair",
+                story: "Charlotte is Iris’s best friend and ex-roommate. They lived together for two years and share the same birthday — the same day and month, just two years apart. Charlotte is older than Iris and tends to take on the role of an older sister. She is mature and gives great advice, which Iris never takes for granted. They’re most likely to be spotted in Gails drinking a coffee and matcha, before gaming for the rest of the evening. Iris looks up to Charlotte, which makes their relationship very special; these two would jump into flames for each other."
             }
         ];
         // Pre-filter ITEM_WIKI once — avoids Array.filter() on every draw frame
