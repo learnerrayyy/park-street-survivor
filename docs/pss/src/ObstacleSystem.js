@@ -1547,14 +1547,20 @@ class ObstacleManager {
     }
 
     getSpriteImage(spritePath) {
-        let img = this.spriteCache[spritePath];
+        // Runtime fallback for legacy/missing art paths.
+        const fallbackPaths = {
+            "assets/power_up/scooter_empty.png": "assets/power_up/powerup_scooter.png"
+        };
+        const resolvedPath = fallbackPaths[spritePath] || spritePath;
+
+        let img = this.spriteCache[resolvedPath];
         if (!img && assets && assets.previews) {
-            const fileNameKey = spritePath.split('/').pop().replace('.png', '').toLowerCase();
+            const fileNameKey = resolvedPath.split('/').pop().replace('.png', '').toLowerCase();
             img = assets.previews[fileNameKey];
         }
         if (!img) {
-            img = loadImage(spritePath);
-            this.spriteCache[spritePath] = img;
+            img = loadImage(resolvedPath);
+            this.spriteCache[resolvedPath] = img;
         }
         return img;
     }

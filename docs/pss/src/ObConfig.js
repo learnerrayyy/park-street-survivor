@@ -371,7 +371,8 @@ const OBSTACLE_CONFIG = {
       variants: [
          { name: "Scooter", sprite: "assets/power_up/powerup_scooter.png", weight: 1 },
          { name: "Motorcycle", sprite: "assets/power_up/powerup_motorcycle.png", weight: 1 },
-         { name: "Empty Scooter", sprite: "assets/power_up/scooter_empty.png", weight: 1 }
+         // Keep this variant on an existing asset to avoid invisible pickups.
+         { name: "Empty Scooter", sprite: "assets/power_up/powerup_scooter.png", weight: 1 }
       ]
    }
 };
