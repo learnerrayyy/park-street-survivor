@@ -631,7 +631,7 @@ function setup() {
  * p5.js lifecycle hook: main render loop — routes to the active scene each frame.
  */
 function draw() {
-    background(30);
+    background(0);
 
     try {
         switch (gameState.currentState) {
@@ -662,6 +662,12 @@ function draw() {
             case STATE_DIFF_SELECT:
             case STATE_DIFF_CONFIRM:
             case STATE_LOAD_GAME:
+                // Advance the splash→menu title enter animation (STATE_MENU only)
+                if (gameState.currentState === STATE_MENU && _menuFromSplash) {
+                    _menuEnterT = min(1, _menuEnterT + 1 / 35); // ~35 frames ≈ 0.6 s
+                    if (_menuEnterT >= 1) _menuFromSplash = false;
+                }
+
                 if (mainMenu) {
                     mainMenu.menuState = gameState.currentState;
                     // Auto-colorize once the entrance animation finishes — keeps visible gray period
@@ -1321,12 +1327,16 @@ function mousePressed() {
         return;
     }
 
-    // Splash screen: unlock audio and transition to main menu
+    // Splash screen: unlock audio and start the animated title transition to main menu
     if (state === STATE_SPLASH) {
         if (getAudioContext().state !== 'running') getAudioContext().resume();
         playSFX(sfxClick);
 
-        triggerTransition(() => gameState.setState(STATE_MENU));
+        // Capture splash title Y so the entering animation can lerp from it
+        _splashEnterCY  = (typeof titleDrop !== 'undefined') ? titleDrop.y : 480;
+        _menuEnterT     = 0;
+        _menuFromSplash = true;
+        gameState.setState(STATE_MENU);
         return;
     }
 
@@ -1594,8 +1604,11 @@ function drawLoadingScreen() {
 // ─── WARNING / SPLASH TRANSITION ─────────────────────────────────────────────
 let _splashFadeAlpha = 0;   // black overlay fading out on splash entry [0..255]
 let _warnFrame = 0;         // counts up each draw call while in STATE_WARNING
+let _menuEnterT     = 1;    // 0→1: splash-to-menu enter animation progress
+let _menuFromSplash = false; // true while the splash→menu title animation is running
+let _splashEnterCY  = 480;  // titleDrop.y captured at the moment of entering menu from splash
 const _WARN_FADE_IN  = 90;  // frames for fade-in  (~1.5 s)
-const _WARN_HOLD     = 540; // frames to hold at full opacity  (~9 s)
+const _WARN_HOLD     = 180; // frames to hold at full opacity  (~9 s)
 const _WARN_FADE_OUT = 90;  // frames for fade-out (~1.5 s)
 const _WARN_TOTAL    = _WARN_FADE_IN + _WARN_HOLD + _WARN_FADE_OUT; // 600 ≈ 10 s
 
@@ -1630,26 +1643,10 @@ function drawWarningScreen() {
     let cx = width / 2;
     let cy = height / 2;
 
-    // ── Background ────────────────────────────────────────────────────────────
+    // ── Background: pure black — content fades in and out over it ────────────
     push();
     colorMode(RGB, 255);
     background(0);
-
-    // Faded background image (otherBg) for atmosphere
-    if (assets && assets.otherBg) {
-        let bgS = max(width / assets.otherBg.width, height / assets.otherBg.height);
-        imageMode(CENTER);
-        tint(255, alpha * 0.3);
-        image(assets.otherBg, cx, cy, assets.otherBg.width * bgS, assets.otherBg.height * bgS);
-        noTint();
-        imageMode(CORNER);
-    }
-
-    // Dark overlay
-    fill(0, 0, 0, alpha * 0.80);
-    noStroke();
-    rectMode(CORNER);
-    rect(0, 0, width, height);
 
     // ── Panel ─────────────────────────────────────────────────────────────────
     let panelW = 1200 * s;
@@ -2052,75 +2049,109 @@ function drawSplashScreen() {
  * @param {number} y Target centre Y.
  */
 function drawLogoPlaceholder(x, y) {
-    let isSplash = (gameState.currentState === STATE_SPLASH);
-    let t = frameCount * 0.02;
-    let targetY = isSplash ? (y + 160) : (y + 10);
+    let isSplash    = (gameState.currentState === STATE_SPLASH);
+    let isEntering  = !isSplash && _menuFromSplash;
+    // t: 0 = fully splash, 1 = fully menu
+    let t           = isSplash ? 0 : (isEntering ? _menuEnterT : 1);
+    let easy        = t * t * (3 - 2 * t); // smoothstep
 
-    // Drop-in physics — wait until the splash fade-in overlay has cleared
-    if (_splashFadeAlpha > 0) {
-        // Hold position off-screen while fading in; shake decays harmlessly
-        titleDrop.shake *= 0.7;
-    } else if (!titleDrop.landed) {
-        titleDrop.vy += 2.0;
-        titleDrop.y += titleDrop.vy;
-        if (titleDrop.y >= y + 160) {
-            titleDrop.y = y + 160;
-            titleDrop.landed = true;
-            titleDrop.shake = 6;
+    // ── Title params: lerp from splash sizes/offsets to menu sizes/offsets ────
+    let psSz    = lerp(300, 210, easy);
+    let surSz   = lerp(200, 190, easy);
+    let psYOff  = lerp(-130, -70,  easy);
+    let surYOff = lerp(80,   100,  easy);
+    let psSW    = lerp(25,   10,   easy);
+    let surSW   = lerp(20,   10,   easy);
+
+    // Alpha for splash-exclusive elements: full at splash, fades out on entry
+    let splashA = constrain((1 - easy) * 255, 0, 255);
+    let showSplashExtras = isSplash || isEntering;
+
+    // ── Title reference centre Y ───────────────────────────────────────────────
+    let cy;
+    let tAnim = frameCount * 0.02;
+    if (isSplash) {
+        // Physics-based drop-in (original behaviour)
+        let targetY = y + 160;
+        if (_splashFadeAlpha > 0) {
+            titleDrop.shake *= 0.7;
+        } else if (!titleDrop.landed) {
+            titleDrop.vy += 2.0;
+            titleDrop.y += titleDrop.vy;
+            if (titleDrop.y >= y + 160) {
+                titleDrop.y = y + 160;
+                titleDrop.landed = true;
+                titleDrop.shake = 6;
+            }
+            titleDrop.shake *= 0.7;
+        } else {
+            titleDrop.y = lerp(titleDrop.y, targetY, 0.15);
+            titleDrop.shake *= 0.7;
         }
-        titleDrop.shake *= 0.7;
+        cy = titleDrop.y;
+    } else if (isEntering) {
+        // Lerp from captured splash position to the menu centre (height * 0.33)
+        cy = lerp(_splashEnterCY, height * 0.33, easy);
+        titleDrop.shake = 0;
     } else {
-        titleDrop.y = lerp(titleDrop.y, targetY, 0.15);
-        titleDrop.shake *= 0.7;
+        cy = height * 0.33;
+        titleDrop.shake = 0;
     }
 
-    // Full-screen logo background
-    if (isSplash && assets.logoImgs && assets.logoImgs[4]) {
+    let shakeX = (isSplash && titleDrop.shake >= 0.5)
+        ? random(-titleDrop.shake, titleDrop.shake) : 0;
+
+    // ── Splash-exclusive: full-screen logo background ─────────────────────────
+    if (showSplashExtras && assets.logoImgs && assets.logoImgs[4]) {
         push();
         imageMode(CENTER);
+        tint(255, splashA);
         image(assets.logoImgs[4], width / 2, height / 2, width * 1.02, height * 1.02);
+        noTint();
         pop();
     }
 
-    // Rear cloud layer
-    if (isSplash && assets.selectClouds) {
+    // ── Rear cloud layer ──────────────────────────────────────────────────────
+    if (showSplashExtras && assets.selectClouds) {
         push();
         imageMode(CENTER);
-        tint(255, 255, 255, 200);
-        image(assets.selectClouds[1], width * 0.1, height * 0.9 + cos(t) * 10, 800, 480);
-        image(assets.selectClouds[2], width * 0.1, height * 0.2 + sin(t) * 10, 700, 420);
-        image(assets.selectClouds[4], width * 1.0, height * 0.09 + sin(t) * 10, 700, 420);
+        tint(255, min(splashA, 200));
+        image(assets.selectClouds[1], width * 0.1, height * 0.9 + cos(tAnim) * 10, 800, 480);
+        image(assets.selectClouds[2], width * 0.1, height * 0.2 + sin(tAnim) * 10, 700, 420);
+        image(assets.selectClouds[4], width * 1.0, height * 0.09 + sin(tAnim) * 10, 700, 420);
+        noTint();
         pop();
     }
 
-    // "PARK STREET" title — only apply random shake while it's perceptible (>= 0.5px)
+    // ── PARK STREET ───────────────────────────────────────────────────────────
     push();
-    let shakeX = (titleDrop.shake >= 0.5) ? random(-titleDrop.shake, titleDrop.shake) : 0;
-    translate(x + shakeX, titleDrop.y);
-    drawSplitTitle("PARK STREET", 300, -130, 25);
+    translate(x + shakeX, cy);
+    drawSplitTitle("PARK STREET", psSz, psYOff, psSW);
     pop();
 
-    // Mid cloud layer (between title lines)
-    if (isSplash && assets.selectClouds) {
+    // ── Mid cloud layer ───────────────────────────────────────────────────────
+    if (showSplashExtras && assets.selectClouds) {
         push();
         imageMode(CENTER);
+        tint(255, splashA);
+        image(assets.selectClouds[0], x - 240, y + 250 + sin(tAnim * 1.2) * 8, 500, 300);
         noTint();
-        image(assets.selectClouds[0], x - 240, y + 250 + sin(t * 1.2) * 8, 500, 300);
         pop();
     }
 
-    // "SURVIVOR" subtitle — reuse the same shake offset computed above
+    // ── SURVIVOR ──────────────────────────────────────────────────────────────
     push();
-    translate(x + shakeX, titleDrop.y);
-    drawSplitTitle("SURVIVOR", 200, 80, 20);
+    translate(x + shakeX, cy);
+    drawSplitTitle("SURVIVOR", surSz, surYOff, surSW);
     pop();
 
-    // Front cloud layer
-    if (isSplash && assets.selectClouds) {
+    // ── Front cloud layer ─────────────────────────────────────────────────────
+    if (showSplashExtras && assets.selectClouds) {
         push();
         imageMode(CENTER);
+        tint(255, splashA);
+        image(assets.selectClouds[2], width * 0.88, y + 230 + sin(tAnim) * 10, 600, 360);
         noTint();
-        image(assets.selectClouds[2], width * 0.88, y + 230 + sin(t) * 10, 600, 360);
         pop();
     }
 }

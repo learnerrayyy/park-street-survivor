@@ -15,8 +15,8 @@ class MainMenu {
         this.setupButtons();
 
         this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => this.handleBackAction());
-        this.bgmSlider = new UISlider(width / 2, height / 2 - 80, 400, 0, 1, masterVolumeBGM, "MUSIC VOLUME");
-        this.sfxSlider = new UISlider(width / 2, height / 2 + 50, 400, 0, 1, masterVolumeSFX, "SOUND EFFECTS");
+        this.bgmSlider = new UISlider(width / 2, height / 2 - 80, 480, 0, 1, masterVolumeBGM, "MUSIC VOLUME");
+        this.sfxSlider = new UISlider(width / 2, height / 2 + 100, 480, 0, 1, masterVolumeSFX, "SOUND EFFECTS");
 
         // Difficulty selector state (kept for save-system compatibility)
         this.difficultyIndex = gameDifficulty;  // 0=EASY, 1=NORMAL, 2=HARD
@@ -216,27 +216,33 @@ class MainMenu {
      * Renders the home screen: logo and the three main action buttons.
      */
     drawHomeScreen() {
-        // Keep a compact title on home menu.
-        // The large animated title remains exclusive to splash ("Click to continue").
-        if (typeof drawSplitTitle === 'function') {
-            push();
-            translate(width / 2, height * 0.33);
-            drawSplitTitle("PARK STREET", 210, -70, 10);
-            drawSplitTitle("SURVIVOR", 190, 100, 10);
-            pop();
+        // Splash→menu entering animation state (globals set by sketch.js)
+        let isEntering = (typeof _menuFromSplash !== 'undefined') && _menuFromSplash;
+        let t    = isEntering ? (typeof _menuEnterT !== 'undefined' ? _menuEnterT : 1) : 1;
+        let easy = t * t * (3 - 2 * t); // smoothstep
+
+        // Logo — drawLogoPlaceholder handles both splash-entering and static-menu cases
+        if (typeof drawLogoPlaceholder === 'function') {
+            drawLogoPlaceholder(width / 2, 320);
         }
 
+        // Buttons fade in during transition, then stay fully opaque
         let anyHover = false;
+        push();
+        drawingContext.globalAlpha = easy;
         for (let i = 0; i < this.buttons.length; i++) {
-            if (!globalFade.isFading && this.buttons[i].checkMouse(mouseX, mouseY)) {
+            // Don't register hover/click while the enter animation is still running
+            if (!isEntering && !globalFade.isFading && this.buttons[i].checkMouse(mouseX, mouseY)) {
                 this.currentIndex = i;
                 anyHover = true;
             }
-            this.buttons[i].isFocused = (this.currentIndex >= 0 && this.currentIndex === i);
+            this.buttons[i].isFocused = (!isEntering && this.currentIndex >= 0 && this.currentIndex === i);
             this.buttons[i].update();
             this.buttons[i].display();
         }
-        // Reset selection when mouse isn't hovering any button
+        drawingContext.globalAlpha = 1;
+        pop();
+
         if (!anyHover && !keyIsPressed) {
             this.currentIndex = -1;
         }
@@ -277,10 +283,10 @@ class MainMenu {
         stroke(0, 0, 0, 200);
         strokeWeight(6);
         fill(255, 215, 0);
-        text("SETTINGS", width / 2, height / 2 - 260);
+        text("SETTINGS", width / 2, height / 2 - 310);
         noStroke();
         fill(255, 215, 0);
-        text("SETTINGS", width / 2, height / 2 - 260);
+        text("SETTINGS", width / 2, height / 2 - 310);
 
         // ── Volume sliders ───────────────────────────────────────────────────
         this.bgmSlider.display();
@@ -288,7 +294,7 @@ class MainMenu {
 
         // Mute toggle icons with hover zoom effect
         let iconSz = 52;
-        let iconXOffset = 260;
+        let iconXOffset = 300;
         let iconHitR = 32;
 
         // Music mute toggle icon
@@ -321,17 +327,17 @@ class MainMenu {
         rectMode(CENTER);
         fill(15, 8, 42, 210);
         stroke(200, 160, 255, 200); strokeWeight(1.5);
-        rect(width / 2, height - 72, 620, 56, 28);
+        rect(width / 2, height - 72, 820, 56, 28);
         noStroke();
         textFont(fonts.body);
-        textSize(28);
+        textSize(24);
         textAlign(CENTER, CENTER);
         stroke(0, 0, 0, 180); strokeWeight(3);
         fill(220, 185, 255);
-        text("Press \u2190 or [ESC] to go back", width / 2, height - 72);
+        text("Press top-left \u2190 button or [ESC] to return to previous screen", width / 2, height - 72);
         noStroke();
         fill(220, 185, 255);
-        text("Press \u2190 or [ESC] to go back", width / 2, height - 72);
+        text("Press top-left \u2190 button or [ESC] to return to previous screen", width / 2, height - 72);
         pop();
     }
 
@@ -412,8 +418,7 @@ class MainMenu {
         else if (this.helpPage === 1) {
             const char      = this._helpCharDetails[this._helpCharIndex];
             const n         = this._helpCharDetails.length;
-            const isUnlocked = char.unlockDay <= currentUnlockedDay ||
-                               (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
+            const isUnlocked = true;
 
             // ── Left portrait panel ────────────────────────────────────────
             const lx = 90, ly = 155, lw = 510, lh = 710;
@@ -945,10 +950,13 @@ class MainMenu {
         playSFX(sfxClick);
 
         if (typeof pauseFromState !== 'undefined' && pauseFromState !== null) {
-            // Return to pause overlay and restore the correct resume target.
-            gameState.setState(STATE_PAUSED);
-            gameState.previousState = pauseFromState;
-            this.helpPage = 0;
+            // Return to pause overlay with a fade so there's no instant snap.
+            const _prevState = pauseFromState;
+            triggerTransition(() => {
+                gameState.setState(STATE_PAUSED);
+                gameState.previousState = _prevState;
+                this.helpPage = 0;
+            });
         } else if (this.menuState === STATE_DIFF_SELECT) {
             triggerTransition(() => {
                 this.menuState = STATE_MENU;

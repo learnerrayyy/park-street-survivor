@@ -138,6 +138,12 @@ class DialogueBox {
         this.options       = null;
         /** Optional callback: (opt, index) => void — intercepts option clicks for echo/tracking. */
         this.onOptionSelect = null;
+        /**
+         * Optional Set of lowercase words to render in gold once typing finishes.
+         * Set via the 5th argument of trigger(), sourced from a line's `highlight` array.
+         * Example in dialogue_data.js: { text: "...", highlight: ["car", "crash"] }
+         */
+        this.highlight = null;
     }
 
     // ─── PUBLIC API ──────────────────────────────────────────────────────────
@@ -149,7 +155,12 @@ class DialogueBox {
      * @param {p5.Image} [portrait]    Character portrait (null → default player portrait).
      * @param {string}   [speakerName] Name shown in a tag above the bar. Omit or "" to hide.
      */
-    trigger(text, portrait, speakerName, options = null) {
+    /**
+     * @param {string[]} [highlight]  Words to render in gold once typing finishes.
+     *                                Sourced from a dialogue line's `highlight: [...]` array.
+     *                                Example: highlight: ['car', 'crash']
+     */
+    trigger(text, portrait, speakerName, options = null, highlight = null) {
         this.active        = true;
         this.timer         = this.timerMax;
         const explicitPortrait = this.hasRenderablePortrait(portrait) ? portrait : null;
@@ -160,7 +171,41 @@ class DialogueBox {
         this.displayedText = "";
         this.wordTickMs    = 0;
         this.speakerName   = speakerName || "";
-        this.options = options;
+        this.options       = options;
+        this.highlight     = highlight && highlight.length
+            ? new Set(highlight.map(w => w.toLowerCase()))
+            : null;
+    }
+
+    /**
+     * Renders `displayedText` word-by-word, drawing words in the `hlWords` Set
+     * in gold and all others in white. Manually replicates p5.js word-wrap.
+     * Only called when typing is fully complete (highlights appear after reveal).
+     */
+    _drawHighlightedText(displayedText, hlWords, tx, ty, tw, th) {
+        if (!displayedText) return;
+        const words = displayedText.split(/\s+/);
+        const lh    = textLeading() || textSize() * 1.2;
+        let cx = tx, cy = ty;
+
+        for (let i = 0; i < words.length; i++) {
+            const w  = words[i];
+            const wW = textWidth(w);
+            const spW = textWidth(' ');
+
+            // Wrap to next line if word doesn't fit (and we're not at line start)
+            if (cx + wW > tx + tw && cx > tx) {
+                cx  = tx;
+                cy += lh;
+                if (cy > ty + th) break;
+            }
+
+            // Strip punctuation for matching but keep original word for display
+            const clean = w.toLowerCase().replace(/[.,!?…:;'"]/g, '');
+            fill(hlWords.has(clean) ? color(255, 215, 0) : color(255));
+            text(w, cx, cy);
+            cx += wW + spW;
+        }
     }
 
     /**
@@ -317,16 +362,19 @@ class DialogueBox {
             }
         }
 
-        // Dialogue text
-
+        // Dialogue text — use word-by-word highlight render when done typing
         let fB = (typeof fonts !== 'undefined') ? (fonts.jersey20 || fonts.dialogueBlue || fonts.body || fonts.title) : null;
         if (fB) textFont(fB);
         textSize(45 * s);
         textLeading(45 * s);
-        fill(255);
         noStroke();
         textAlign(LEFT, TOP);
-        text(this.displayedText, tx, ty, tw, th);
+        if (this.highlight && this.highlight.size > 0 && this.isFinishedTyping()) {
+            this._drawHighlightedText(this.displayedText, this.highlight, tx, ty, tw, th);
+        } else {
+            fill(255);
+            text(this.displayedText, tx, ty, tw, th);
+        }
 
         // Continue indicator (always while dialogue is active)
         const triX = UI.triangle.x * s;

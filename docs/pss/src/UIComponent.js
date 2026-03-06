@@ -782,10 +782,10 @@ class UISlider {
         stroke(0, 0, 0, 200);
         strokeWeight(5);
         fill(255, 215, 0);
-        text(this.label, this.x, this.y - 44);
+        text(this.label, this.x, this.y - 65);
         noStroke();
         fill(255, 215, 0);
-        text(this.label, this.x, this.y - 44);
+        text(this.label, this.x, this.y - 65);
 
         let leftX   = this.x - this.w / 2;
         let rightX  = this.x + this.w / 2;
@@ -810,17 +810,17 @@ class UISlider {
         rect(0, 0, this.knobSize, this.knobSize + 10, 5);
         pop();
 
-        // Percentage text
+        // Percentage text — larger for legibility
         textFont(fonts.time);
         textAlign(CENTER, CENTER);
         stroke(0, 0, 0, 160);
         strokeWeight(3);
         fill(255, 215, 0);
-        textSize(20);
-        text(floor(this.value * 100) + "%", sliderX, this.y + 35);
+        textSize(48);
+        text(floor(this.value * 100) + "%", sliderX, this.y + 50);
         noStroke();
         fill(255, 215, 0);
-        text(floor(this.value * 100) + "%", sliderX, this.y + 35);
+        text(floor(this.value * 100) + "%", sliderX, this.y + 50);
         pop();
 
         this.update();

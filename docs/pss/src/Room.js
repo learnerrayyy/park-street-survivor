@@ -538,7 +538,8 @@ class RoomScene {
     }
 
     /**
-     * Draws the bottom-bar movement key guide shown on Day 1 (first entry only).
+     * Draws a compact left-side movement key guide shown on Day 1 (first entry only).
+     * Shows WASD and Arrow key groups stacked vertically.
      * Dismissed automatically when the player moves 50 px from spawn.
      */
     drawMoveTutorial() {
@@ -546,10 +547,10 @@ class RoomScene {
         const DESIGN_H = 1080;
         const s = min(width / DESIGN_W, height / DESIGN_H);
 
-        const panelW = 1440 * s;
-        const panelH = 280  * s;
-        const panelX = width  / 2;
-        const panelY = height - (panelH / 2) - (30 * s);
+        const panelW = 310 * s;
+        const panelH = 480 * s;
+        const panelX = panelW / 2 + 28 * s;   // anchored to left edge
+        const panelY = height / 2;
 
         let pulse    = (sin(frameCount * 0.08) + 1) * 0.5;
         let keyAlpha = 180 + pulse * 75;
@@ -578,61 +579,70 @@ class RoomScene {
         rect(panelX, panelY, panelW - 14 * s, panelH - 14 * s, 13 * s);
 
         // ── Keys rendered at their natural aspect ratio ──
-        let targetH = 75 * s;
+        let targetH = 58 * s;
 
         let drawKey = (sheet, x, y) => {
             if (!sheet) return;
-            let frame   = floor(frameCount / 20) % 3;
             let sw      = sheet.width / 3;
             let sh      = sheet.height;
             let renderH = targetH;
             let renderW = (sw / sh) * renderH;
             imageMode(CENTER);
             tint(255, keyAlpha);
+            let frame = floor(frameCount / 20) % 3;
             image(sheet, x, y, renderW, renderH, frame * sw, 0, sw, sh);
             noTint();
         };
 
         let refSheet   = assets.keys.w;
         let keyRenderW = refSheet ? (refSheet.width / 3 / refSheet.height) * targetH : targetH * 1.1;
-        let colGap = keyRenderW + 12 * s;
-        let rowOff = targetH + 12 * s;
+        let colGap = keyRenderW + 10 * s;
+        let rowOff = targetH + 10 * s;
 
-        let keyCY   = panelY + 14 * s;
-        let topRowY = keyCY - rowOff / 2;
-        let botRowY = keyCY + rowOff / 2;
-
-        // ── WASD group (left of panel centre) ──
-        let wasdX = panelX - 380 * s;
-        drawKey(assets.keys.w, wasdX,           topRowY);
-        drawKey(assets.keys.a, wasdX - colGap,  botRowY);
-        drawKey(assets.keys.s, wasdX,           botRowY);
-        drawKey(assets.keys.d, wasdX + colGap,  botRowY);
-
-        // ── Arrow keys group (right of panel centre) ──
-        let arrX = panelX + 380 * s;
-        drawKey(assets.keys.up,    arrX,           topRowY);
-        drawKey(assets.keys.left,  arrX - colGap,  botRowY);
-        drawKey(assets.keys.down,  arrX,           botRowY);
-        drawKey(assets.keys.right, arrX + colGap,  botRowY);
-
-        // ── Labels ──
+        // ── Title label ──
+        let titleY = panelY - panelH / 2 + 30 * s;
         textAlign(CENTER, CENTER);
         textFont(fonts.body);
-
-        let labelY = panelY - panelH / 2 + 36 * s;
-        textSize(28 * s);
-        stroke(0, 0, 0, 160);
-        strokeWeight(4);
+        textSize(18 * s);
+        stroke(0, 0, 0, 160); strokeWeight(3);
         fill(255, 220, 80, keyAlpha);
-        text("USE WASD OR ARROW KEYS TO MOVE", panelX, labelY);
+        text("MOVE TO NAVIGATE", panelX, titleY);
         noStroke();
         fill(255, 220, 80, keyAlpha);
-        text("USE WASD OR ARROW KEYS TO MOVE", panelX, labelY);
+        text("MOVE TO NAVIGATE", panelX, titleY);
 
-        textSize(20 * s);
+        // ── WASD group — centred in upper half ──
+        let wasdCY = panelY - 100 * s;
+        let topRowY = wasdCY - rowOff / 2;
+        let botRowY = wasdCY + rowOff / 2;
+        drawKey(assets.keys.w, panelX,            topRowY);
+        drawKey(assets.keys.a, panelX - colGap,   botRowY);
+        drawKey(assets.keys.s, panelX,            botRowY);
+        drawKey(assets.keys.d, panelX + colGap,   botRowY);
+
+        // ── "OR" divider ──
+        let orY = panelY + 10 * s;
+        textSize(16 * s);
+        stroke(0, 0, 0, 120); strokeWeight(2);
+        fill(180, 160, 220, keyAlpha * 0.8);
+        text("─── OR ───", panelX, orY);
+        noStroke();
+        fill(180, 160, 220, keyAlpha * 0.8);
+        text("─── OR ───", panelX, orY);
+
+        // ── Arrow keys group — centred in lower half ──
+        let arrCY = panelY + 115 * s;
+        let arrTopY = arrCY - rowOff / 2;
+        let arrBotY = arrCY + rowOff / 2;
+        drawKey(assets.keys.up,    panelX,            arrTopY);
+        drawKey(assets.keys.left,  panelX - colGap,   arrBotY);
+        drawKey(assets.keys.down,  panelX,            arrBotY);
+        drawKey(assets.keys.right, panelX + colGap,   arrBotY);
+
+        // ── Dismiss hint ──
+        textSize(16 * s);
         fill(200, 175, 255, keyAlpha * 0.75);
-        text("MOVE TO DISMISS", panelX, panelY + panelH / 2 - 20 * s);
+        text("MOVE TO DISMISS", panelX, panelY + panelH / 2 - 22 * s);
 
         pop();
     }
