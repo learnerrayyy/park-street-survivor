@@ -51,6 +51,9 @@ let assets = {
 let fonts = {};
 let sfxSelect, sfxClick, sfxScold;
 let sfxDialogue, sfxHitBigCar, sfxHitSmallCar, sfxPickupCoffee, sfxPickupScooter;
+let sfxAmbulance, sfxHeartbeat, sfxGameWin;
+
+let failEndAudioTimer = null;
 
 // ─── AUDIO VOLUME CONTROLS ───────────────────────────────────────────────────
 let masterVolumeBGM = 0.25;
@@ -485,12 +488,21 @@ function preload() {
 
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
     sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
-    sfxDialogue      = loadSound('assets/audio/effects/DIalogue.mp3',   itemLoaded);
+    sfxDialogue      = loadSound('assets/audio/effects/Dialogue.mp3',   itemLoaded);
     sfxHitBigCar     = loadSound('assets/audio/effects/HitBigCar.mp3',  itemLoaded);
     sfxHitSmallCar   = loadSound('assets/audio/effects/HitSmallCar.mp3', itemLoaded);
     sfxPickupCoffee  = loadSound('assets/audio/effects/CoffeeDrink.wav', itemLoaded);
     sfxPickupScooter = loadSound('assets/audio/effects/ScooterPick.wav', itemLoaded);
-    // sfxScold = loadSound('assets/audio/effects/Scold.wav', itemLoaded); // TODO: add asset later
+    sfxScooterBrake = loadSound('assets/audio/effects/ScooterBrake.wav', itemLoaded);
+    sfxHitNpc = loadSound('assets/audio/effects/HitNPC.wav', itemLoaded);
+    sfxPuddleBoots = loadSound('assets/audio/effects/PuddleWithShoe.mp3', itemLoaded);
+    sfxPuddleNoBoots = loadSound('assets/audio/effects/HitPuddle.mp3', itemLoaded);
+    sfxHitFantasyCoffee = loadSound('assets/audio/effects/HitFantasyCoffee.mp3', itemLoaded);
+    sfxSmallBusiness = loadSound('assets/audio/effects/HitSmallBusiness.mp3', itemLoaded);
+    sfxPaperCrumple = loadSound('assets/audio/effects/HitPoster.mp3', itemLoaded);
+    sfxAmbulance = loadSound('assets/audio/effects/GameOverAmbulance.wav', itemLoaded);
+    sfxHeartbeat = loadSound('assets/audio/effects/GameOverHeartbeat.mp3', itemLoaded);
+    sfxGameWin = loadSound('assets/audio/effects/GameWin.mp3', itemLoaded);
 
     // Control key sprites
     assets.keys.w = loadImage('assets/control_keys/W.png', itemLoaded);
@@ -899,6 +911,117 @@ function playSFX(sound, opt = {}) {
             if (__sfxCounts[k] > topN) { topN = __sfxCounts[k]; topId = k; }
         }
         if (topN > 3) console.warn("[AUDIO] top playSFX calls:", topId, topN, __sfxCounts);
+    }
+}
+
+
+/**
+ * Stops pending/playing fail end audio.
+ */
+function stopFailEndAudio() {
+    if (failEndAudioTimer) {
+        clearTimeout(failEndAudioTimer);
+        failEndAudioTimer = null;
+    }
+
+    const failAudioList = [sfxAmbulance, sfxHeartbeat];
+
+    for (const s of failAudioList) {
+        if (!s) continue;
+        try {
+            if (typeof s.isPlaying === 'function' && s.isPlaying()) {
+                s.stop();
+            }
+        } catch (e) {
+            console.warn('[AUDIO] stopFailEndAudio failed:', e);
+        }
+    }
+}
+
+/**
+ * On FAIL: stop current BGM immediately, wait ~2s, then play fail audio once.
+ * Day 1-4 -> ambulance
+ * Day 5   -> heartbeat
+ */
+function playFailEndAudio() {
+    const day = (typeof currentDayID === 'number') ? currentDayID : 1;
+    const failSound = (day === 5) ? sfxHeartbeat : sfxAmbulance;
+
+    if (!failSound) return;
+
+    // Cancel any pending fail-audio trigger first
+    if (failEndAudioTimer) {
+        clearTimeout(failEndAudioTimer);
+        failEndAudioTimer = null;
+    }
+
+    // Stop current BGM immediately
+    try {
+        if (typeof BGM !== 'undefined' && BGM && typeof BGM.stop === 'function') {
+            BGM.stop();
+        }
+    } catch (e) {
+        console.warn('[AUDIO] Failed to stop BGM on fail:', e);
+    }
+
+    // Schedule fail audio after a short silent buffer
+    failEndAudioTimer = setTimeout(() => {
+        failEndAudioTimer = null;
+
+        try {
+            const vol = (typeof masterVolumeSFX === 'number') ? masterVolumeSFX : 0.5;
+
+            failSound.stop();   // ensure clean restart
+            failSound.setVolume(vol);
+            failSound.play();
+        } catch (e) {
+            console.warn('[AUDIO] playFailEndAudio failed:', e);
+        }
+    }, 2000);
+}
+
+/**
+ * On WIN (Day 1-4): stop current BGM, then play win audio once.
+ * Day 5 uses its own ending BGM, so do nothing there.
+ */
+function playWinEndAudio() {
+    const day = (typeof currentDayID === 'number') ? currentDayID : 1;
+
+    // Day 5 should keep its own ending BGM logic
+    if (day >= 5) return;
+    if (!sfxGameWin) return;
+
+    try {
+        if (typeof BGM !== 'undefined' && BGM && typeof BGM.stop === 'function') {
+            BGM.stop();
+        }
+    } catch (e) {
+        console.warn('[AUDIO] Failed to stop BGM on win:', e);
+    }
+
+    try {
+        const vol = (typeof masterVolumeBGM === 'number') ? masterVolumeBGM : 0.25;
+
+        sfxGameWin.stop();
+        sfxGameWin.setVolume(vol);
+        sfxGameWin.play();
+    } catch (e) {
+        console.warn('[AUDIO] playWinEndAudio failed:', e);
+    }
+}
+
+/**
+ * Stops win end audio if it is still playing.
+ */
+function stopWinEndAudio() {
+    if (!sfxGameWin) return;
+
+    try {
+        if (typeof sfxGameWin.isPlaying === 'function' && sfxGameWin.isPlaying()) {
+            sfxGameWin.stop();
+        }
+    } catch (e) {
+        console.warn('[AUDIO] stopWinEndAudio failed:', e);
     }
 }
 

@@ -572,12 +572,22 @@ class EndScreenManager {
         screen.failType = reason; // ensure reason is current
         screen.activate();
         this._activeScreen = screen;
+
+        // New fail-audio rule:
+        // stop current BGM, then play day-specific fail audio.
+        if (typeof playFailEndAudio === 'function') {
+            playFailEndAudio();
+        }
     }
 
     /** Called when entering STATE_WIN. */
     activateSuccess() {
         this.successScreen.activate();
         this._activeScreen = this.successScreen;
+
+        if (typeof playWinEndAudio === 'function') {
+            playWinEndAudio();
+        }
     }
 
     /** Main display dispatcher. */

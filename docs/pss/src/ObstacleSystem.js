@@ -1004,12 +1004,38 @@ class ObstacleManager {
                     player.isInvincibleActive() &&
                     obs.config && obs.config.type !== "BUFF" &&
                     !["leaflet", "forcedLaneSwitch", "stun"].includes(obs.config.effect)) {
-                    this.obstacles.splice(i, 1);
-                    continue;
+
+                // Only play scooter brake when the invincibility comes from scooter buff (not coffee hpLock)
+                const hasScooterBuff =
+                    (typeof player.hasEmptyScooterBuffActive === "function" && player.hasEmptyScooterBuffActive()) || false;
+
+                // Avoid noise during promoter poster mini-game
+                const promoterPosterActive =
+                    (obstacleManager && obstacleManager.promoterInteraction && obstacleManager.promoterInteraction.active) || false;
+
+                // Brake applies to "any obstacle except LARGE_CAR"
+                if (hasScooterBuff && !promoterPosterActive && obs.type !== "LARGE_CAR") {
+                    if (typeof feedbackLayer !== "undefined" && feedbackLayer &&
+                        typeof feedbackLayer.onCollision === "function") {
+                        feedbackLayer.onCollision(obs.type, {
+                            damage: 0,
+                            effect: "scooterBrake",
+                            scooterBrake: true,
+                            playerX: player ? player.x : width / 2,
+                            playerY: player ? player.y : height * 0.66
+                        });
+                    } else if (typeof sfxScooterBrake !== "undefined" && sfxScooterBrake) {
+                        // Fallback if feedbackLayer not available
+                        playSFX(sfxScooterBrake, { id: "scooter_brake", cooldownMs: 120, monophonic: true });
+                    }
                 }
 
-                this.handleCollision(player, obs);
                 this.obstacles.splice(i, 1);
+                continue;
+            }       
+
+            this.handleCollision(player, obs);
+            this.obstacles.splice(i, 1);
             }
         }
 
@@ -1376,9 +1402,20 @@ class ObstacleManager {
                     playerY: player ? player.y : height * 0.66
                 });
             } else if (typeof feedbackLayer.onCollision === "function") {
+                const hasRainBoots =
+                  (typeof backpackVisual !== "undefined" && backpackVisual &&
+                    Array.isArray(backpackVisual.topSlots) &&
+                    backpackVisual.topSlots.includes("Rain Boots")) || false;
+
+                const hasScooterBuff =
+                  (player && typeof player.hasEmptyScooterBuffActive === "function" &&
+                    player.hasEmptyScooterBuffActive()) || false;
+
                 feedbackLayer.onCollision(obs.type, {
                     damage: config.damage || 0,
                     effect: config.effect || "",
+                    hasRainBoots,
+                    hasScooterBuff,
                     playerX: player ? player.x : width / 2,
                     playerY: player ? player.y : height * 0.66
                 });
@@ -1455,6 +1492,16 @@ class ObstacleManager {
         if (!this.promoterInteraction.active) return false;
 
         this.promoterInteraction.spacePressCount++;
+
+        // Paper crumple SFX for each SPACE press during poster interaction
+        if (typeof feedbackLayer !== "undefined" && feedbackLayer) {
+            if (typeof feedbackLayer.onPromoterCrumple === "function") {
+                feedbackLayer.onPromoterCrumple({});
+            } else if (typeof feedbackLayer.requestSFX === "function") {
+                feedbackLayer.requestSFX("promoter_crumple", {});
+            }
+        }
+
         if (this.promoterInteraction.spacePressCount >= this.promoterInteraction.spacePressRequired) {
             this.firePromoterPaperBall(player);
             this.promoterInteraction.active = false;
@@ -1722,6 +1769,13 @@ class ObstacleManager {
             obs.escapeVx = speed * Math.cos(angleRad);
             obs.escapeVy = speed * Math.sin(angleRad);
             obs.spritePath = cfg.runSpriteSheet || obs.spritePath;
+
+            // Fantasy coffee SFX should trigger when it starts running (no collision event).
+            if (typeof feedbackLayer !== "undefined" && feedbackLayer &&
+                typeof feedbackLayer.requestSFX === "function") {
+                feedbackLayer.requestSFX("collision_generic", { type: "FANTASY_COFFEE" });
+            }
+
             return;
         }
 

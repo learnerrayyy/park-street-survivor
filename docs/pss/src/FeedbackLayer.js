@@ -42,22 +42,85 @@ class FeedbackLayer {
         // --- SFX Mapping Table ---
         this.sfxMap = {
 
+            // All dayRun collision-style events (except SMALL_BUSINESS which has its own event)
             collision_generic: (payload) => {
-                const baseType = payload.type;
+                const type = payload.type;
 
-                if (baseType === "SMALL_CAR" && typeof sfxHitSmallCar !== "undefined" && sfxHitSmallCar) {
-                    playSFX(sfxHitSmallCar, {
-                        id: 'collision_small_car',
-                        cooldownMs: 140,
-                        monophonic: true
-                    });
+                // (11) Scooter buff special: brake SFX on any hit except LARGE_CAR
+                if (payload.scooterBrake === true && type !== "LARGE_CAR") {
+                    if (typeof sfxScooterBrake !== "undefined" && sfxScooterBrake) {
+                        playSFX(sfxScooterBrake, {
+                            id: "scooter_brake",
+                            cooldownMs: 120,
+                            monophonic: true
+                        });
+                    }
                     return;
                 }
 
-                // LARGE_CAR or unknown: use BigCar as generic fallback
+                // (5) PROMOTER + HOMELESS share one SFX
+                if (type === "PROMOTER" || type === "HOMELESS") {
+                    if (typeof sfxHitNpc !== "undefined" && sfxHitNpc) {
+                        playSFX(sfxHitNpc, {
+                            id: "hit_npc",
+                            cooldownMs: 170,
+                            monophonic: true
+                        });
+                    }
+                    return;
+                }
+
+                // (7) SMALL_CAR + SCOOTER_RIDER share one SFX (reuse sfxHitSmallCar)
+                if (type === "SMALL_CAR" || type === "SCOOTER_RIDER") {
+                    if (typeof sfxHitSmallCar !== "undefined" && sfxHitSmallCar) {
+                        playSFX(sfxHitSmallCar, {
+                            id: "hit_smallcar_or_scooterrider",
+                            cooldownMs: 140,
+                            monophonic: true
+                        });
+                    }
+                    return;
+                }
+
+                // (10) PUDDLE: boots / no boots
+                if (type === "PUDDLE") {
+                    const hasBoots = !!payload.hasRainBoots;
+                    if (hasBoots) {
+                        if (typeof sfxPuddleBoots !== "undefined" && sfxPuddleBoots) {
+                            playSFX(sfxPuddleBoots, {
+                                id: "puddle_boots",
+                                cooldownMs: 200,
+                                monophonic: true
+                            });
+                        }
+                    } else {
+                        if (typeof sfxPuddleNoBoots !== "undefined" && sfxPuddleNoBoots) {
+                            playSFX(sfxPuddleNoBoots, {
+                                id: "puddle_no_boots",
+                                cooldownMs: 200,
+                                monophonic: true
+                            });
+                        }
+                    }
+                    return;
+                }
+
+                // (9) Fantasy coffee SFX (NOTE: should be triggered manually; kept here for routing)
+                if (type === "FANTASY_COFFEE") {
+                    if (typeof sfxHitFantasyCoffee !== "undefined" && sfxHitFantasyCoffee) {
+                        playSFX(sfxHitFantasyCoffee, {
+                            id: "fantasy_coffee",
+                            cooldownMs: 220,
+                            monophonic: true
+                        });
+                    }
+                    return;
+                }
+
+                // Existing vehicle logic: SMALL_CAR already handled above; keep LARGE_CAR / fallback as BigCar
                 if (typeof sfxHitBigCar !== "undefined" && sfxHitBigCar) {
                     playSFX(sfxHitBigCar, {
-                        id: 'collision_big_car',
+                        id: "collision_big_car",
                         cooldownMs: 160,
                         monophonic: true
                     });
@@ -66,19 +129,20 @@ class FeedbackLayer {
             },
 
             pickup_buff: (payload) => {
-                const baseType = payload.type;
+                const type = payload.type;
 
-                if (baseType === "COFFEE" && typeof sfxPickupCoffee !== "undefined" && sfxPickupCoffee) {
+                if (type === "COFFEE" && typeof sfxPickupCoffee !== "undefined" && sfxPickupCoffee) {
                     playSFX(sfxPickupCoffee, {
-                        id: 'pickup_coffee',
+                        id: "pickup_coffee",
                         cooldownMs: 120,
                         monophonic: true
                     });
                     return;
                 }
-                if (baseType === "EMPTY_SCOOTER" && typeof sfxPickupScooter !== "undefined" && sfxPickupScooter) {
+
+                if (type === "EMPTY_SCOOTER" && typeof sfxPickupScooter !== "undefined" && sfxPickupScooter) {
                     playSFX(sfxPickupScooter, {
-                        id: 'pickup_scooter',
+                        id: "pickup_scooter",
                         cooldownMs: 120,
                         monophonic: true
                     });
@@ -86,16 +150,29 @@ class FeedbackLayer {
                 }
             },
 
-            collision_small_business: (payload) => {
+            // (4) SMALL_BUSINESS only (unchanged)
+            collision_small_business: (_payload) => {
                 if (typeof sfxSmallBusiness !== "undefined" && sfxSmallBusiness) {
                     playSFX(sfxSmallBusiness, {
-                        id: 'collision_small_business',
+                        id: "collision_small_business",
                         cooldownMs: 200,
+                        monophonic: true
+                    });
+                }
+            },
+
+            // (6) Promoter poster active: crumple paper on SPACE
+            promoter_crumple: (_payload) => {
+                if (typeof sfxPaperCrumple !== "undefined" && sfxPaperCrumple) {
+                    playSFX(sfxPaperCrumple, {
+                        id: "paper_crumple",
+                        cooldownMs: 60,
                         monophonic: true
                     });
                 }
             }
         };
+       
     }
 
     onCollision(type, context = {}) {
