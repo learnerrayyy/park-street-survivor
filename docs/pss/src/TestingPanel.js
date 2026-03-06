@@ -1322,9 +1322,6 @@ class TestingPanel {
         cursorY += sectionGap;
 
         this.drawDevActions(sectionX, cursorY + 6, sectionW, 170);
-        cursorY += 176;
-        const devActionsH = this.drawDevActions(sectionX, cursorY + 6, sectionW, 84);
-        cursorY += devActionsH + 6;
         pop();
     }
 
@@ -1922,19 +1919,19 @@ class TestingPanel {
 
         const csButtons = [
             { id: "cs_main_menu", label: "Main Menu" },
-            { id: "cs_prologue", label: "Prologue" },
-            { id: "cs_room_1", label: "Room D1" },
-            { id: "cs_room_2", label: "Room D2" },
-            { id: "cs_room_3", label: "Room D3" },
-            { id: "cs_room_4", label: "Room D4" },
-            { id: "cs_room_5", label: "Room D5" },
-            { id: "cs_npc_1", label: "NPC D1" },
-            { id: "cs_npc_2", label: "NPC D2" },
-            { id: "cs_npc_3", label: "NPC D3" },
-            { id: "cs_npc_4", label: "NPC D4" },
-            { id: "cs_npc_5", label: "NPC D5" },
-            { id: "cs_good_end", label: "Good End" },
-            { id: "cs_bad_end", label: "Bad End" }
+            { id: "cs_prologue",  label: "Prologue" },
+            { id: "cs_room_1",    label: "Room D1" },
+            { id: "cs_room_2",    label: "Room D2" },
+            { id: "cs_room_3",    label: "Room D3" },
+            { id: "cs_room_4",    label: "Room D4" },
+            { id: "cs_room_5",    label: "Room D5" },
+            { id: "cs_npc_1",     label: "NPC D1" },
+            { id: "cs_npc_2",     label: "NPC D2" },
+            { id: "cs_npc_3",     label: "NPC D3" },
+            { id: "cs_npc_4",     label: "NPC D4" },
+            { id: "cs_npc_5",     label: "NPC D5" },
+            { id: "cs_good_end",  label: "Good End" },
+            { id: "cs_bad_end",   label: "Bad End" }
         ];
 
         const r2BtnW = floor((w - 16 - (csButtons.length - 1) * btnGap) / csButtons.length);
