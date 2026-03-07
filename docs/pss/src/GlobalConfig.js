@@ -19,9 +19,10 @@ const STATE_WARNING = 12;
 const STATE_CREDITS = 13;
 const STATE_CUTSCENE = 14;
 const STATE_SAVE_CHOICE = 15;
-const STATE_DIFF_SELECT  = 16;   // Difficulty selection screen
+const STATE_DIFF_SELECT = 16;   // Difficulty selection screen
 const STATE_DIFF_CONFIRM = 17;   // Difficulty confirmation screen
-const STATE_LOAD_GAME    = 18;   // New game / continue screen
+const STATE_LOAD_GAME = 18;   // New game / continue screen
+const STATE_TUTORIAL_SLIDES = 19; // Day 1 pre-run tutorial slideshow
 
 /**
  * Core canvas resolution, world-space boundaries, and scroll physics.
@@ -181,7 +182,7 @@ const DAYS_CONFIG = {
         obstacleSpawnInterval: 60,
         baseScrollSpeed: 16,
         basePlayerSpeed: 17,
-        healthDecay: 0.04,
+        healthDecay: 0.03,
         buffControlConfig: {
             avgRespawnSec: 4.2,
             respawnJitter: 0.3,

@@ -998,44 +998,54 @@ class ObstacleManager {
             }
 
             if (this.checkCollision(player, obs)) {
-                // Keep control/interactive effects while invincible so promoter/homeless/scooter
-                // still feel responsive; only bypass pure damage-style hits.
+                const hasScooterBuff = !!(
+                    player &&
+                    typeof player.hasEmptyScooterBuffActive === "function" &&
+                    player.hasEmptyScooterBuffActive()
+                );
+
+                // Scooter buff has one exception: promoter/homeless cancel the buff
+                // without triggering their normal control effects.
+                if (hasScooterBuff && (obs.type === "PROMOTER" || obs.type === "HOMELESS")) {
+                    this.handleCollision(player, obs);
+                    this.obstacles.splice(i, 1);
+                    continue;
+                }
+
+                // All other non-buff obstacles are ignored while scooter buff is active.
+                if (hasScooterBuff && obs.config && obs.config.type !== "BUFF") {
+                    const promoterPosterActive =
+                        (obstacleManager && obstacleManager.promoterInteraction && obstacleManager.promoterInteraction.active) || false;
+                    if (!promoterPosterActive && obs.type !== "LARGE_CAR") {
+                        if (typeof feedbackLayer !== "undefined" && feedbackLayer &&
+                            typeof feedbackLayer.onCollision === "function") {
+                            feedbackLayer.onCollision(obs.type, {
+                                damage: 0,
+                                effect: "scooterBrake",
+                                scooterBrake: true,
+                                playerX: player ? player.x : width / 2,
+                                playerY: player ? player.y : height * 0.66
+                            });
+                        } else if (typeof sfxScooterBrake !== "undefined" && sfxScooterBrake) {
+                            playSFX(sfxScooterBrake, { id: "scooter_brake", cooldownMs: 120, monophonic: true });
+                        }
+                    }
+                    this.obstacles.splice(i, 1);
+                    continue;
+                }
+
+                // Coffee hpLock invincibility keeps control effects responsive;
+                // only bypass pure damage-style hits.
                 if (player && typeof player.isInvincibleActive === "function" &&
                     player.isInvincibleActive() &&
                     obs.config && obs.config.type !== "BUFF" &&
                     !["leaflet", "forcedLaneSwitch", "stun"].includes(obs.config.effect)) {
-
-                // Only play scooter brake when the invincibility comes from scooter buff (not coffee hpLock)
-                const hasScooterBuff =
-                    (typeof player.hasEmptyScooterBuffActive === "function" && player.hasEmptyScooterBuffActive()) || false;
-
-                // Avoid noise during promoter poster mini-game
-                const promoterPosterActive =
-                    (obstacleManager && obstacleManager.promoterInteraction && obstacleManager.promoterInteraction.active) || false;
-
-                // Brake applies to "any obstacle except LARGE_CAR"
-                if (hasScooterBuff && !promoterPosterActive && obs.type !== "LARGE_CAR") {
-                    if (typeof feedbackLayer !== "undefined" && feedbackLayer &&
-                        typeof feedbackLayer.onCollision === "function") {
-                        feedbackLayer.onCollision(obs.type, {
-                            damage: 0,
-                            effect: "scooterBrake",
-                            scooterBrake: true,
-                            playerX: player ? player.x : width / 2,
-                            playerY: player ? player.y : height * 0.66
-                        });
-                    } else if (typeof sfxScooterBrake !== "undefined" && sfxScooterBrake) {
-                        // Fallback if feedbackLayer not available
-                        playSFX(sfxScooterBrake, { id: "scooter_brake", cooldownMs: 120, monophonic: true });
-                    }
+                    this.obstacles.splice(i, 1);
+                    continue;
                 }
 
+                this.handleCollision(player, obs);
                 this.obstacles.splice(i, 1);
-                continue;
-            }       
-
-            this.handleCollision(player, obs);
-            this.obstacles.splice(i, 1);
             }
         }
 
@@ -1365,13 +1375,13 @@ class ObstacleManager {
         const config = obs.config;
         const isBuff = config && config.type === "BUFF";
         const isFantasyCoffee = obs && obs.type === "FANTASY_COFFEE";
-
-        // Empty scooter buff is cancelled by promoter/homeless only,
-        // and no extra collision effects are applied in that hit.
-        if (player && ["PROMOTER", "HOMELESS"].includes(obs.type) &&
+        const hasScooterBuff = !!(
+            player &&
             typeof player.hasEmptyScooterBuffActive === "function" &&
-            typeof player.cancelEmptyScooterBuff === "function" &&
-            player.hasEmptyScooterBuffActive()) {
+            player.hasEmptyScooterBuffActive()
+        );
+
+        if (hasScooterBuff && (obs.type === "PROMOTER" || obs.type === "HOMELESS")) {
             if (typeof feedbackLayer !== "undefined" && feedbackLayer &&
                 typeof feedbackLayer.onCollision === "function") {
                 feedbackLayer.onCollision(obs.type, {
@@ -1382,7 +1392,9 @@ class ObstacleManager {
                     playerY: player ? player.y : height * 0.66
                 });
             }
-            player.cancelEmptyScooterBuff();
+            if (typeof player.cancelEmptyScooterBuff === "function") {
+                player.cancelEmptyScooterBuff();
+            }
             return;
         }
 

@@ -179,7 +179,11 @@ class RoomScene {
                 player.x = GLOBAL_CONFIG.lanes.lane1;
                 player.y = PLAYER_RUN_FOOT_Y;  // Player foot anchor for day run
             }
-            gameState.setState(STATE_DAY_RUN);
+            if (typeof startRoomExitRunSequence === 'function') {
+                startRoomExitRunSequence();
+            } else {
+                gameState.setState(STATE_DAY_RUN);
+            }
             if (typeof playSFX !== 'undefined' && typeof sfxClick !== 'undefined') {
                 playSFX(sfxClick);
             }

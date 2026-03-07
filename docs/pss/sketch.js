@@ -10,6 +10,12 @@ let feedbackLayer;
 let tutorialDialogue;   // global dialogue box for tutorial page explanations
 let __sfxFrame = -1;
 let __sfxCounts = Object.create(null);
+let tutorialSlidePlayback = {
+    active: false,
+    frameStart: 0,
+    currentIndex: 0,
+    framesPerSlide: 60
+};
 
 // ─── GAME PROGRESS STATE ─────────────────────────────────────────────────────
 let currentUnlockedDay = 1;
@@ -22,9 +28,9 @@ let assets = {
     warningImg: null,
     bbg: null,
     libraryBg: null,
-    csNewsBg:   null,   // assets/dialogue/news.png  — prologue cutscene bg
+    csNewsBg: null,   // assets/dialogue/news.png  — prologue cutscene bg
     csLibraryBg: null, // assets/dialogue/library.png — NPC cutscene + success screen bg
-    dialogBox:  null,  // assets/obstacles/dialog_box.png — homeless speech bubble
+    dialogBox: null,  // assets/obstacles/dialog_box.png — homeless speech bubble
     dialogueBox: null,      // assets/dialogue/dialog_box.png — main dialogue bar
     dialogueFrameBox: null, // assets/dialogue/frame_box.png — portrait frame
     dialogueNameBox: null,  // assets/dialogue/name_box.png — speaker name tag
@@ -41,6 +47,7 @@ let assets = {
         lock: null
     },
     previews: [],
+    tutorialSlides: [],
     playerAnim: {
         north: [],
         south: [],
@@ -74,6 +81,14 @@ function isStoryRunMode() {
 
 function isEndlessRunMode() {
     return currentRunMode === RUN_MODE_ENDLESS_EASY || currentRunMode === RUN_MODE_ENDLESS_HARD;
+}
+
+function shouldShowDay1RoomExitTutorial() {
+    return currentRunMode === RUN_MODE_STORY &&
+        currentDayID === 1 &&
+        assets &&
+        Array.isArray(assets.tutorialSlides) &&
+        assets.tutorialSlides.length > 0;
 }
 
 // ─── WIN-CUTSCENE GUARD ───────────────────────────────────────────────────────
@@ -152,7 +167,7 @@ let pauseFromState = null;
 // Pause options vary by context (room vs day-run)
 function getPauseOptions() {
     if (gameState && gameState.previousState === STATE_DAY_RUN) {
-        return ["RESTART","SETTINGS", "STORY", "HELP", "EXIT"];
+        return ["RESTART", "SETTINGS", "STORY", "HELP", "EXIT"];
     }
     return ["SETTINGS", "STORY", "HELP", "EXIT"];
 }
@@ -288,7 +303,7 @@ function getStoryRecap(day) {
     }
 
     if (day === 4) {
-        const help    = ch(4);   // 0 = "give me a sec", 1 = "DON'T TOUCH ME"
+        const help = ch(4);   // 0 = "give me a sec", 1 = "DON'T TOUCH ME"
         const confide = ch(13);  // 0 = confide, 1 = push away
 
         return {
@@ -318,9 +333,9 @@ function getStoryRecap(day) {
     }
 
     if (day === 5) {
-        const voices  = ch(3);   // 0 = continue listening, 1 = snap out
-        const who     = ch(21);  // 0 = keep listening to voices, 1 = listen to Charlotte
-        const ending  = ch(36);  // 0 = "No… I can't keep running", 1 = "Okayy…"
+        const voices = ch(3);   // 0 = continue listening, 1 = snap out
+        const who = ch(21);  // 0 = keep listening to voices, 1 = listen to Charlotte
+        const ending = ch(36);  // 0 = "No… I can't keep running", 1 = "Okayy…"
 
         return {
             title: "Day 5 — Friday",
@@ -433,21 +448,21 @@ function preload() {
     assets.inventoryBg = loadImage('assets/inventory/table.png', itemLoaded);
     assets.backpackImg = loadImage('assets/inventory/backpack.png', itemLoaded);
     assets.studentCardImg = loadImage('assets/inventory/student_card.png', itemLoaded);
-    assets.computerImg    = loadImage('assets/inventory/computer.png', itemLoaded);
-    assets.vitaminImg     = loadImage('assets/inventory/vitamin.png', itemLoaded);
-    assets.tangleImg      = loadImage('assets/inventory/tangle.png', itemLoaded);
-    assets.headphoneImg   = loadImage('assets/inventory/headphone.png', itemLoaded);
-    assets.rainbootImg    = loadImage('assets/inventory/rainboot.png', itemLoaded);
+    assets.computerImg = loadImage('assets/inventory/computer.png', itemLoaded);
+    assets.vitaminImg = loadImage('assets/inventory/vitamin.png', itemLoaded);
+    assets.tangleImg = loadImage('assets/inventory/tangle.png', itemLoaded);
+    assets.headphoneImg = loadImage('assets/inventory/headphone.png', itemLoaded);
+    assets.rainbootImg = loadImage('assets/inventory/rainboot.png', itemLoaded);
 
-    assets.bbg         = loadImage('assets/background/bbg.png', itemLoaded);
-    assets.libraryBg   = loadImage('assets/background/library.jpg', itemLoaded);
-    assets.csNewsBg    = loadImage('assets/dialogue/news.png',              itemLoaded);
-    assets.csLibraryBg = loadImage('assets/dialogue/library.png',           itemLoaded);
-    assets.dialogBox   = loadImage('assets/obstacles/dialog_box.png',       itemLoaded);
-    assets.dialogueBox = loadImage('assets/dialogue/dialog_box.png',        itemLoaded);
-    assets.dialogueFrameBox = loadImage('assets/dialogue/frame_box.png',    itemLoaded);
-    assets.dialogueNameBox = loadImage('assets/dialogue/name_box.png',      itemLoaded);
-    assets.noticeBox = loadImage('assets/dialogue/notice_box.png',          itemLoaded);
+    assets.bbg = loadImage('assets/background/bbg.png', itemLoaded);
+    assets.libraryBg = loadImage('assets/background/library.jpg', itemLoaded);
+    assets.csNewsBg = loadImage('assets/dialogue/news.png', itemLoaded);
+    assets.csLibraryBg = loadImage('assets/dialogue/library.png', itemLoaded);
+    assets.dialogBox = loadImage('assets/obstacles/dialog_box.png', itemLoaded);
+    assets.dialogueBox = loadImage('assets/dialogue/dialog_box.png', itemLoaded);
+    assets.dialogueFrameBox = loadImage('assets/dialogue/frame_box.png', itemLoaded);
+    assets.dialogueNameBox = loadImage('assets/dialogue/name_box.png', itemLoaded);
+    assets.noticeBox = loadImage('assets/dialogue/notice_box.png', itemLoaded);
 
     loadImage('assets/end_screen/spritesheet_celebrate.png', (img) => {
         let fW = img.width / 5;
@@ -457,8 +472,13 @@ function preload() {
         }
     });
 
-    assets.storyShape  = loadImage('assets/story/frame_shape.png', itemLoaded);
-    assets.storyCloud  = loadImage('assets/story/frame_cloud.png', itemLoaded);
+    assets.storyShape = loadImage('assets/story/frame_shape.png', itemLoaded);
+    assets.storyCloud = loadImage('assets/story/frame_cloud.png', itemLoaded);
+
+    for (let i = 1; i <= 32; i++) {
+        const fileName = `tutorial_${String(i).padStart(2, '0')}.png`;
+        assets.tutorialSlides.push(loadImage(`assets/tutorial/${fileName}`));
+    }
 
     assets.selectBg.unlock = loadImage('assets/select_background/day_unlock.jpg', itemLoaded);
     assets.selectBg.lock = loadImage('assets/select_background/day_lock.jpg', itemLoaded);
@@ -488,10 +508,10 @@ function preload() {
 
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
     sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
-    sfxDialogue      = loadSound('assets/audio/effects/Dialogue.mp3',   itemLoaded);
-    sfxHitBigCar     = loadSound('assets/audio/effects/HitBigCar.mp3',  itemLoaded);
-    sfxHitSmallCar   = loadSound('assets/audio/effects/HitSmallCar.mp3', itemLoaded);
-    sfxPickupCoffee  = loadSound('assets/audio/effects/CoffeeDrink.wav', itemLoaded);
+    sfxDialogue = loadSound('assets/audio/effects/Dialogue.mp3', itemLoaded);
+    sfxHitBigCar = loadSound('assets/audio/effects/HitBigCar.mp3', itemLoaded);
+    sfxHitSmallCar = loadSound('assets/audio/effects/HitSmallCar.mp3', itemLoaded);
+    sfxPickupCoffee = loadSound('assets/audio/effects/CoffeeDrink.wav', itemLoaded);
     sfxPickupScooter = loadSound('assets/audio/effects/ScooterPick.wav', itemLoaded);
     sfxScooterBrake = loadSound('assets/audio/effects/ScooterBrake.wav', itemLoaded);
     sfxHitNpc = loadSound('assets/audio/effects/HitNPC.wav', itemLoaded);
@@ -536,7 +556,7 @@ function preload() {
     assets.buttonSettingImg = loadImage('assets/buttons/button_setting.png', itemLoaded);
     assets.backImg = loadImage('assets/buttons/back.png', itemLoaded);
     assets.pauseImg = loadImage('assets/buttons/pause.png', itemLoaded);
-    assets.musicOn  = loadImage('assets/buttons/music_on.png',  itemLoaded);
+    assets.musicOn = loadImage('assets/buttons/music_on.png', itemLoaded);
     assets.musicOff = loadImage('assets/buttons/music_off.png', itemLoaded);
 
     // Entity preview sprites (no progress tracking — non-critical)
@@ -558,11 +578,11 @@ function preload() {
     const portraitPath = 'assets/characters/portrait/';
 
     assets.portraitPlayerNormal = loadImage(portraitPath + 'portrait_iris.png', itemLoaded);
-    assets.portraitWiola        = loadImage(portraitPath + 'portrait_wiola.png', itemLoaded);
-    assets.portraitLayla        = loadImage(portraitPath + 'portrait_layla.png', itemLoaded);
-    assets.portraitRaymond      = loadImage(portraitPath + 'portrait_raymond.png', itemLoaded);
-    assets.portraitYuki         = loadImage(portraitPath + 'portrait_yuki.png', itemLoaded);
-    assets.portraitCharlotte     = loadImage(portraitPath + 'portrait_charlotte.png', itemLoaded);
+    assets.portraitWiola = loadImage(portraitPath + 'portrait_wiola.png', itemLoaded);
+    assets.portraitLayla = loadImage(portraitPath + 'portrait_layla.png', itemLoaded);
+    assets.portraitRaymond = loadImage(portraitPath + 'portrait_raymond.png', itemLoaded);
+    assets.portraitYuki = loadImage(portraitPath + 'portrait_yuki.png', itemLoaded);
+    assets.portraitCharlotte = loadImage(portraitPath + 'portrait_charlotte.png', itemLoaded);
 
     // Player directional frame animation (uses authored frame PNGs directly)
     assets.playerAnim = {};
@@ -718,6 +738,10 @@ function draw() {
                 drawPauseButton();
                 break;
 
+            case STATE_TUTORIAL_SLIDES:
+                drawTutorialSlidesScreen();
+                break;
+
             case STATE_PAUSED:
                 if (gameState.previousState === STATE_ROOM) {
                     if (roomScene) roomScene.display();
@@ -749,7 +773,7 @@ function draw() {
                         let s = max(width / assets.otherBg.width, height / assets.otherBg.height);
                         imageMode(CENTER);
                         image(assets.otherBg, width / 2, height / 2,
-                              assets.otherBg.width * s, assets.otherBg.height * s);
+                            assets.otherBg.width * s, assets.otherBg.height * s);
                     }
                 }
                 if (endScreenManager) {
@@ -858,10 +882,10 @@ const _sfxCooldownUntil = Object.create(null);  // {id: timestamp}
  */
 function playSFX(sound, opt = {}) {
     try {
-        
+
         // 1. basic check
         if (!sound || typeof sound.isLoaded !== 'function' || !sound.isLoaded()) {
-            return; 
+            return;
         }
 
         // 2. Ensure ID and attribute
@@ -888,11 +912,11 @@ function playSFX(sound, opt = {}) {
 
         if (monophonic && typeof sound.isPlaying === 'function' && sound.isPlaying()) {
             // Optimization: Use jump(0) to reduce the overhead of reconnecting nodes.
-            try { 
-                sound.jump(0); 
-            } catch (jumpErr) { 
-                sound.stop(); 
-                sound.play(); 
+            try {
+                sound.jump(0);
+            } catch (jumpErr) {
+                sound.stop();
+                sound.play();
             }
         } else {
             // 5. Adjust volume and play.
@@ -1053,12 +1077,12 @@ function renderGlobalFade() {
     if (globalFade.dir === 1 && globalFade.alpha >= 255) {
         globalFade.alpha = 255;
         if (globalFade.callback) {
-        try {
-            globalFade.callback();
-        } catch (e) {
-            console.error('[Transition] callback crashed:', e);
+            try {
+                globalFade.callback();
+            } catch (e) {
+                console.error('[Transition] callback crashed:', e);
+            }
         }
-    }
         globalFade.dir = -1;
     }
     if (globalFade.dir === -1 && globalFade.alpha <= 0) {
@@ -1148,7 +1172,7 @@ function keyPressed() {
 
     // Dev shortcuts: 8 = instant WIN, 9 = instant FAIL
     if (developerMode) {
-        if (key === '8') { devGoToWin();  return; }
+        if (key === '8') { devGoToWin(); return; }
         if (key === '9') { devGoToFail("EXHAUSTED"); return; }
     }
 
@@ -1250,6 +1274,10 @@ function keyPressed() {
         if (obstacleManager.handlePromoterSpacePress(player)) return false;
     }
 
+    if (state === STATE_TUTORIAL_SLIDES) {
+        return false;
+    }
+
     // Menu navigation
     if (state === STATE_MENU || state === STATE_LEVEL_SELECT ||
         state === STATE_SETTINGS || state === STATE_HELP ||
@@ -1299,8 +1327,8 @@ function handlePauseSelection() {
         if (typeof tutorialHints !== 'undefined' &&
             tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
             tutorialHints.uiTutorialDone = true;
-            tutorialHints.uiIntroStep    = 0;
-            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+            tutorialHints.uiIntroStep = 0;
+            tutorialHints.roomPhase = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
         showStoryRecap = true;
         storyRecapDay = 0;   // open at Prologue (day 0); Days 1-5 follow
@@ -1310,46 +1338,46 @@ function handlePauseSelection() {
         if (typeof tutorialHints !== 'undefined' &&
             tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
             tutorialHints.uiTutorialDone = true;
-            tutorialHints.uiIntroStep    = 0;
-            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+            tutorialHints.uiIntroStep = 0;
+            tutorialHints.roomPhase = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         mainMenu.diffToastTimer = 0;
         gameState.currentState = STATE_SETTINGS;
-        mainMenu.menuState     = STATE_SETTINGS;
+        mainMenu.menuState = STATE_SETTINGS;
     } else if (selected === "HELP") {
         // Tutorial first-pause: mark done then open help
         if (typeof tutorialHints !== 'undefined' &&
             tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
             tutorialHints.uiTutorialDone = true;
-            tutorialHints.uiIntroStep    = 0;
-            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+            tutorialHints.uiIntroStep = 0;
+            tutorialHints.roomPhase = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         gameState.currentState = STATE_HELP;
-        mainMenu.menuState     = STATE_HELP;
-        mainMenu.helpPage      = 0;
+        mainMenu.menuState = STATE_HELP;
+        mainMenu.helpPage = 0;
     } else if (selected === "EXPLORE ON MY OWN") {
         // Tutorial first-pause: player skips guidance, mark done and resume
         if (typeof tutorialHints !== 'undefined') {
             tutorialHints.uiTutorialDone = true;
-            tutorialHints.uiIntroStep    = 0;
-            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+            tutorialHints.uiIntroStep = 0;
+            tutorialHints.roomPhase = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
         togglePause();
         pauseFromState = null;
     } else if (selected === "RESTART") {
-        showRestartChoice  = true;
+        showRestartChoice = true;
         restartChoiceIndex = -1;
     } else if (selected === "EXIT") {
         triggerTransition(() => {
             gameState.setState(STATE_MENU);
             mainMenu.menuState = STATE_MENU;
-            pauseFromState     = null;
-            showRestartChoice  = false;
-            showStoryRecap     = false;
+            pauseFromState = null;
+            showRestartChoice = false;
+            showStoryRecap = false;
         });
     }
 }
@@ -1382,14 +1410,14 @@ function handleRestartChoice() {
  * Dispatches mouse press events; also unlocks the Web Audio context on first click.
  */
 function mousePressed() {
-    
-        if (frameCount % 60 === 0) {
-            const ctx = (typeof getAudioContext === 'function') ? getAudioContext() : null;
-            if (ctx && ctx.state !== 'running') {
-                ctx.resume().catch(e => console.warn('[SFX] Context resume failed', e));
-            }
+
+    if (frameCount % 60 === 0) {
+        const ctx = (typeof getAudioContext === 'function') ? getAudioContext() : null;
+        if (ctx && ctx.state !== 'running') {
+            ctx.resume().catch(e => console.warn('[SFX] Context resume failed', e));
         }
-    
+    }
+
     if (globalFade.isFading || !gameState) return;
 
     // Dev corner-drag: intercept before everything else
@@ -1434,7 +1462,7 @@ function mousePressed() {
     if (state === STATE_CREDITS) {
         if (_creditPhase === 'scroll' || _creditPhase === 'pause') {
             console.log("[Credits] Scrolling... interaction locked.");
-            return; 
+            return;
         }
 
         if (_creditPhase === 'poem' && _creditPoemAlpha >= 255) {
@@ -1446,7 +1474,7 @@ function mousePressed() {
             } else {
                 triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
             }
-        } 
+        }
         return;
     }
 
@@ -1456,8 +1484,8 @@ function mousePressed() {
         playSFX(sfxClick);
 
         // Capture splash title Y so the entering animation can lerp from it
-        _splashEnterCY  = (typeof titleDrop !== 'undefined') ? titleDrop.y : 480;
-        _menuEnterT     = 0;
+        _splashEnterCY = (typeof titleDrop !== 'undefined') ? titleDrop.y : 480;
+        _menuEnterT = 0;
         _menuFromSplash = true;
         gameState.setState(STATE_MENU);
         return;
@@ -1483,8 +1511,8 @@ function mousePressed() {
             handleRestartChoice();
         } else if (showStoryRecap) {
             // Right-side up/down arrow clicks
-            let arrowX   = width - 90;
-            let centerY  = height / 2;
+            let arrowX = width - 90;
+            let centerY = height / 2;
             let arrowGap = 90;
             if (storyRecapDay > 0 && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35) {
                 storyRecapDay--;
@@ -1523,6 +1551,8 @@ function mousePressed() {
         state === STATE_SETTINGS || state === STATE_HELP ||
         state === STATE_DIFF_SELECT || state === STATE_DIFF_CONFIRM || state === STATE_LOAD_GAME) {
         if (mainMenu) mainMenu.handleClick(mouseX, mouseY);
+    } else if (state === STATE_TUTORIAL_SLIDES) {
+        return false;
     } else if (state === STATE_FAIL || state === STATE_WIN) {
         if (endScreenManager) endScreenManager.handleClick(mouseX, mouseY);
     } else if (state === STATE_ROOM || state === STATE_DAY_RUN) {
@@ -1609,6 +1639,24 @@ function togglePause() {
     }
 }
 
+function startRoomExitRunSequence() {
+    if (shouldShowDay1RoomExitTutorial()) {
+        tutorialSlidePlayback.active = true;
+        tutorialSlidePlayback.frameStart = frameCount;
+        tutorialSlidePlayback.currentIndex = 0;
+        gameState.setState(STATE_TUTORIAL_SLIDES);
+        return;
+    }
+    gameState.setState(STATE_DAY_RUN);
+}
+
+function finishTutorialSlides() {
+    tutorialSlidePlayback.active = false;
+    tutorialSlidePlayback.frameStart = 0;
+    tutorialSlidePlayback.currentIndex = 0;
+    gameState.setState(STATE_DAY_RUN);
+}
+
 /**
  * Initialises and starts a new run for the given day ID.
  */
@@ -1629,7 +1677,7 @@ function setupRun(dayID) {
 
     if (typeof tutorialHints !== 'undefined') {
         if (dayID === 1 && !tutorialHints.uiTutorialDone) {
-            tutorialHints.roomPhase  = 'UI_INTRO';
+            tutorialHints.roomPhase = 'UI_INTRO';
             tutorialHints.uiIntroStep = 0;
         } else if (dayID === 1 && !tutorialHints.moveTutorialDone) {
             tutorialHints.roomPhase = 'MOVE';
@@ -1724,16 +1772,55 @@ function drawLoadingScreen() {
     }
 }
 
+function drawTutorialSlidesScreen() {
+    const slides = (assets && Array.isArray(assets.tutorialSlides)) ? assets.tutorialSlides : [];
+    if (!tutorialSlidePlayback.active || slides.length === 0) {
+        finishTutorialSlides();
+        return;
+    }
+
+    const elapsedFrames = Math.max(0, frameCount - tutorialSlidePlayback.frameStart);
+    const slideIndex = Math.floor(elapsedFrames / tutorialSlidePlayback.framesPerSlide);
+    tutorialSlidePlayback.currentIndex = slideIndex;
+
+    if (slideIndex >= slides.length) {
+        finishTutorialSlides();
+        return;
+    }
+
+    const slide = slides[slideIndex];
+    background(0);
+
+    if (slide) {
+        const scale = Math.min(width / slide.width, height / slide.height);
+        imageMode(CENTER);
+        image(slide, width / 2, height / 2, slide.width * scale, slide.height * scale);
+        imageMode(CORNER);
+    }
+
+    push();
+    rectMode(CENTER);
+    noStroke();
+    fill(0, 0, 0, 140);
+    rect(width / 2, height - 54, 520, 50, 16);
+    textAlign(CENTER, CENTER);
+    textFont(fonts.body);
+    textSize(24);
+    fill(255, 235, 200);
+    text("Click anywhere to continue", width / 2, height - 54);
+    pop();
+}
+
 // ─── WARNING / SPLASH TRANSITION ─────────────────────────────────────────────
 let _splashFadeAlpha = 0;   // black overlay fading out on splash entry [0..255]
 let _warnFrame = 0;         // counts up each draw call while in STATE_WARNING
-let _menuEnterT     = 1;    // 0→1: splash-to-menu enter animation progress
+let _menuEnterT = 1;    // 0→1: splash-to-menu enter animation progress
 let _menuFromSplash = false; // true while the splash→menu title animation is running
-let _splashEnterCY  = 480;  // titleDrop.y captured at the moment of entering menu from splash
-const _WARN_FADE_IN  = 90;  // frames for fade-in  (~1.5 s)
-const _WARN_HOLD     = 180; // frames to hold at full opacity  (~9 s)
+let _splashEnterCY = 480;  // titleDrop.y captured at the moment of entering menu from splash
+const _WARN_FADE_IN = 90;  // frames for fade-in  (~1.5 s)
+const _WARN_HOLD = 180; // frames to hold at full opacity  (~9 s)
 const _WARN_FADE_OUT = 90;  // frames for fade-out (~1.5 s)
-const _WARN_TOTAL    = _WARN_FADE_IN + _WARN_HOLD + _WARN_FADE_OUT; // 600 ≈ 10 s
+const _WARN_TOTAL = _WARN_FADE_IN + _WARN_HOLD + _WARN_FADE_OUT; // 600 ≈ 10 s
 
 /**
  * Full-screen mental-health content warning.
@@ -1814,19 +1901,19 @@ function drawWarningScreen() {
     textFont(fonts.body);
     textAlign(CENTER, TOP);
     let bodyLines = [
-    { txt: "Please note: This experience explores stress, burnout,", size: 28, col: [230, 220, 205] },
-    { txt: "and the psychological impact of self-doubt.", size: 28, col: [230, 220, 205] },
-    { txt: "", size: 28, col: [230, 220, 205] },
-    
-    { txt: "If you find these themes distressing, we encourage you", size: 28, col: [230, 220, 205] },
-    { txt: "to prioritise your well-being while playing.", size: 28, col: [230, 220, 205] },
-    { txt: "Support is available if the climb feels too steep.", size: 28, col: [230, 220, 205] },
-    { txt: "", size: 24, col: [230, 220, 205] },
+        { txt: "Please note: This experience explores stress, burnout,", size: 28, col: [230, 220, 205] },
+        { txt: "and the psychological impact of self-doubt.", size: 28, col: [230, 220, 205] },
+        { txt: "", size: 28, col: [230, 220, 205] },
 
-    { txt: "— Resources for Support —", size: 24, col: [210, 185, 120] },
-    { txt: "Bristol Nightline | 01179 266 266 (Nightly, Term-time)", size: 26, col: [210, 185, 120] },
-    { txt: "Samaritans | 116 123 (Free, 24/7 Support)", size: 26, col: [210, 185, 120] },
-    { txt: "Shout Crisis | Text 'SHOUT' to 85258", size: 26, col: [210, 185, 120] },
+        { txt: "If you find these themes distressing, we encourage you", size: 28, col: [230, 220, 205] },
+        { txt: "to prioritise your well-being while playing.", size: 28, col: [230, 220, 205] },
+        { txt: "Support is available if the climb feels too steep.", size: 28, col: [230, 220, 205] },
+        { txt: "", size: 24, col: [230, 220, 205] },
+
+        { txt: "— Resources for Support —", size: 24, col: [210, 185, 120] },
+        { txt: "Bristol Nightline | 01179 266 266 (Nightly, Term-time)", size: 26, col: [210, 185, 120] },
+        { txt: "Samaritans | 116 123 (Free, 24/7 Support)", size: 26, col: [210, 185, 120] },
+        { txt: "Shout Crisis | Text 'SHOUT' to 85258", size: 26, col: [210, 185, 120] },
     ];
 
     let ty = divY + 32 * s;
@@ -1853,78 +1940,78 @@ function drawWarningScreen() {
 }
 
 // ─── CREDITS SCREEN ───────────────────────────────────────────────────────────
-let _creditPhase     = 'scroll'; // 'scroll' | 'pause' | 'poem'
-let _creditScrollY   = 0;
-let _creditPauseF    = 0;
+let _creditPhase = 'scroll'; // 'scroll' | 'pause' | 'poem'
+let _creditScrollY = 0;
+let _creditPauseF = 0;
 let _creditPoemAlpha = 0;
 
 const _CREDIT_SCROLL_SPEED = 2.0; // design-space px per frame (~30 s total scroll)
 
 // Raw credit data — sizes in 1920×1080 design-space pixels
 const _CREDIT_DATA = [
-    { type: 'space',    h: 120 },
-    { type: 'header',   h: 80,  text: '\u2014 PARK STREET SURVIVOR \u2014' },
-    { type: 'sub',      h: 50,  text: 'A University of Bristol Group Project' },
-    { type: 'space',    h: 70 },
-    { type: 'divider',  h: 40 },
-    { type: 'space',    h: 55 },
-    { type: 'section',  h: 58,  text: 'THE TEAM' },
-    { type: 'space',    h: 45 },
-    { type: 'name',     h: 50,  text: 'Charlotte Yu' },
-    { type: 'role',     h: 36,  text: 'Core Mechanism & Systems Architect' },
-    { type: 'desc',     h: 32,  text: 'System Integration  \xb7  State Machine Logic  \xb7  Physics Pipeline' },
-    { type: 'space',    h: 44 },
-    { type: 'name',     h: 50,  text: 'Kangrui Wang' },
-    { type: 'role',     h: 36,  text: 'Level Designer' },
-    { type: 'desc',     h: 32,  text: 'Level Geometry  \xb7  Environmental Storytelling  \xb7  Obstacle Choreography' },
-    { type: 'space',    h: 44 },
-    { type: 'name',     h: 50,  text: 'Layla Pei' },
-    { type: 'role',     h: 36,  text: 'UI/UX & Audio Designer' },
-    { type: 'desc',     h: 32,  text: 'Interface Ergonomics  \xb7  Interaction Flows  \xb7  Soundscape Design' },
-    { type: 'space',    h: 44 },
-    { type: 'name',     h: 50,  text: 'Lucca Zhou' },
-    { type: 'role',     h: 36,  text: 'Aesthetic Designer' },
-    { type: 'desc',     h: 32,  text: 'Visual Style Guide  \xb7  Pixel Asset Creation  \xb7  Colour Palette' },
-    { type: 'space',    h: 44 },
-    { type: 'name',     h: 50,  text: 'Keyu Zhou' },
-    { type: 'role',     h: 36,  text: 'Script Designer' },
-    { type: 'desc',     h: 32,  text: 'Narrative Scripting  \xb7  Dialogue Design  \xb7  Emotional Arc' },
-    { type: 'space',    h: 75 },
-    { type: 'divider',  h: 40 },
-    { type: 'space',    h: 55 },
-    { type: 'section',  h: 58,  text: 'SOUNDS & MUSIC' },
-    { type: 'space',    h: 40 },
-    { type: 'label',    h: 40,  text: 'Original Soundscapes' },
-    { type: 'desc',     h: 32,  text: '\u201cPark Street Echoes\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
-    { type: 'desc',     h: 32,  text: '\u201cFeathers in the Rain\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
-    { type: 'space',    h: 55 },
-    { type: 'section',  h: 58,  text: 'VISUAL DESIGN' },
-    { type: 'space',    h: 40 },
-    { type: 'label',    h: 40,  text: 'Pixel Art & Palettes' },
-    { type: 'desc',     h: 32,  text: 'Lucca Zhou  &  Group 7' },
-    { type: 'space',    h: 28 },
-    { type: 'label',    h: 40,  text: 'Typography' },
-    { type: 'desc',     h: 32,  text: 'DotGothic16  \xb7  VT323  (Google Fonts, Open Licence)' },
-    { type: 'space',    h: 75 },
-    { type: 'divider',  h: 40 },
-    { type: 'space',    h: 55 },
-    { type: 'section',  h: 58,  text: 'GOVERNANCE' },
-    { type: 'space',    h: 40 },
-    { type: 'label',    h: 40,  text: 'Academic Programme' },
-    { type: 'desc',     h: 32,  text: 'MSc Computer Science  \xb7  Group 7' },
-    { type: 'desc',     h: 32,  text: 'University of Bristol  \xb7  Faculty of Engineering' },
-    { type: 'space',    h: 28 },
-    { type: 'label',    h: 40,  text: 'Technical Traceability' },
-    { type: 'desc',     h: 32,  text: 'Agile Development  \xb7  Jira Workflow' },
-    { type: 'desc',     h: 32,  text: 'Version Control  \xb7  GitHub' },
-    { type: 'space',    h: 160 },
+    { type: 'space', h: 120 },
+    { type: 'header', h: 80, text: '\u2014 PARK STREET SURVIVOR \u2014' },
+    { type: 'sub', h: 50, text: 'A University of Bristol Group Project' },
+    { type: 'space', h: 70 },
+    { type: 'divider', h: 40 },
+    { type: 'space', h: 55 },
+    { type: 'section', h: 58, text: 'THE TEAM' },
+    { type: 'space', h: 45 },
+    { type: 'name', h: 50, text: 'Charlotte Yu' },
+    { type: 'role', h: 36, text: 'Core Mechanism & Systems Architect' },
+    { type: 'desc', h: 32, text: 'System Integration  \xb7  State Machine Logic  \xb7  Physics Pipeline' },
+    { type: 'space', h: 44 },
+    { type: 'name', h: 50, text: 'Kangrui Wang' },
+    { type: 'role', h: 36, text: 'Level Designer' },
+    { type: 'desc', h: 32, text: 'Level Geometry  \xb7  Environmental Storytelling  \xb7  Obstacle Choreography' },
+    { type: 'space', h: 44 },
+    { type: 'name', h: 50, text: 'Layla Pei' },
+    { type: 'role', h: 36, text: 'UI/UX & Audio Designer' },
+    { type: 'desc', h: 32, text: 'Interface Ergonomics  \xb7  Interaction Flows  \xb7  Soundscape Design' },
+    { type: 'space', h: 44 },
+    { type: 'name', h: 50, text: 'Lucca Zhou' },
+    { type: 'role', h: 36, text: 'Aesthetic Designer' },
+    { type: 'desc', h: 32, text: 'Visual Style Guide  \xb7  Pixel Asset Creation  \xb7  Colour Palette' },
+    { type: 'space', h: 44 },
+    { type: 'name', h: 50, text: 'Keyu Zhou' },
+    { type: 'role', h: 36, text: 'Script Designer' },
+    { type: 'desc', h: 32, text: 'Narrative Scripting  \xb7  Dialogue Design  \xb7  Emotional Arc' },
+    { type: 'space', h: 75 },
+    { type: 'divider', h: 40 },
+    { type: 'space', h: 55 },
+    { type: 'section', h: 58, text: 'SOUNDS & MUSIC' },
+    { type: 'space', h: 40 },
+    { type: 'label', h: 40, text: 'Original Soundscapes' },
+    { type: 'desc', h: 32, text: '\u201cPark Street Echoes\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
+    { type: 'desc', h: 32, text: '\u201cFeathers in the Rain\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
+    { type: 'space', h: 55 },
+    { type: 'section', h: 58, text: 'VISUAL DESIGN' },
+    { type: 'space', h: 40 },
+    { type: 'label', h: 40, text: 'Pixel Art & Palettes' },
+    { type: 'desc', h: 32, text: 'Lucca Zhou  &  Group 7' },
+    { type: 'space', h: 28 },
+    { type: 'label', h: 40, text: 'Typography' },
+    { type: 'desc', h: 32, text: 'DotGothic16  \xb7  VT323  (Google Fonts, Open Licence)' },
+    { type: 'space', h: 75 },
+    { type: 'divider', h: 40 },
+    { type: 'space', h: 55 },
+    { type: 'section', h: 58, text: 'GOVERNANCE' },
+    { type: 'space', h: 40 },
+    { type: 'label', h: 40, text: 'Academic Programme' },
+    { type: 'desc', h: 32, text: 'MSc Computer Science  \xb7  Group 7' },
+    { type: 'desc', h: 32, text: 'University of Bristol  \xb7  Faculty of Engineering' },
+    { type: 'space', h: 28 },
+    { type: 'label', h: 40, text: 'Technical Traceability' },
+    { type: 'desc', h: 32, text: 'Agile Development  \xb7  Jira Workflow' },
+    { type: 'desc', h: 32, text: 'Version Control  \xb7  GitHub' },
+    { type: 'space', h: 160 },
 ];
 
 /** Resets all credits state; call this before transitioning to STATE_CREDITS. */
 function resetCredits() {
-    _creditPhase     = 'scroll';
-    _creditScrollY   = height;   // block enters from bottom of screen
-    _creditPauseF    = 0;
+    _creditPhase = 'scroll';
+    _creditScrollY = height;   // block enters from bottom of screen
+    _creditPauseF = 0;
     _creditPoemAlpha = 0;
 }
 
@@ -1933,7 +2020,7 @@ function drawCreditsScreen() {
     push();
     background(0);
 
-    let s  = min(width / 1920, height / 1080);
+    let s = min(width / 1920, height / 1080);
     let cx = width / 2;
 
     if (_creditPhase === 'scroll') {
@@ -1944,7 +2031,7 @@ function drawCreditsScreen() {
 
         let cumH = 0;
         for (let i = 0; i < _CREDIT_DATA.length; i++) {
-            let d     = _CREDIT_DATA[i];
+            let d = _CREDIT_DATA[i];
             let lineH = d.h * s;
             let lineY = _creditScrollY + cumH;
             if (lineY + lineH > 0 && lineY < height) {
@@ -1962,7 +2049,7 @@ function drawCreditsScreen() {
     } else if (_creditPhase === 'pause') {
         _creditPauseF++;
         if (_creditPauseF >= 10) {           // ~0.25s black pause before poem
-            _creditPhase     = 'poem';
+            _creditPhase = 'poem';
             _creditPoemAlpha = 0;
         }
 
@@ -2038,7 +2125,7 @@ function _drawCreditsFade() {
     let steps = 14;
     let fadeH = 110;
     for (let i = 0; i < steps; i++) {
-        let t  = i / (steps - 1);
+        let t = i / (steps - 1);
         let y0 = (i / steps) * fadeH;
         let yH = fadeH / steps + 1;
         fill(0, 0, 0, lerp(230, 0, t));
@@ -2052,7 +2139,7 @@ function _drawCreditsFade() {
 function _drawCreditsPoem(s, cx) {
     _creditPoemAlpha = min(255, _creditPoemAlpha + 6);
     let alpha = _creditPoemAlpha;
-    let cy    = height / 2;
+    let cy = height / 2;
 
     push();
     textAlign(CENTER, CENTER);
@@ -2061,17 +2148,17 @@ function _drawCreditsPoem(s, cx) {
 
     let poem = [
         { text: '\u201cHope is the thing with feathers \u2014', ts: 30 * s, col: [240, 228, 200] },
-        { text: 'That perches in the soul \u2014',              ts: 30 * s, col: [240, 228, 200] },
-        { text: 'And sings the tune without the words \u2014',  ts: 30 * s, col: [240, 228, 200] },
-        { text: 'And never stops \u2014 at all.\u201d',         ts: 30 * s, col: [240, 228, 200] },
-        { text: '',                                              ts: 18 * s, col: [0, 0, 0]       },
-        { text: '\u2014 Emily Dickinson (1830\u20131886)',       ts: 22 * s, col: [175, 160, 125] },
-        { text: '',                                              ts: 22 * s, col: [0, 0, 0]       },
-        { text: '',                                              ts: 18 * s, col: [0, 0, 0]       },
-        { text: 'THANK YOU FOR SURVIVING THE SLOPE.',           ts: 28 * s, col: [215, 185, 105] },
+        { text: 'That perches in the soul \u2014', ts: 30 * s, col: [240, 228, 200] },
+        { text: 'And sings the tune without the words \u2014', ts: 30 * s, col: [240, 228, 200] },
+        { text: 'And never stops \u2014 at all.\u201d', ts: 30 * s, col: [240, 228, 200] },
+        { text: '', ts: 18 * s, col: [0, 0, 0] },
+        { text: '\u2014 Emily Dickinson (1830\u20131886)', ts: 22 * s, col: [175, 160, 125] },
+        { text: '', ts: 22 * s, col: [0, 0, 0] },
+        { text: '', ts: 18 * s, col: [0, 0, 0] },
+        { text: 'THANK YOU FOR SURVIVING THE SLOPE.', ts: 28 * s, col: [215, 185, 105] },
     ];
 
-    let lineH  = 44 * s;
+    let lineH = 44 * s;
     let startY = cy - (poem.length * lineH) / 2 + lineH / 2;
 
     for (let i = 0; i < poem.length; i++) {
@@ -2172,19 +2259,19 @@ function drawSplashScreen() {
  * @param {number} y Target centre Y.
  */
 function drawLogoPlaceholder(x, y) {
-    let isSplash    = (gameState.currentState === STATE_SPLASH);
-    let isEntering  = !isSplash && _menuFromSplash;
+    let isSplash = (gameState.currentState === STATE_SPLASH);
+    let isEntering = !isSplash && _menuFromSplash;
     // t: 0 = fully splash, 1 = fully menu
-    let t           = isSplash ? 0 : (isEntering ? _menuEnterT : 1);
-    let easy        = t * t * (3 - 2 * t); // smoothstep
+    let t = isSplash ? 0 : (isEntering ? _menuEnterT : 1);
+    let easy = t * t * (3 - 2 * t); // smoothstep
 
     // ── Title params: lerp from splash sizes/offsets to menu sizes/offsets ────
-    let psSz    = lerp(300, 210, easy);
-    let surSz   = lerp(200, 190, easy);
-    let psYOff  = lerp(-130, -70,  easy);
-    let surYOff = lerp(80,   100,  easy);
-    let psSW    = lerp(25,   10,   easy);
-    let surSW   = lerp(20,   10,   easy);
+    let psSz = lerp(300, 210, easy);
+    let surSz = lerp(200, 190, easy);
+    let psYOff = lerp(-130, -70, easy);
+    let surYOff = lerp(80, 100, easy);
+    let psSW = lerp(25, 10, easy);
+    let surSW = lerp(20, 10, easy);
 
     // Alpha for splash-exclusive elements: full at splash, fades out on entry
     let splashA = constrain((1 - easy) * 255, 0, 255);
@@ -2376,8 +2463,8 @@ function renderPauseOverlay() {
     if (showStoryRecap) {
         renderStoryRecap();
     } else if (showRestartChoice) {
-        let btnW = (assets.btnImg ? assets.btnImg.width  : 240) * 1.5;
-        let btnH = (assets.btnImg ? assets.btnImg.height : 60)  * 1.5;
+        let btnW = (assets.btnImg ? assets.btnImg.width : 240) * 1.5;
+        let btnH = (assets.btnImg ? assets.btnImg.height : 60) * 1.5;
         let spacing = 145;
         let totalH = (RESTART_OPTIONS.length - 1) * spacing;
         let startY = (height / 2) - (totalH / 2) + 20;
@@ -2396,7 +2483,7 @@ function renderPauseOverlay() {
             let ox = width / 2;
             let oy = startY + i * spacing;
             let isHover = (mouseX > ox - btnW / 2 && mouseX < ox + btnW / 2 &&
-                           mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
+                mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
             if (isHover) { restartChoiceIndex = i; anyRestartHover = true; }
             let isSelected = (i === restartChoiceIndex) && restartChoiceIndex >= 0;
 
@@ -2415,8 +2502,8 @@ function renderPauseOverlay() {
         if (!anyRestartHover && !keyIsPressed) restartChoiceIndex = -1;
     } else {
         let options = getPauseOptions();
-        let btnW = (assets.btnImg ? assets.btnImg.width  : 240) * 1.5;
-        let btnH = (assets.btnImg ? assets.btnImg.height : 60)  * 1.5;
+        let btnW = (assets.btnImg ? assets.btnImg.width : 240) * 1.5;
+        let btnH = (assets.btnImg ? assets.btnImg.height : 60) * 1.5;
         let spacing = 145;
         let totalH = (options.length - 1) * spacing;
         let startY = (height / 2) - (totalH / 2) + 30;
@@ -2436,7 +2523,7 @@ function renderPauseOverlay() {
             let ox = width / 2;
             let oy = startY + i * spacing;
             let isHover = (mouseX > ox - btnW / 2 && mouseX < ox + btnW / 2 &&
-                           mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
+                mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
             if (isHover) { pauseIndex = i; anyPauseHover = true; }
             let isSelected = (i === pauseIndex) && pauseIndex >= 0;
 
@@ -2492,7 +2579,7 @@ function drawEndScreen() {
  */
 function renderStoryRecap() {
     // chapter 0 = Prologue, chapters 1-5 = Days 1-5
-    let chapterNums   = ["P", "01", "02", "03", "04", "05"];
+    let chapterNums = ["P", "01", "02", "03", "04", "05"];
     let chapterLabels = ["PROLOGUE", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
 
     // Unlock logic: Prologue always visible; Day N needs Day N complete (currentUnlockedDay >= N+1)
@@ -2506,9 +2593,9 @@ function renderStoryRecap() {
     let recap = getStoryRecap(storyRecapDay);
 
     // ── L2a: Left sidebar — skewed chapter cards (Prologue + Days 1-5) ──
-    let sidebarX     = width * 0.16;
+    let sidebarX = width * 0.16;
     let sidebarBaseY = height * 0.45;
-    let cardSpacing  = 130;
+    let cardSpacing = 130;
 
     push();
     translate(sidebarX, sidebarBaseY);
@@ -2524,7 +2611,7 @@ function renderStoryRecap() {
             : ((i < currentUnlockedDay) || debugAll);
         let isSelected = (i === storyRecapDay);
         let alpha = map(distFromCenter, 0, 2, 255, 50);
-        let s     = map(distFromCenter, 0, 1, 1.15, 0.8);
+        let s = map(distFromCenter, 0, 1, 1.15, 0.8);
 
         push();
         translate(cardX, cardY);
@@ -2538,7 +2625,7 @@ function renderStoryRecap() {
 
         beginShape();
         vertex(-110, -32); vertex(130, -44);
-        vertex(110,   32); vertex(-130,  44);
+        vertex(110, 32); vertex(-130, 44);
         endShape(CLOSE);
 
         textAlign(LEFT, CENTER);
@@ -2564,8 +2651,8 @@ function renderStoryRecap() {
         push();
         imageMode(CENTER);
         image(assets.storyShape,
-              storyDebugData.shape.x, storyDebugData.shape.y,
-              storyDebugData.shape.w, storyDebugData.shape.h);
+            storyDebugData.shape.x, storyDebugData.shape.y,
+            storyDebugData.shape.w, storyDebugData.shape.h);
         drawingContext.filter = 'none';
         pop();
     }
@@ -2585,10 +2672,10 @@ function renderStoryRecap() {
 
         // Content lines — LEFT-aligned, "SPEAKER: text" format with colour-coded speaker names
         textFont(fonts.body); textSize(22); textAlign(LEFT, CENTER);
-        let lineH      = 30;
-        let lineLeft   = textX - textW / 2 + 16;   // left edge with padding
+        let lineH = 30;
+        let lineLeft = textX - textW / 2 + 16;   // left edge with padding
         let contentTop = textY - textH / 2 + 20;   // start near top of clip box
-        let maxScroll  = max(0, recap.lines.length - 14);
+        let maxScroll = max(0, recap.lines.length - 14);
         storyScrollOffset = constrain(storyScrollOffset, 0, maxScroll);
 
         for (let j = 0; j < recap.lines.length; j++) {
@@ -2598,8 +2685,8 @@ function renderStoryRecap() {
             if (lineText === "") continue;
 
             let edgeFade = 255;
-            let topEdge  = textY - textH / 2 + 30;
-            let botEdge  = textY + textH / 2 - 28;
+            let topEdge = textY - textH / 2 + 30;
+            let botEdge = textY + textH / 2 - 28;
             if (ly < topEdge) edgeFade = map(ly, textY - textH / 2, topEdge, 0, 255);
             if (ly > botEdge) edgeFade = map(ly, botEdge, textY + textH / 2, 255, 0);
             edgeFade = constrain(edgeFade, 0, 255);
@@ -2637,7 +2724,7 @@ function renderStoryRecap() {
             rect(textX - barW / 2, textY + textH / 2 + 18, barW, barH, 3);
             fill(255, 215, 0, 150);
             rect(textX - barW / 2, textY + textH / 2 + 18,
-                 map(storyScrollOffset, 0, maxScroll, 20, barW), barH, 3);
+                map(storyScrollOffset, 0, maxScroll, 20, barW), barH, 3);
         }
     } else {
         push();
@@ -2668,8 +2755,8 @@ function renderStoryRecap() {
         imageMode(CENTER);
         tint(255, storyDebugData.cloud.alpha);
         image(assets.storyCloud,
-              storyDebugData.cloud.x, storyDebugData.cloud.y,
-              storyDebugData.cloud.w, storyDebugData.cloud.h);
+            storyDebugData.cloud.x, storyDebugData.cloud.y,
+            storyDebugData.cloud.w, storyDebugData.cloud.h);
         noTint();
         pop();
     }
@@ -2686,20 +2773,20 @@ function renderStoryRecap() {
     }
 
     // ── L5: Up/Down arrows + day indicator — identical to level-select arrows ──
-    let arrowX   = width - 90;
-    let centerY  = height / 2;
-    let arrowSz  = 60;
+    let arrowX = width - 90;
+    let centerY = height / 2;
+    let arrowSz = 60;
     let arrowGap = 90;
 
     if (assets.backImg) {
         // Up arrow (previous chapter — Prologue is 0)
-        let canGoUp  = storyRecapDay > 0;
-        let upHover  = canGoUp && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35;
+        let canGoUp = storyRecapDay > 0;
+        let upHover = canGoUp && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35;
         push();
         translate(arrowX, centerY - arrowGap);
         rotate(HALF_PI);
         if (!canGoUp) tint(255, 60);
-        if (upHover)  scale(1.25);
+        if (upHover) scale(1.25);
         imageMode(CENTER);
         image(assets.backImg, 0, 0, arrowSz, arrowSz);
         noTint();
@@ -2723,7 +2810,7 @@ function renderStoryRecap() {
         translate(arrowX, centerY + arrowGap);
         rotate(-HALF_PI);
         if (!canGoDown) tint(255, 60);
-        if (downHover)  scale(1.25);
+        if (downHover) scale(1.25);
         imageMode(CENTER);
         image(assets.backImg, 0, 0, arrowSz, arrowSz);
         noTint();
@@ -2743,15 +2830,15 @@ function renderStoryRecap() {
 function drawStoryDebugOverlay() {
     push();
     let layers = [
-        { key: 'shape',     label: 'SHAPE',      color: [255, 80,  80 ] },
-        { key: 'cloud',     label: 'CLOUD',      color: [80,  200, 255] },
-        { key: 'textArea',  label: 'CONTENT',    color: [80,  255, 80 ] },
-        { key: 'titleArea', label: 'TITLE',      color: [255, 200, 0  ] }
+        { key: 'shape', label: 'SHAPE', color: [255, 80, 80] },
+        { key: 'cloud', label: 'CLOUD', color: [80, 200, 255] },
+        { key: 'textArea', label: 'CONTENT', color: [80, 255, 80] },
+        { key: 'titleArea', label: 'TITLE', color: [255, 200, 0] }
     ];
 
     for (let l = 0; l < layers.length; l++) {
         let layerIdx = l + 1;
-        let d   = storyDebugData[layers[l].key];
+        let d = storyDebugData[layers[l].key];
         let col = layers[l].color;
         let active = (layerIdx === storyDebugActiveLayer);
 
@@ -2765,7 +2852,7 @@ function drawStoryDebugOverlay() {
         fill(col[0], col[1], col[2], active ? 230 : 130);
         textFont(fonts.body); textSize(15); textAlign(LEFT, BOTTOM);
         text(`[${layerIdx}] ${layers[l].label}: (${d.x}, ${d.y})  ${d.w}×${d.h}`,
-             d.x - d.w / 2 + 4, d.y - d.h / 2 - 4);
+            d.x - d.w / 2 + 4, d.y - d.h / 2 - 4);
     }
 
     // Controls hint bar
@@ -2775,7 +2862,7 @@ function drawStoryDebugOverlay() {
     fill(255, 255, 0, 220);
     textFont(fonts.body); textSize(17); textAlign(CENTER, CENTER);
     text("DEV  [1] Shape  [2] Cloud  [3] Content  [4] Title  |  Arrows: Move  |  Shift+Arrows: Resize  |  P: print",
-         width / 2, height - 25);
+        width / 2, height - 25);
     pop();
 }
 
@@ -2794,7 +2881,7 @@ function drawSaveChoiceScreen() {
     const save = SaveSystem.load();
     const W = width, H = height;
     const cx = W / 2;
-    const s  = min(W / 1920, H / 1080);
+    const s = min(W / 1920, H / 1080);
 
     push();
 
@@ -2832,15 +2919,15 @@ function drawSaveChoiceScreen() {
     }
 
     // ── Option buttons (assets.btnImg, 2× integer scale: 240×60 → 480×120) ──
-    const btnW      = 480 * s;   // 240 native × 2
-    const btnH      = 120 * s;   // 60  native × 2
+    const btnW = 480 * s;   // 240 native × 2
+    const btnH = 120 * s;   // 60  native × 2
     const optLabels = ['[E]  CONTINUE', '[ENTER]  NEW GAME'];
-    const optY      = [H * 0.615, H * 0.760];
+    const optY = [H * 0.615, H * 0.760];
 
     if (fT) textFont(fT);
     for (let i = 0; i < 2; i++) {
-        const bx      = cx - btnW / 2;
-        const by      = optY[i] - btnH / 2;
+        const bx = cx - btnW / 2;
+        const by = optY[i] - btnH / 2;
         const isHover = _saveChoiceIndex === i;
 
         // Draw button image (tint dims unselected option)
@@ -2882,7 +2969,7 @@ function drawSaveChoiceScreen() {
 function _saveChoiceHitTest(mx, my, click) {
     const W = width, H = height;
     const cx = W / 2;
-    const s  = min(W / 1920, H / 1080);
+    const s = min(W / 1920, H / 1080);
     const btnW = 480 * s;
     const btnH = 120 * s;
     const optY = [H * 0.615, H * 0.760];
