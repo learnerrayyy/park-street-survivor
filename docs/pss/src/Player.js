@@ -68,6 +68,11 @@ class Player {
         this._clockStr     = "08:30:00";
         this._clockRed     = false;
         this._lastClockSec = -1;
+
+        // ── Carried utility item state (selected in Room before DAY_RUN) ──
+        this.carriedUtilityItem = null;      // "Soft Gummy Vitamins" | "Tangle" | "Headphones" | "Rain Boots" | null
+        this.utilityItemCharges = 0;         // remaining uses
+        this.utilityItemArmed = false;       // for E-activated passive items: Tangle / Headphones / Rain Boots
     }
 
     /**
@@ -107,6 +112,195 @@ class Player {
         this.puddleSlowMultiplier = 0.72;
         // In DAY_RUN, default forward-running view should be back-facing.
         this.dir = 'north';
+
+        this.carriedUtilityItem = null;
+        this.utilityItemCharges = 0;
+        this.utilityItemArmed = false;
+    }
+
+    // ─── CARRIED UTILITY ITEM ───────────────────────────────────────────────
+
+    /**
+     * Reads backpackUI.topSlots and stores the selected utility item as the
+     * authoritative DAY_RUN item state on the player.
+     * Required items (Student ID / Laptop) are ignored here.
+     */
+    syncUtilityItemFromBackpack() {
+        if (typeof backpackUI === "undefined" || !backpackUI || !Array.isArray(backpackUI.topSlots)) {
+            this.clearUtilityItemState();
+            return;
+        }
+
+        const utilityNames = [
+            "Soft Gummy Vitamins",
+            "Tangle",
+            "Headphones",
+            "Rain Boots"
+        ];
+
+        const selected = backpackUI.topSlots.find(name => utilityNames.includes(name)) || null;
+
+        if (!selected) {
+            this.clearUtilityItemState();
+            return;
+        }
+
+        this.carriedUtilityItem = selected;
+        this.utilityItemCharges = this.getDefaultChargesForUtilityItem(selected);
+        this.utilityItemArmed = false;
+
+        if (typeof gameState !== "undefined" && gameState &&
+            typeof gameState.saveRunUtilityItemSnapshot === "function") {
+            gameState.saveRunUtilityItemSnapshot(this.carriedUtilityItem);
+        }
+    }
+
+    /**
+     * Clears the currently carried utility item state.
+     */
+    clearUtilityItemState() {
+        this.carriedUtilityItem = null;
+        this.utilityItemCharges = 0;
+        this.utilityItemArmed = false;
+    }
+
+    /**
+     * Returns the default number of uses for the given utility item.
+     */
+    getDefaultChargesForUtilityItem(itemName) {
+        if (itemName === "Soft Gummy Vitamins") return 1;
+        if (itemName === "Tangle") return 8;
+        if (itemName === "Headphones") return 5;
+        if (itemName === "Rain Boots") return 3;
+        return 0;
+    }
+
+    /**
+     * Returns true if the player still has a usable carried utility item.
+     */
+    hasUsableUtilityItem() {
+        return !!this.carriedUtilityItem && this.utilityItemCharges > 0;
+    }
+
+    /**
+     * Consumes one charge from the carried utility item.
+     * If charges reach 0, the item is removed and the HUD should fall back to backpack.
+     */
+    consumeUtilityItemCharge() {
+        if (!this.hasUsableUtilityItem()) return false;
+
+        this.utilityItemCharges = max(0, this.utilityItemCharges - 1);
+        this.utilityItemArmed = false;
+
+        if (this.utilityItemCharges <= 0) {
+            this.clearUtilityItemState();
+        }
+
+        return true;
+    }
+
+    /**
+     * Activates the carried utility item with the E key.
+     * - Vitamins: immediate full heal + consume 1 charge
+     * - Tangle / Headphones / Rain Boots: arm once, do not consume yet
+     * @returns {boolean} True if the key press was consumed.
+     */
+    activateUtilityItem() {
+        if (!this.hasUsableUtilityItem()) return false;
+
+        if (this.carriedUtilityItem === "Soft Gummy Vitamins") {
+            this.health = this.maxHealth;
+            this.consumeUtilityItemCharge();
+            return true;
+        }
+
+        if (
+            this.carriedUtilityItem === "Tangle" ||
+            this.carriedUtilityItem === "Headphones" ||
+            this.carriedUtilityItem === "Rain Boots"
+        ) {
+            if (!this.utilityItemArmed) {
+                this.utilityItemArmed = true;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+        /**
+     * Returns true when the armed utility item should cancel the next Fantasy Coffee.
+     */
+    shouldTriggerTangle() {
+        return this.utilityItemArmed &&
+               this.carriedUtilityItem === "Tangle" &&
+               this.utilityItemCharges > 0;
+    }
+
+    /**
+     * Returns true when the armed utility item should cancel the next Promoter poster.
+     */
+    shouldTriggerHeadphones() {
+        return this.utilityItemArmed &&
+               this.carriedUtilityItem === "Headphones" &&
+               this.utilityItemCharges > 0;
+    }
+
+    /**
+     * Returns true when the armed utility item should cancel the next Puddle trap.
+     */
+    shouldTriggerRainBoots() {
+        return this.utilityItemArmed &&
+               this.carriedUtilityItem === "Rain Boots" &&
+               this.utilityItemCharges > 0;
+    }
+
+    /**
+     * Consumes the currently armed utility item if it matches the expected item name.
+     * Returns true when consumption succeeds.
+     */
+    consumeArmedUtilityItem(expectedItemName) {
+        if (!this.utilityItemArmed) return false;
+        if (this.carriedUtilityItem !== expectedItemName) return false;
+        if (!this.hasUsableUtilityItem()) return false;
+
+        return this.consumeUtilityItemCharge();
+    }
+
+    /**
+     * Returns the HUD icon image for the currently carried utility item.
+     * Falls back to the default backpack icon when no usable item is carried.
+     */
+    getUtilityItemHudIcon() {
+        if (!this.hasUsableUtilityItem()) return assets.backpackImg || null;
+
+        if (this.carriedUtilityItem === "Soft Gummy Vitamins") return assets.vitaminImg || assets.backpackImg || null;
+        if (this.carriedUtilityItem === "Tangle") return assets.tangleImg || assets.backpackImg || null;
+        if (this.carriedUtilityItem === "Headphones") return assets.headphoneImg || assets.backpackImg || null;
+        if (this.carriedUtilityItem === "Rain Boots") return assets.rainbootImg || assets.backpackImg || null;
+
+        return assets.backpackImg || null;
+    }
+
+    /**
+     * Restores the carried utility item from the current run snapshot.
+     * Used by restart run so the player keeps the same item and remaining charges.
+     */
+    restoreUtilityItemFromRunSnapshot() {
+        if (typeof gameState === "undefined" || !gameState) {
+            this.clearUtilityItemState();
+            return;
+        }
+
+        const itemName = gameState.runUtilityItemName || null;
+        if (!itemName) {
+            this.clearUtilityItemState();
+            return;
+        }
+
+        this.carriedUtilityItem = itemName;
+        this.utilityItemCharges = this.getDefaultChargesForUtilityItem(itemName);
+        this.utilityItemArmed = false;
     }
 
     // ─── CORE UPDATE ─────────────────────────────────────────────────────────
@@ -338,8 +532,9 @@ class Player {
         push();
 
         this.drawHealthBar(165, 65);
+        this.drawUtilityItemCharges(165, 65);
         this.drawBackpackIcon(98, 85);
-        
+
         const leftMargin = 70;
         const topBarH = 170;
         if (!isEndlessRunMode()) {
@@ -401,17 +596,56 @@ class Player {
     }
 
     /**
-     * Backpack HUD: circular base plate + overlay item icon (slightly larger than plate)
-     * - plate: white fill + black stroke (static)
-     * - icon: backpack.png by default; if buff item carried, show item.icon
-     * Returns layout metrics so caller can place the health bar tightly beside it.
+     * Draws remaining utility-item charges as dots under the health bar.
+     * Label is displayed to the left of the dots.
+     */
+    drawUtilityItemCharges(x, y) {
+        if (!this.hasUsableUtilityItem()) return;
+
+        const count = max(0, floor(this.utilityItemCharges || 0));
+        if (count <= 0) return;
+
+        const dotSize = 14;
+        const dotGap = 10;
+
+        // Move dots slightly lower to avoid health bar overlap
+        const dotY = y + 90;
+
+        const totalW = count * dotSize + (count - 1) * dotGap;
+        const dotsStartX = x + 200 - totalW / 2;
+
+        push();
+
+        // Draw label on the left
+        textAlign(RIGHT, CENTER);
+        textSize(32);
+        textStyle(BOLD);
+        noStroke();
+        fill(255, 215, 0);
+        text("USES", dotsStartX - 14, dotY);
+
+        // Draw dots
+        for (let i = 0; i < count; i++) {
+            const cx = dotsStartX + i * (dotSize + dotGap) + dotSize / 2;
+
+            fill(255, 215, 0);
+            stroke(0);
+            strokeWeight(2);
+            circle(cx, dotY, dotSize);
+        }
+
+        pop();
+    }
+
+    /**
+     * Backpack HUD: circular base plate + carried utility item icon.
+     * - No utility item / no charges left -> backpack icon
+     * - Utility item equipped with charges left -> item icon
      */
     drawBackpackIcon(x, y) {
-        // --- layout ---
-        const plateD = 136;          // Base plate diameter
-        const iconD  = 188;          // Icon slightly larger(visual appeal).
+        const plateD = 136;
+        const iconD  = 188;
 
-        // --- draw base plate ---
         push();
         ellipseMode(CENTER);
         stroke(0);
@@ -419,25 +653,8 @@ class Player {
         fill(255);
         circle(x, y, plateD);
 
-        // --- decide what to show ---
-        // 需要把这里的“拿当前携带道具”的逻辑替换成真实的接口/字段
-        let heldItem = null;
-        if (typeof inventorySystem !== "undefined" && inventorySystem.getHeldItem) {
-            heldItem = inventorySystem.getHeldItem();
-        } else if (gameState && gameState.heldItem) {
-            heldItem = gameState.heldItem;
-        }
+        const iconImg = this.getUtilityItemHudIcon();
 
-        // 默认显示基础背包图
-        let iconImg = assets.backpackImg;
-
-        // 如果携带了 buff 道具且有图标，则显示该道具图
-        // （type/isBuff 字段按实际数据结构改）
-       if (heldItem && (heldItem.type === "BUFF" || heldItem.isBuff === true) && heldItem.icon) {
-            iconImg = heldItem.icon;
-        }
-
-        // --- draw icon (slightly larger than plate) ---
         if (iconImg) {
             push();
             imageMode(CENTER);
@@ -446,7 +663,6 @@ class Player {
             image(iconImg, 0, -8, iconD, iconD);
             pop();
         } else {
-            // Placeholder (to avoid blank spaces)
             noStroke();
             fill(0);
             textAlign(CENTER, CENTER);

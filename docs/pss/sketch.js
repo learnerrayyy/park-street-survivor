@@ -56,9 +56,10 @@ let assets = {
     }
 };
 let fonts = {};
-let sfxSelect, sfxClick, sfxScold;
-let sfxDialogue, sfxHitBigCar, sfxHitSmallCar, sfxPickupCoffee, sfxPickupScooter;
-let sfxAmbulance, sfxHeartbeat, sfxGameWin;
+let sfxSelect, sfxClick, sfxDialogue;
+let sfxHitNpc, sfxHitBigCar, sfxHitSmallCar, sfxHitFantasyCoffee, sfxPuddleNoBoots, sfxSmallBusiness; 
+let sfxPickupCoffee, sfxPickupScooter, sfxPuddleBoots, sfxPaperCrumple, sfxScooterBrake;
+let sfxDoorOpen, sfxAmbulance, sfxHeartbeat, sfxGameWin;
 
 let failEndAudioTimer = null;
 
@@ -157,7 +158,11 @@ let globalFade = {
     speed: 255 / (0.3 * 60),
     isFading: false,
     dir: 1,
-    callback: null
+    callback: null,
+
+    // Special-case hold support (used only for library entry transition)
+    holdUntilMs: 0,
+    holdDoneCallback: null
 };
 
 // ─── PAUSE MENU STATE ─────────────────────────────────────────────────────────
@@ -520,6 +525,7 @@ function preload() {
     sfxHitFantasyCoffee = loadSound('assets/audio/effects/HitFantasyCoffee.mp3', itemLoaded);
     sfxSmallBusiness = loadSound('assets/audio/effects/HitSmallBusiness.mp3', itemLoaded);
     sfxPaperCrumple = loadSound('assets/audio/effects/HitPoster.mp3', itemLoaded);
+    sfxDoorOpen = loadSound('assets/audio/effects/LibraryDoorOpen.mp3', itemLoaded);
     sfxAmbulance = loadSound('assets/audio/effects/GameOverAmbulance.wav', itemLoaded);
     sfxHeartbeat = loadSound('assets/audio/effects/GameOverHeartbeat.mp3', itemLoaded);
     sfxGameWin = loadSound('assets/audio/effects/GameWin.mp3', itemLoaded);
@@ -853,17 +859,20 @@ function runGameLoop() {
 
     if (levelController) { levelController.display(); }
 
-    // Settlement reached in story mode -> WIN cutscene.
+    // Settlement reached in story mode -> black screen + door SFX (2s) -> library cutscene.
     if (!freezeGameplay && levelController) {
         const settlementResult = levelController.checkSettlementPoint();
         if (settlementResult === "WIN") {
             if (!_winCutscenePending) {
                 _winCutscenePending = true;
                 let day = currentDayID;
-                console.log(`[runGameLoop] Settlement -> NPC cutscene Day ${day}`);
-                triggerTransition(() => startCutscene('library', CS_DAY_NPC[day], () => {
-                    triggerTransition(() => gameState.setState(STATE_WIN));
-                }));
+                console.log(`[runGameLoop] Settlement -> library entry transition -> NPC cutscene Day ${day}`);
+
+                triggerLibraryEntryTransition(() => {
+                    startCutscene('library', CS_DAY_NPC[day], () => {
+                        triggerTransition(() => gameState.setState(STATE_WIN));
+                    });
+                });
             }
         }
     }
@@ -1001,7 +1010,7 @@ function playFailEndAudio() {
         } catch (e) {
             console.warn('[AUDIO] playFailEndAudio failed:', e);
         }
-    }, 2000);
+    }, 1200);
 }
 
 /**
@@ -1066,29 +1075,107 @@ function triggerTransition(onBlackout) {
 }
 
 /**
- * Renders the full-screen fade overlay each frame.
- * Advances the alpha, fires the midpoint callback, and resets state on completion.
+ * Special transition used only when entering the library after DayRun.
+ * Fade to black -> immediately play door SFX -> hold black for 2s -> switch to library -> fade in.
+ */
+function triggerLibraryEntryTransition(onAfterBlackout) {
+    if (globalFade.isFading) return;
+
+    // Reset special hold fields first
+    globalFade.holdUntilMs = 0;
+    globalFade.holdDoneCallback = null;
+
+    triggerTransition(() => {
+    // At full black, stop current BGM first
+        if (typeof BGM !== 'undefined' && BGM && typeof BGM.stop === 'function') {
+            BGM.stop();
+        }
+
+        // Then play the door SFX immediately
+        if (typeof playSFX === 'function' && sfxDoorOpen) {
+            playSFX(sfxDoorOpen, {
+                id: 'door_open_library',
+                cooldownMs: 300,
+                monophonic: true
+            });
+        }
+
+        // Hold black for 2 seconds
+        globalFade.holdUntilMs = performance.now() + 2000;
+
+        // After the black hold finishes, continue into the library cutscene
+        globalFade.holdDoneCallback = () => {
+            if (typeof onAfterBlackout === 'function') {
+                onAfterBlackout();
+            }
+        };
+    });
+}
+
+/**
+ * Special transition used only when entering the library after DayRun.
+ * Fade to black -> play door SFX while holding black for 2s -> enter library cutscene.
  */
 function renderGlobalFade() {
     if (!globalFade.isFading && globalFade.alpha <= 0) return;
 
-    globalFade.alpha += globalFade.speed * globalFade.dir;
+    const now = performance.now();
 
-    if (globalFade.dir === 1 && globalFade.alpha >= 255) {
-        globalFade.alpha = 255;
-        if (globalFade.callback) {
-            try {
-                globalFade.callback();
-            } catch (e) {
-                console.error('[Transition] callback crashed:', e);
+    // Fade in to black
+    if (globalFade.dir === 1) {
+        globalFade.alpha += globalFade.speed;
+
+        if (globalFade.alpha >= 255) {
+            globalFade.alpha = 255;
+
+            if (globalFade.callback) {
+                try {
+                    const cb = globalFade.callback;
+                    globalFade.callback = null; // ensure callback only runs once
+                    cb();
+                } catch (e) {
+                    console.error('[Transition] callback crashed:', e);
+                }
+            }
+
+            // Only special transitions will configure a black-screen hold.
+            if (globalFade.holdUntilMs && now < globalFade.holdUntilMs) {
+                globalFade.dir = 0; // hold on black
+            } else {
+                globalFade.dir = -1; // normal fade out
             }
         }
-        globalFade.dir = -1;
     }
-    if (globalFade.dir === -1 && globalFade.alpha <= 0) {
-        globalFade.alpha = 0;
-        globalFade.isFading = false;
-        globalFade.callback = null;
+    // Hold on full black
+    else if (globalFade.dir === 0) {
+        globalFade.alpha = 255;
+
+        if (!globalFade.holdUntilMs || now >= globalFade.holdUntilMs) {
+            if (globalFade.holdDoneCallback) {
+                try {
+                    const cb = globalFade.holdDoneCallback;
+                    globalFade.holdDoneCallback = null;
+                    cb();
+                } catch (e) {
+                    console.error('[Transition] holdDoneCallback crashed:', e);
+                }
+            }
+
+            globalFade.holdUntilMs = 0;
+            globalFade.dir = -1;
+        }
+    }
+    // Fade out from black
+    else if (globalFade.dir === -1) {
+        globalFade.alpha -= globalFade.speed;
+
+        if (globalFade.alpha <= 0) {
+            globalFade.alpha = 0;
+            globalFade.isFading = false;
+            globalFade.callback = null;
+            globalFade.holdUntilMs = 0;
+            globalFade.holdDoneCallback = null;
+        }
     }
 
     push();
@@ -1260,6 +1347,13 @@ function keyPressed() {
         return;
     }
 
+    // Utility item activation: E key
+    if (state === STATE_DAY_RUN && (key === 'e' || key === 'E' || keyCode === 69)) {
+        if (player && typeof player.activateUtilityItem === "function") {
+            if (player.activateUtilityItem()) return false;
+        }
+    }
+
     // Promoter leaflet interaction: SPACE is consumed by obstacle system while active.
     if (state === STATE_DAY_RUN && player &&
         typeof player.handlePuddleEscapePress === 'function' &&
@@ -1386,18 +1480,25 @@ function handleRestartChoice() {
     if (RESTART_OPTIONS[restartChoiceIndex] === "BACK TO ROOM") {
         triggerTransition(() => {
             showRestartChoice = false;
-            gameState.setState(STATE_ROOM);
-            if (roomScene) roomScene.reset();
+            gameState.resetFlags();
+            setupRun(currentDayID);
             pauseFromState = null;
         });
     } else if (RESTART_OPTIONS[restartChoiceIndex] === "RESTART RUN") {
         triggerTransition(() => {
             showRestartChoice = false;
+
             player.applyLevelStats(currentDayID);
+            if (typeof player.restoreUtilityItemFromRunSnapshot === "function") {
+                player.restoreUtilityItemFromRunSnapshot();
+            }
+
             player.x = GLOBAL_CONFIG.lanes.lane1;
             player.y = PLAYER_RUN_FOOT_Y;
+
             obstacleManager = new ObstacleManager();
             levelController.initializeLevel(currentDayID);
+
             if (endScreenManager) endScreenManager._activeScreen = null;
             gameState.setState(STATE_DAY_RUN);
 
@@ -1687,6 +1788,9 @@ function setupRun(dayID) {
     }
     if (backpackUI) backpackUI.resetForNewDay();
     if (endScreenManager) endScreenManager._activeScreen = null;
+    if (gameState && typeof gameState.clearRunUtilityItemSnapshot === "function") {
+        gameState.clearRunUtilityItemSnapshot();
+    }
 
     // Room cutscene — only on first visit per day per session
     if (typeof CS_DAY_ROOM !== 'undefined' && CS_DAY_ROOM[dayID] &&
@@ -1708,14 +1812,17 @@ function setupRun(dayID) {
     }
 }
 
-/**
- * Starts a run directly on the street, skipping the room scene.
- */
 function setupRunDirectly(dayID, runMode = RUN_MODE_STORY) {
     currentDayID = dayID;
     currentRunMode = runMode;
     _winCutscenePending = false;
+
     player.applyLevelStats(dayID);
+
+    // Restore the selected utility item for direct restart paths
+    if (typeof player.restoreUtilityItemFromRunSnapshot === "function") {
+        player.restoreUtilityItemFromRunSnapshot();
+    }
 
     // Set position at lane 1 matching standard run spawn
     player.x = GLOBAL_CONFIG.lanes.lane1;
@@ -1723,6 +1830,7 @@ function setupRunDirectly(dayID, runMode = RUN_MODE_STORY) {
 
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
+
     if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DONE';
     if (backpackUI) backpackUI.resetForNewDay();
     if (endScreenManager) endScreenManager._activeScreen = null;

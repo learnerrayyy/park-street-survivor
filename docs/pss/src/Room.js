@@ -178,6 +178,9 @@ class RoomScene {
             if (typeof player !== 'undefined') {
                 player.x = GLOBAL_CONFIG.lanes.lane1;
                 player.y = PLAYER_RUN_FOOT_Y;  // Player foot anchor for day run
+                if (typeof player.syncUtilityItemFromBackpack === "function") {
+                    player.syncUtilityItemFromBackpack();
+                }
             }
             if (typeof startRoomExitRunSequence === 'function') {
                 startRoomExitRunSequence();

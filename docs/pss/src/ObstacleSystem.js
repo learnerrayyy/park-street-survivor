@@ -1464,10 +1464,33 @@ class ObstacleManager {
         }
 
         if (config.effect === "puddleTrap" && typeof player.applyPuddleTrap === "function") {
+            const useRainBoots =
+                player &&
+                typeof player.shouldTriggerRainBoots === "function" &&
+                typeof player.consumeArmedUtilityItem === "function" &&
+                player.shouldTriggerRainBoots();
+
+            if (useRainBoots) {
+                player.consumeArmedUtilityItem("Rain Boots");
+                return;
+            }
+
             player.applyPuddleTrap(config.escapePressRequired ?? 3, config.slowMultiplier ?? 0.72);
         }
 
         if (config.effect === "leaflet") {
+            const useHeadphones =
+                player &&
+                typeof player.shouldTriggerHeadphones === "function" &&
+                typeof player.consumeArmedUtilityItem === "function" &&
+                player.shouldTriggerHeadphones();
+
+            if (useHeadphones) {
+                player.consumeArmedUtilityItem("Headphones");
+                this.firePromoterPaperBall(player);
+                return;
+            }
+
             this.startPromoterInteraction(obs);
         }
     }
@@ -1770,6 +1793,18 @@ class ObstacleManager {
             const distance = Math.hypot(dx, dy);
             const triggerRadius = Math.max(1, Number(cfg.escapeTriggerRadius ?? 300));
             if (distance > triggerRadius) return;
+
+            const useTangle =
+                playerRef &&
+                typeof playerRef.shouldTriggerTangle === "function" &&
+                typeof playerRef.consumeArmedUtilityItem === "function" &&
+                playerRef.shouldTriggerTangle();
+
+            if (useTangle) {
+                playerRef.consumeArmedUtilityItem("Tangle");
+                this.removeObstacleInstance(obs);
+                return;
+            }
 
             const startup = Math.max(0, Math.floor(Number(cfg.escapeStartupFrames ?? 12)));
             obs.fantasyState = "STARTUP";

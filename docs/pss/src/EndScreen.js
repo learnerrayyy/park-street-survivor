@@ -394,8 +394,7 @@ class FailScreen extends EndScreenBase {
             if (option === "BACK TO ROOM") {
                 triggerTransition(() => {
                     gameState.resetFlags();
-                    if (player) { player.x = 940; player.y = 550; }
-                    gameState.setState(STATE_ROOM);
+                    setupRun(currentDayID);
                 });
             } else if (option === "START RUN") {
                 triggerTransition(() => {
@@ -537,8 +536,7 @@ class SuccessScreen extends EndScreenBase {
             if (option === "BACK TO ROOM") {
                 triggerTransition(() => {
                     gameState.resetFlags();
-                    if (player) { player.x = 940; player.y = 550; }
-                    gameState.setState(STATE_ROOM);
+                    setupRun(currentDayID);
                 });
             } else if (option === "START RUN") {
                 triggerTransition(() => {

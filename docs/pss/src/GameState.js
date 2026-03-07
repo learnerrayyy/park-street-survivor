@@ -15,6 +15,9 @@ class GameState {
 
         // Tracks progression to trigger specific tutorial or dialogue events in the Room
         this.isFirstTimeInRoom = true;
+
+        // Current run utility-item snapshot (should survive restart run)
+        this.runUtilityItemName = null;
     }
 
     /**
@@ -76,5 +79,20 @@ class GameState {
      */
     resetFlags() {
         this.failReason = "";
+    }
+
+    /**
+     * Saves the current run's carried utility item so restart can restore it.
+     */
+    saveRunUtilityItemSnapshot(itemName) {
+        this.runUtilityItemName = itemName || null;
+    }
+
+    /**
+     * Clears the current run's utility item snapshot.
+     * Used when starting a fresh room-preparation flow.
+     */
+    clearRunUtilityItemSnapshot() {
+        this.runUtilityItemName = null;
     }
 }
