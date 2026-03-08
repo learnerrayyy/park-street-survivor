@@ -26,6 +26,7 @@ let assets = {
     menuBg: null,
     otherBg: null,
     warningImg: null,
+    warningBox: null,
     bbg: null,
     libraryBg: null,
     csNewsBg: null,   // assets/dialogue/news.png  — prologue cutscene bg
@@ -425,7 +426,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 56;
+const totalAssetsToLoad = 57;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -555,6 +556,7 @@ function preload() {
 
     assets.uobLogo = loadImage('assets/logo/uob_logo.png', itemLoaded);
     assets.warningImg = loadImage('assets/buttons/warning.png', itemLoaded);
+    assets.warningBox = loadImage('assets/buttons/warning_box.png', itemLoaded);
     assets.btnImg = loadImage('assets/buttons/button.png', itemLoaded);
     assets.button1Img = loadImage('assets/buttons/button_1.png', itemLoaded);
     assets.buttonStartImg = loadImage('assets/buttons/button_start.png', itemLoaded);
@@ -657,7 +659,7 @@ function setup() {
     tutorialDialogue = new DialogueBox();
     tutorialDialogue.timerMax = 300;   // 5 s — long enough to read tutorial page explanations
 
-    textFont(fonts.body);
+    textFont(fonts.jersey20 || fonts.body);
     gameState.setState(STATE_LOADING);
 
     if (developerMode) devApplyStartupSkip();
@@ -1912,8 +1914,8 @@ function drawTutorialSlidesScreen() {
     fill(0, 0, 0, 140);
     rect(width / 2, height - 54, 520, 50, 16);
     textAlign(CENTER, CENTER);
-    textFont(fonts.body);
-    textSize(24);
+    textFont(fonts.jersey20 || fonts.body);
+    textSize(28);
     fill(255, 235, 200);
     text("Click anywhere to continue", width / 2, height - 54);
     pop();
@@ -1966,34 +1968,35 @@ function drawWarningScreen() {
     colorMode(RGB, 255);
     background(0);
 
-    // ── Panel ─────────────────────────────────────────────────────────────────
+    // ── Warning box panel (1200x800, text area is bottom 1200x655) ──────────
     let panelW = 1200 * s;
-    let panelH = 640 * s;
+    let panelH = 800 * s;
     let panelX = cx;
     let panelY = cy;
 
-    // Shadow
-    fill(0, 0, 0, alpha * 0.5);
-    noStroke();
-    rectMode(CENTER);
-    rect(panelX + 10 * s, panelY + 10 * s, panelW, panelH, 22 * s);
+    if (assets.warningBox) {
+        imageMode(CENTER);
+        tint(255, alpha);
+        image(assets.warningBox, panelX, panelY, panelW, panelH);
+        noTint();
+    } else {
+        // Fallback panel if warning_box.png is unavailable.
+        fill(14, 14, 22, alpha * 0.95);
+        stroke(200, 170, 100, alpha);
+        strokeWeight(2.5 * s);
+        rectMode(CENTER);
+        rect(panelX, panelY, panelW, panelH, 22 * s);
+        noStroke();
+    }
 
-    // Panel body
-    fill(14, 14, 22, alpha * 0.95);
-    stroke(200, 170, 100, alpha);
-    strokeWeight(2.5 * s);
-    rect(panelX, panelY, panelW, panelH, 22 * s);
-
-    // Inner border
-    stroke(200, 170, 100, alpha * 0.35);
-    strokeWeight(1 * s);
-    rect(panelX, panelY, panelW - 24 * s, panelH - 24 * s, 16 * s);
-    noStroke();
+    let textAreaTop = panelY - panelH / 2 + 145 * s;
+    let textAreaBottom = panelY + panelH / 2;
+    let textAreaH = textAreaBottom - textAreaTop;
 
     // ── Title ─────────────────────────────────────────────────────────────────
-    let titleY = panelY - panelH / 2 + 80 * s;
+    let titleY = textAreaTop + 48 * s;
     textFont(fonts.title || fonts.body);
-    textSize(52 * s);
+    textSize(44 * s);
     textAlign(CENTER, CENTER);
     fill(220, 190, 110, alpha);
     text("A Quiet Note to You", panelX, titleY);
@@ -2001,30 +2004,30 @@ function drawWarningScreen() {
     // Divider line
     stroke(200, 170, 100, alpha * 0.45);
     strokeWeight(1.5 * s);
-    let divY = titleY + 44 * s;
+    let divY = titleY + 36 * s;
     line(panelX - panelW / 2 + 60 * s, divY, panelX + panelW / 2 - 60 * s, divY);
     noStroke();
 
     // ── Body text (centred, warm) ──────────────────────────────────────────────
-    textFont(fonts.body);
+    textFont(fonts.jersey20 || fonts.body);
     textAlign(CENTER, TOP);
     let bodyLines = [
-        { txt: "Please note: This experience explores stress, burnout,", size: 28, col: [230, 220, 205] },
-        { txt: "and the psychological impact of self-doubt.", size: 28, col: [230, 220, 205] },
-        { txt: "", size: 28, col: [230, 220, 205] },
+        { txt: "Please note: This experience explores stress, burnout,", size: 40, col: [230, 220, 205] },
+        { txt: "and the psychological impact of self-doubt.", size: 40, col: [230, 220, 205] },
+        { txt: "", size: 40, col: [230, 220, 205] },
 
-        { txt: "If you find these themes distressing, we encourage you", size: 28, col: [230, 220, 205] },
-        { txt: "to prioritise your well-being while playing.", size: 28, col: [230, 220, 205] },
-        { txt: "Support is available if the climb feels too steep.", size: 28, col: [230, 220, 205] },
-        { txt: "", size: 24, col: [230, 220, 205] },
+        { txt: "If you find these themes distressing, we encourage you", size: 40, col: [230, 220, 205] },
+        { txt: "to prioritise your well-being while playing.", size: 40, col: [230, 220, 205] },
+        { txt: "Support is available if the climb feels too steep.", size: 40, col: [230, 220, 205] },
+        { txt: "", size: 35, col: [230, 220, 205] },
 
-        { txt: "— Resources for Support —", size: 24, col: [210, 185, 120] },
-        { txt: "Bristol Nightline | 01179 266 266 (Nightly, Term-time)", size: 26, col: [210, 185, 120] },
-        { txt: "Samaritans | 116 123 (Free, 24/7 Support)", size: 26, col: [210, 185, 120] },
-        { txt: "Shout Crisis | Text 'SHOUT' to 85258", size: 26, col: [210, 185, 120] },
+        { txt: "— Resources for Support —", size: 35, col: [210, 185, 120] },
+        { txt: "Bristol Nightline | 01179 266 266 (Nightly, Term-time)", size: 35, col: [210, 185, 120] },
+        { txt: "Samaritans | 116 123 (Free, 24/7 Support)", size: 35, col: [210, 185, 120] },
+        { txt: "Shout Crisis | Text 'SHOUT' to 85258", size: 35, col: [210, 185, 120] },
     ];
 
-    let ty = divY + 32 * s;
+    let ty = divY + 20 * s;
     for (let i = 0; i < bodyLines.length; i++) {
         let entry = bodyLines[i];
         // Compute cumulative y by summing previous line heights
@@ -2034,15 +2037,17 @@ function drawWarningScreen() {
         }
         textSize(entry.size * s);
         fill(entry.col[0], entry.col[1], entry.col[2], alpha);
-        text(entry.txt, panelX, ty + prevH);
+        let y = ty + prevH;
+        if (y > textAreaBottom - 30 * s) break;
+        text(entry.txt, panelX, y);
     }
 
     // ── Footer ────────────────────────────────────────────────────────────────
-    textFont(fonts.body);
+    textFont(fonts.jersey20 || fonts.body);
     textSize(21 * s);
     textAlign(CENTER, CENTER);
     fill(160, 150, 130, alpha * 0.65);
-    text("This screen will continue automatically.", panelX, panelY + panelH / 2 - 35 * s);
+    text("This screen will continue automatically.", panelX, textAreaTop + textAreaH - 24 * s);
 
     pop();
 }
@@ -2600,7 +2605,7 @@ function renderPauseOverlay() {
             if (isSelected) scale(1.15);
             imageMode(CENTER);
             if (assets.btnImg) image(assets.btnImg, 0, 0, btnW, btnH);
-            textFont(fonts.body); textSize(36); textAlign(CENTER, CENTER);
+            textFont(fonts.jersey20 || fonts.body); textSize(36); textAlign(CENTER, CENTER);
             stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
             text(RESTART_OPTIONS[i], 0, -6);
             noStroke(); fill(255, 215, 0);
@@ -2640,7 +2645,7 @@ function renderPauseOverlay() {
             if (isSelected) scale(1.15);
             imageMode(CENTER);
             if (assets.btnImg) image(assets.btnImg, 0, 0, btnW, btnH);
-            textFont(fonts.body); textSize(36); textAlign(CENTER, CENTER);
+            textFont(fonts.jersey20 || fonts.body); textSize(42); textAlign(CENTER, CENTER);
             stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
             text(options[i], 0, -6);
             noStroke(); fill(255, 215, 0);

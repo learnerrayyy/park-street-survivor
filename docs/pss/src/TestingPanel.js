@@ -1335,7 +1335,7 @@ class TestingPanel {
         fill(0);
         textAlign(LEFT, CENTER);
         textStyle(BOLD);
-        textSize(19);
+        textSize(28);
         const mark = this.isSectionExpanded(sectionKey) ? "[-]" : "[+]";
         text(`${mark} ${label}`, x + 10, y + h / 2 + 1);
         this.sectionHeaderHitboxes.push({ sectionKey, x, y, w, h });
@@ -1361,7 +1361,7 @@ class TestingPanel {
             fill(selected ? 255 : 0);
             textAlign(CENTER, CENTER);
             textStyle(BOLD);
-            textSize(24);
+            textSize(28);
             text(`DAY ${day}`, bx + buttonW / 2, y + buttonH / 2 + 1);
 
             this.dayButtons.push({ day, x: bx, y, w: buttonW, h: buttonH });
@@ -1383,7 +1383,7 @@ class TestingPanel {
         textAlign(LEFT, CENTER);
         text("Difficulty Mode Sequence", x + 12, y + 18);
 
-        textSize(16);
+        textSize(20);
         text("Input example: 1231010 or 1,2,3,10,1,2", x + 12, y + 40);
 
         const valueX = x + 12;
@@ -1444,7 +1444,7 @@ class TestingPanel {
             fill(selected ? 255 : (inPattern ? 0 : 110));
             textAlign(CENTER, CENTER);
             textStyle(BOLD);
-            textSize(16);
+            textSize(20);
             text(`MODE ${modeId}`, bx + btnW / 2, byRow + btnH / 2 + 1);
             this.modeButtons.push({ modeId, x: bx, y: byRow, w: btnW, h: btnH });
         }
@@ -1478,7 +1478,7 @@ class TestingPanel {
 
             fill(0);
             textStyle(BOLD);
-            textSize(17);
+            textSize(20);
             textAlign(LEFT, CENTER);
             text(def.label, cellX, cellY + rowH / 2);
 
@@ -1493,7 +1493,7 @@ class TestingPanel {
             fill(0);
             textAlign(LEFT, CENTER);
             textStyle(BOLD);
-            textSize(15);
+                textSize(18);
             const rawVal = modeCfg[def.key];
             let valueText = isEditing ? `${this.inputBuffer}_` : this.stringifyCompactValue(rawVal);
             if (!isEditing && valueText.length > 64) valueText = `${valueText.slice(0, 64)}...`;
@@ -1522,7 +1522,7 @@ class TestingPanel {
         fill(0);
         textAlign(LEFT, CENTER);
         textStyle(BOLD);
-        textSize(16);
+            textSize(18);
         text("obWeights Preview", innerX + 8, panelY + 12);
 
         const sorted = keys.sort((a, b) => a.localeCompare(b));
@@ -1531,7 +1531,7 @@ class TestingPanel {
         for (let i = 0; i < Math.min(maxLines, sorted.length); i++) {
             const k = sorted[i];
             const v = weightMap[k];
-            textSize(14);
+                textSize(18);
             text(`${k}: ${v}`, innerX + 10, panelY + 26 + i * lineH);
         }
     }
@@ -1562,7 +1562,7 @@ class TestingPanel {
 
             fill(0);
             textStyle(BOLD);
-            textSize(17);
+                textSize(18);
             textAlign(LEFT, CENTER);
             text(def.label, innerX, cellY + rowH / 2);
 
@@ -1577,7 +1577,7 @@ class TestingPanel {
             fill(0);
             textAlign(LEFT, CENTER);
             textStyle(BOLD);
-            textSize(15);
+                textSize(18);
             let valueText = isEditing ? `${this.inputBuffer}_` : this.stringifyCompactValue(cfg[def.key]);
             if (!isEditing && valueText.length > 64) valueText = `${valueText.slice(0, 64)}...`;
             text(valueText, valueX + 6, cellY + rowH / 2 + 1);
@@ -1786,7 +1786,7 @@ class TestingPanel {
         noStroke();
         fill(0);
         textStyle(BOLD);
-        textSize(16);
+            textSize(18);
         textAlign(CENTER, CENTER);
         text("ALL OFF", allOffX + allOffW / 2, allOffY + allOffH / 2 + 1);
 
@@ -1907,7 +1907,7 @@ class TestingPanel {
             stroke(0); strokeWeight(1.2); fill(255);
             rect(bx, r1Y, r1BtnW, btnH, 6);
             noStroke(); fill(0);
-            textAlign(CENTER, CENTER); textStyle(BOLD); textSize(17);
+                textAlign(CENTER, CENTER); textStyle(BOLD); textSize(18);
             text(b.label, bx + r1BtnW / 2, r1Y + btnH / 2 + 1);
             this.devButtons.push({ id: b.id, x: bx, y: r1Y, w: r1BtnW, h: btnH });
         }
@@ -1943,7 +1943,7 @@ class TestingPanel {
             stroke(0, 120); strokeWeight(1); fill(230, 240, 255);
             rect(bx, r2Y, r2BtnW, btnH, 6);
             noStroke(); fill(20, 40, 120);
-            textAlign(CENTER, CENTER); textStyle(BOLD); textSize(16);
+                textAlign(CENTER, CENTER); textStyle(BOLD); textSize(18);
             text(b.label, bx + r2BtnW / 2, r2Y + btnH / 2 + 1);
             this.devButtons.push({ id: b.id, x: bx, y: r2Y, w: r2BtnW, h: btnH });
         }
