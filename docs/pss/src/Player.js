@@ -73,6 +73,7 @@ class Player {
         this.carriedUtilityItem = null;      // "Soft Gummy Vitamins" | "Tangle" | "Headphones" | "Rain Boots" | null
         this.utilityItemCharges = 0;         // remaining uses
         this.utilityItemArmed = false;       // for E-activated passive items: Tangle / Headphones / Rain Boots
+        this.utilityHudSwapProgress = 0;     // 0 = backpack main, 1 = utility item main
     }
 
     /**
@@ -116,6 +117,7 @@ class Player {
         this.carriedUtilityItem = null;
         this.utilityItemCharges = 0;
         this.utilityItemArmed = false;
+        this.utilityHudSwapProgress = 0;
     }
 
     // ─── CARRIED UTILITY ITEM ───────────────────────────────────────────────
@@ -148,11 +150,7 @@ class Player {
         this.carriedUtilityItem = selected;
         this.utilityItemCharges = this.getDefaultChargesForUtilityItem(selected);
         this.utilityItemArmed = false;
-
-        if (typeof gameState !== "undefined" && gameState &&
-            typeof gameState.saveRunUtilityItemSnapshot === "function") {
-            gameState.saveRunUtilityItemSnapshot(this.carriedUtilityItem);
-        }
+        this.saveUtilityItemSnapshot();
     }
 
     /**
@@ -162,6 +160,25 @@ class Player {
         this.carriedUtilityItem = null;
         this.utilityItemCharges = 0;
         this.utilityItemArmed = false;
+        this.utilityHudSwapProgress = 0;
+        this.saveUtilityItemSnapshot();
+    }
+
+    isPassiveUtilityItem(itemName) {
+        return itemName === "Tangle" ||
+               itemName === "Headphones" ||
+               itemName === "Rain Boots";
+    }
+
+    saveUtilityItemSnapshot() {
+        if (typeof gameState !== "undefined" && gameState &&
+            typeof gameState.saveRunUtilityItemSnapshot === "function") {
+            gameState.saveRunUtilityItemSnapshot(
+                this.carriedUtilityItem,
+                this.utilityItemCharges,
+                this.utilityItemArmed
+            );
+        }
     }
 
     /**
@@ -169,7 +186,7 @@ class Player {
      */
     getDefaultChargesForUtilityItem(itemName) {
         if (itemName === "Soft Gummy Vitamins") return 1;
-        if (itemName === "Tangle") return 8;
+        if (itemName === "Tangle") return 10;
         if (itemName === "Headphones") return 5;
         if (itemName === "Rain Boots") return 3;
         return 0;
@@ -189,13 +206,16 @@ class Player {
     consumeUtilityItemCharge() {
         if (!this.hasUsableUtilityItem()) return false;
 
+        const consumedItem = this.carriedUtilityItem;
         this.utilityItemCharges = max(0, this.utilityItemCharges - 1);
-        this.utilityItemArmed = false;
+        this.utilityItemArmed = this.isPassiveUtilityItem(consumedItem) && this.utilityItemCharges > 0;
 
         if (this.utilityItemCharges <= 0) {
             this.clearUtilityItemState();
+            return true;
         }
 
+        this.saveUtilityItemSnapshot();
         return true;
     }
 
@@ -219,9 +239,8 @@ class Player {
             this.carriedUtilityItem === "Headphones" ||
             this.carriedUtilityItem === "Rain Boots"
         ) {
-            if (!this.utilityItemArmed) {
-                this.utilityItemArmed = true;
-            }
+            this.utilityItemArmed = true;
+            this.saveUtilityItemSnapshot();
             return true;
         }
 
@@ -282,9 +301,18 @@ class Player {
         return assets.backpackImg || null;
     }
 
+    getEquippedUtilityItemIcon() {
+        if (!this.hasUsableUtilityItem()) return null;
+        if (this.carriedUtilityItem === "Soft Gummy Vitamins") return assets.vitaminImg || null;
+        if (this.carriedUtilityItem === "Tangle") return assets.tangleImg || null;
+        if (this.carriedUtilityItem === "Headphones") return assets.headphoneImg || null;
+        if (this.carriedUtilityItem === "Rain Boots") return assets.rainbootImg || null;
+        return null;
+    }
+
     /**
      * Restores the carried utility item from the current run snapshot.
-     * Used by restart run so the player keeps the same item and remaining charges.
+     * Used by restart run so the player keeps the same item with fresh charges.
      */
     restoreUtilityItemFromRunSnapshot() {
         if (typeof gameState === "undefined" || !gameState) {
@@ -301,6 +329,7 @@ class Player {
         this.carriedUtilityItem = itemName;
         this.utilityItemCharges = this.getDefaultChargesForUtilityItem(itemName);
         this.utilityItemArmed = false;
+        this.saveUtilityItemSnapshot();
     }
 
     // ─── CORE UPDATE ─────────────────────────────────────────────────────────
@@ -367,6 +396,12 @@ class Player {
         if (this.speedBoostFramesRemaining > 0) this.speedBoostFramesRemaining--;
         if (this.invincibleFramesRemaining > 0) this.invincibleFramesRemaining--;
         if (this.hpLockFramesRemaining > 0) this.hpLockFramesRemaining--;
+
+        const hudTarget = (this.utilityItemArmed && this.hasUsableUtilityItem()) ? 1 : 0;
+        this.utilityHudSwapProgress = lerp(this.utilityHudSwapProgress, hudTarget, 0.18);
+        if (Math.abs(this.utilityHudSwapProgress - hudTarget) < 0.01) {
+            this.utilityHudSwapProgress = hudTarget;
+        }
     }
 
     // ─── MOVEMENT ────────────────────────────────────────────────────────────
@@ -643,33 +678,55 @@ class Player {
      * - Utility item equipped with charges left -> item icon
      */
     drawBackpackIcon(x, y) {
-        const plateD = 136;
-        const iconD  = 188;
+        const swap = constrain(this.utilityHudSwapProgress || 0, 0, 1);
+        const hasUtility = this.hasUsableUtilityItem() && !!this.getEquippedUtilityItemIcon();
+        const backpackImg = assets.backpackImg || null;
+        const utilityImg = this.getEquippedUtilityItemIcon();
+
+        const mainPlateD = lerp(136, 150, swap);
+        const secondaryPlateD = lerp(76, 84, swap);
+        const mainIconD = lerp(188, 202, swap);
+        const secondaryIconD = lerp(84, 92, swap);
+
+        const mainX = x;
+        const mainY = y;
+        const secondaryX = x + 52;
+        const secondaryY = y + 48;
+
+        const drawHudPlate = (cx, cy, plateD, iconImg, iconD, rotDeg, alpha = 255) => {
+            push();
+            ellipseMode(CENTER);
+            stroke(0, alpha);
+            strokeWeight(5);
+            fill(255, alpha);
+            circle(cx, cy, plateD);
+
+            if (iconImg) {
+                push();
+                tint(255, alpha);
+                imageMode(CENTER);
+                translate(cx, cy);
+                rotate(radians(rotDeg));
+                image(iconImg, 0, -8, iconD, iconD);
+                pop();
+                noTint();
+            }
+            pop();
+        };
 
         push();
-        ellipseMode(CENTER);
-        stroke(0);
-        strokeWeight(5);
-        fill(255);
-        circle(x, y, plateD);
-
-        const iconImg = this.getUtilityItemHudIcon();
-
-        if (iconImg) {
-            push();
-            imageMode(CENTER);
-            translate(x, y);
-            rotate(radians(-20));
-            image(iconImg, 0, -8, iconD, iconD);
+        if (!hasUtility) {
+            drawHudPlate(mainX, mainY, 136, backpackImg, 188, -20);
             pop();
-        } else {
-            noStroke();
-            fill(0);
-            textAlign(CENTER, CENTER);
-            textSize(32);
-            text("NO ICON", x, y);
+            return;
         }
 
+        const pulse = sin(frameCount * 0.18) * 0.04 * swap;
+
+        drawHudPlate(mainX, mainY, mainPlateD * (1 + pulse), backpackImg, mainIconD * (1 + pulse), -20, 255 * (1 - swap));
+        drawHudPlate(mainX, mainY, mainPlateD * (1 + pulse), utilityImg, mainIconD * (1 + pulse), -8, 255 * swap);
+        drawHudPlate(secondaryX, secondaryY, secondaryPlateD, utilityImg, secondaryIconD, -8, 230 * (1 - swap));
+        drawHudPlate(secondaryX, secondaryY, secondaryPlateD, backpackImg, secondaryIconD, -20, 230 * swap);
         pop();
     }
    

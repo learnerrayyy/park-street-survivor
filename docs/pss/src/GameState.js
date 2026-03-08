@@ -18,6 +18,8 @@ class GameState {
 
         // Current run utility-item snapshot (should survive restart run)
         this.runUtilityItemName = null;
+        this.runUtilityItemCharges = 0;
+        this.runUtilityItemArmed = false;
     }
 
     /**
@@ -84,8 +86,10 @@ class GameState {
     /**
      * Saves the current run's carried utility item so restart can restore it.
      */
-    saveRunUtilityItemSnapshot(itemName) {
+    saveRunUtilityItemSnapshot(itemName, charges = 0, armed = false) {
         this.runUtilityItemName = itemName || null;
+        this.runUtilityItemCharges = Number.isFinite(Number(charges)) ? Math.max(0, Number(charges)) : 0;
+        this.runUtilityItemArmed = !!armed;
     }
 
     /**
@@ -94,5 +98,7 @@ class GameState {
      */
     clearRunUtilityItemSnapshot() {
         this.runUtilityItemName = null;
+        this.runUtilityItemCharges = 0;
+        this.runUtilityItemArmed = false;
     }
 }

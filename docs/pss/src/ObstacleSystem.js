@@ -1380,6 +1380,34 @@ class ObstacleManager {
             typeof player.hasEmptyScooterBuffActive === "function" &&
             player.hasEmptyScooterBuffActive()
         );
+        const useRainBoots = !!(
+            config &&
+            config.effect === "puddleTrap" &&
+            player &&
+            typeof player.shouldTriggerRainBoots === "function" &&
+            typeof player.consumeArmedUtilityItem === "function" &&
+            player.shouldTriggerRainBoots()
+        );
+        const useHeadphones = !!(
+            config &&
+            config.effect === "leaflet" &&
+            player &&
+            typeof player.shouldTriggerHeadphones === "function" &&
+            typeof player.consumeArmedUtilityItem === "function" &&
+            player.shouldTriggerHeadphones()
+        );
+
+        if (useRainBoots) {
+            if (typeof feedbackLayer !== "undefined" && feedbackLayer &&
+                typeof feedbackLayer.requestSFX === "function") {
+                feedbackLayer.requestSFX("collision_generic", {
+                    type: obs.type,
+                    hasRainBoots: true
+                });
+            }
+            player.consumeArmedUtilityItem("Rain Boots");
+            return;
+        }
 
         if (hasScooterBuff && (obs.type === "PROMOTER" || obs.type === "HOMELESS")) {
             if (typeof feedbackLayer !== "undefined" && feedbackLayer &&
@@ -1464,27 +1492,10 @@ class ObstacleManager {
         }
 
         if (config.effect === "puddleTrap" && typeof player.applyPuddleTrap === "function") {
-            const useRainBoots =
-                player &&
-                typeof player.shouldTriggerRainBoots === "function" &&
-                typeof player.consumeArmedUtilityItem === "function" &&
-                player.shouldTriggerRainBoots();
-
-            if (useRainBoots) {
-                player.consumeArmedUtilityItem("Rain Boots");
-                return;
-            }
-
             player.applyPuddleTrap(config.escapePressRequired ?? 3, config.slowMultiplier ?? 0.72);
         }
 
         if (config.effect === "leaflet") {
-            const useHeadphones =
-                player &&
-                typeof player.shouldTriggerHeadphones === "function" &&
-                typeof player.consumeArmedUtilityItem === "function" &&
-                player.shouldTriggerHeadphones();
-
             if (useHeadphones) {
                 player.consumeArmedUtilityItem("Headphones");
                 this.firePromoterPaperBall(player);
@@ -1787,42 +1798,25 @@ class ObstacleManager {
         if (!playerRef) return;
         const cfg = obs.config || {};
 
+        const useTangle =
+            playerRef &&
+            typeof playerRef.shouldTriggerTangle === "function" &&
+            typeof playerRef.consumeArmedUtilityItem === "function" &&
+            playerRef.shouldTriggerTangle();
+
         if (obs.fantasyState === "DISGUISED") {
+            if (useTangle && this.isObstacleVisibleOnScreen(obs)) {
+                this.startFantasyCoffeeEscape(obs, cfg, playerRef);
+                playerRef.consumeArmedUtilityItem("Tangle");
+                return;
+            }
+
             const dx = playerRef.x - obs.x;
             const dy = playerRef.y - obs.y;
             const distance = Math.hypot(dx, dy);
             const triggerRadius = Math.max(1, Number(cfg.escapeTriggerRadius ?? 300));
             if (distance > triggerRadius) return;
-
-            const useTangle =
-                playerRef &&
-                typeof playerRef.shouldTriggerTangle === "function" &&
-                typeof playerRef.consumeArmedUtilityItem === "function" &&
-                playerRef.shouldTriggerTangle();
-
-            if (useTangle) {
-                playerRef.consumeArmedUtilityItem("Tangle");
-                this.removeObstacleInstance(obs);
-                return;
-            }
-
-            const startup = Math.max(0, Math.floor(Number(cfg.escapeStartupFrames ?? 12)));
-            obs.fantasyState = "STARTUP";
-            obs.escapeStartupFrames = startup;
-
-            const angleDeg = Number(cfg.escapeAngleDeg ?? 76);
-            const angleRad = angleDeg * Math.PI / 180;
-            const speed = Math.abs(Number(cfg.escapeSpeed ?? 3.4));
-            obs.escapeVx = speed * Math.cos(angleRad);
-            obs.escapeVy = speed * Math.sin(angleRad);
-            obs.spritePath = cfg.runSpriteSheet || obs.spritePath;
-
-            // Fantasy coffee SFX should trigger when it starts running (no collision event).
-            if (typeof feedbackLayer !== "undefined" && feedbackLayer &&
-                typeof feedbackLayer.requestSFX === "function") {
-                feedbackLayer.requestSFX("collision_generic", { type: "FANTASY_COFFEE" });
-            }
-
+            this.startFantasyCoffeeEscape(obs, cfg, playerRef);
             return;
         }
 
@@ -1845,6 +1839,36 @@ class ObstacleManager {
                 const frames = Math.max(1, Math.floor(Number(cfg.runSpriteFrames ?? 6)));
                 obs.runFrame = ((obs.runFrame || 0) + 1) % frames;
             }
+        }
+    }
+
+    isObstacleVisibleOnScreen(obs) {
+        if (!obs) return false;
+        const halfW = Number(obs.width || 0) * 0.5;
+        const halfH = Number(obs.height || 0) * 0.5;
+        return obs.x + halfW >= 0 &&
+               obs.x - halfW <= width &&
+               obs.y + halfH >= 0 &&
+               obs.y - halfH <= height;
+    }
+
+    startFantasyCoffeeEscape(obs, cfg) {
+        if (!obs) return;
+        const startup = Math.max(0, Math.floor(Number(cfg.escapeStartupFrames ?? 12)));
+        obs.fantasyState = "STARTUP";
+        obs.escapeStartupFrames = startup;
+
+        const angleDeg = Number(cfg.escapeAngleDeg ?? 76);
+        const angleRad = angleDeg * Math.PI / 180;
+        const speed = Math.abs(Number(cfg.escapeSpeed ?? 3.4));
+        obs.escapeVx = speed * Math.cos(angleRad);
+        obs.escapeVy = speed * Math.sin(angleRad);
+        obs.spritePath = cfg.runSpriteSheet || obs.spritePath;
+
+        // Fantasy coffee SFX should trigger when it starts running (no collision event).
+        if (typeof feedbackLayer !== "undefined" && feedbackLayer &&
+            typeof feedbackLayer.requestSFX === "function") {
+            feedbackLayer.requestSFX("collision_generic", { type: "FANTASY_COFFEE" });
         }
     }
 

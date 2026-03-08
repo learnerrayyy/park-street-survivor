@@ -83,72 +83,34 @@ class LevelController {
       console.log(`[LevelController] Loading backgrounds for Day ${dayID}`);
 
       try {
-         const dayBackgrounds = {
-            1: {
-               run: [
-                  "assets/background/bg_sunny/bg_sunny_A.png",
-                  "assets/background/bg_sunny/bg_sunny_B.png",
-                  "assets/background/bg_sunny/bg_sunny_C.png"
-               ],
-               destination: "assets/background/bg_sunny/bg_sunny_destination.png"
-            },
-            2: {
-               run: [
-                  "assets/background/bg_sunny/bg_sunny_A.png",
-                  "assets/background/bg_sunny/bg_sunny_B.png",
-                  "assets/background/bg_sunny/bg_sunny_C.png"
-               ],
-               destination: "assets/background/bg_sunny/bg_sunny_destination.png"
-            },
-            3: {
-               run: [
-                  "assets/background/bg_sunny/bg_sunny_A.png",
-                  "assets/background/bg_sunny/bg_sunny_B.png",
-                  "assets/background/bg_sunny/bg_sunny_C.png"
-               ],
-               destination: "assets/background/bg_sunny/bg_sunny_destination.png"
-            },
-            4: {
-               run: [
-                  "assets/background/bg_light_rain/bg_light_rain_A.png",
-                  "assets/background/bg_light_rain/bg_light_rain_B.png",
-                  "assets/background/bg_light_rain/bg_light_rain_C.png"
-               ],
-               destination: "assets/background/bg_light_rain/bg_light_rain_destination.png"
-            },
-            5: {
-               run: [
-                  "assets/background/bg_heavy_rain/bg_heavy_rain_A.png",
-                  "assets/background/bg_heavy_rain/bg_heavy_rain_B.png",
-                  "assets/background/bg_heavy_rain/bg_heavy_rain_C.png"
-               ],
-               destination: "assets/background/bg_heavy_rain/bg_heavy_rain_destination.png"
-            }
+         const backgroundThemeByDay = {
+            1: "sunny",
+            2: "sunny",
+            3: "sunny",
+            4: "lightRain",
+            5: "heavyRain"
          };
-         const selectedBackground = dayBackgrounds[dayID] || dayBackgrounds[1];
+         const themeKey = backgroundThemeByDay[dayID] || "sunny";
+         const preloadedRunTiles =
+            assets && assets.runBackgrounds && Array.isArray(assets.runBackgrounds[themeKey])
+               ? assets.runBackgrounds[themeKey].filter(Boolean)
+               : [];
+         const preloadedDestination =
+            assets && assets.destinationBackgrounds
+               ? (assets.destinationBackgrounds[themeKey] || null)
+               : null;
 
-         // Load running background cycle (A/B/C). Keep current scroll logic unchanged;
-         // only tile image source varies.
-         const shuffledRunPaths = [...selectedBackground.run].sort(() => Math.random() - 0.5);
-         env.defaultBgCycle = [];
+         env.defaultBgCycle = [...preloadedRunTiles].sort(() => Math.random() - 0.5);
          env.defaultBgHeadIndex = 0;
-         for (const p of shuffledRunPaths) {
-            const img = loadImage(
-               p,
-               () => console.log(`[LevelController] ✓ Loaded run tile: ${p}`),
-               () => console.warn(`[LevelController] ✗ Failed to load run tile: ${p}`)
-            );
-            env.defaultBgCycle.push(img);
-         }
          env.defaultBg = env.defaultBgCycle[0] || null;
+         env.destinationBg = preloadedDestination;
 
-         // Load destination/victory background
-         const destinationBgPath = selectedBackground.destination;
-
-         env.destinationBg = loadImage(destinationBgPath,
-            () => console.log(`[LevelController] ✓ Loaded destination background: ${destinationBgPath}`),
-            () => console.warn(`[LevelController] ✗ Failed to load: ${destinationBgPath}`)
-         );
+         if (!env.defaultBg) {
+            console.warn(`[LevelController] Missing preloaded run backgrounds for theme "${themeKey}"`);
+         }
+         if (!env.destinationBg) {
+            console.warn(`[LevelController] Missing preloaded destination background for theme "${themeKey}"`);
+         }
       } catch (error) {
          console.error(`[LevelController] Error loading backgrounds: ${error}`);
       }

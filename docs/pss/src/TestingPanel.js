@@ -137,16 +137,21 @@ function devToggle() {
 
 /**
  * Drops the game directly into the Room scene for layout and interaction testing.
- * Call from the browser console: setupRoomTestMode()
+ * @param {number} dayOverride Optional day ID override.
+ * Call from the browser console: setupRoomTestMode() or setupRoomTestMode(4)
  */
-function setupRoomTestMode() {
-    console.log("[DEV] Entering ROOM directly");
+function setupRoomTestMode(dayOverride) {
+    const dayID = Number.isFinite(Number(dayOverride)) ? Number(dayOverride) : DEBUG_DAY_ID;
+    console.log(`[DEV] Entering ROOM directly (Day ${dayID})`);
+    currentDayID = dayID;
+    if (player) player.applyLevelStats(dayID);
     gameState.currentState = STATE_ROOM;
     if (player) {
         player.x = DEBUG_PLAYER_X;
         player.y = DEBUG_PLAYER_Y;
     }
     if (roomScene) roomScene.reset();
+    if (backpackUI) backpackUI.resetForNewDay();
 }
 
 /**
@@ -227,7 +232,7 @@ function devApplyStartupSkip() {
     }
 
     if (DEBUG_START_STATE === STATE_ROOM) {
-        setupRoomTestMode();
+        setupRoomTestMode(DEBUG_DAY_ID);
     } else if (DEBUG_START_STATE === STATE_DAY_RUN) {
         setupRunTestMode();
     } else if (DEBUG_START_STATE === STATE_INVENTORY) {
@@ -1103,7 +1108,7 @@ class TestingPanel {
         }
 
         if (actionId === "goto_room") {
-            if (typeof setupRoomTestMode === "function") setupRoomTestMode();
+            if (typeof setupRoomTestMode === "function") setupRoomTestMode(this.selectedDay);
             return;
         }
 
@@ -1174,6 +1179,10 @@ class TestingPanel {
         if (roomMatch) {
             const day = parseInt(roomMatch[1]);
             this.visible = false;
+            currentDayID = day;
+            if (typeof player !== "undefined" && player) player.applyLevelStats(day);
+            if (typeof roomScene !== "undefined" && roomScene) roomScene.reset();
+            if (typeof backpackUI !== "undefined" && backpackUI) backpackUI.resetForNewDay();
             if (typeof triggerTransition === "function" && typeof startCutscene === "function"
                 && typeof CS_DAY_ROOM !== 'undefined' && CS_DAY_ROOM[day]) {
                 triggerTransition(() => startCutscene('room', CS_DAY_ROOM[day], () => {

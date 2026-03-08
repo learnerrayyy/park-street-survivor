@@ -47,6 +47,16 @@ let assets = {
         unlock: null,
         lock: null
     },
+    runBackgrounds: {
+        sunny: [],
+        lightRain: [],
+        heavyRain: []
+    },
+    destinationBackgrounds: {
+        sunny: null,
+        lightRain: null,
+        heavyRain: null
+    },
     previews: [],
     tutorialSlides: [],
     playerAnim: {
@@ -488,6 +498,27 @@ function preload() {
 
     assets.selectBg.unlock = loadImage('assets/select_background/day_unlock.jpg', itemLoaded);
     assets.selectBg.lock = loadImage('assets/select_background/day_lock.jpg', itemLoaded);
+
+    assets.runBackgrounds.sunny = [
+        loadImage('assets/background/bg_sunny/bg_sunny_A.png', itemLoaded),
+        loadImage('assets/background/bg_sunny/bg_sunny_B.png', itemLoaded),
+        loadImage('assets/background/bg_sunny/bg_sunny_C.png', itemLoaded)
+    ];
+    assets.destinationBackgrounds.sunny = loadImage('assets/background/bg_sunny/bg_sunny_destination.png', itemLoaded);
+
+    assets.runBackgrounds.lightRain = [
+        loadImage('assets/background/bg_light_rain/bg_light_rain_A.png', itemLoaded),
+        loadImage('assets/background/bg_light_rain/bg_light_rain_B.png', itemLoaded),
+        loadImage('assets/background/bg_light_rain/bg_light_rain_C.png', itemLoaded)
+    ];
+    assets.destinationBackgrounds.lightRain = loadImage('assets/background/bg_light_rain/bg_light_rain_destination.png', itemLoaded);
+
+    assets.runBackgrounds.heavyRain = [
+        loadImage('assets/background/bg_heavy_rain/bg_heavy_rain_A.png', itemLoaded),
+        loadImage('assets/background/bg_heavy_rain/bg_heavy_rain_B.png', itemLoaded),
+        loadImage('assets/background/bg_heavy_rain/bg_heavy_rain_C.png', itemLoaded)
+    ];
+    assets.destinationBackgrounds.heavyRain = loadImage('assets/background/bg_heavy_rain/bg_heavy_rain_destination.png', itemLoaded);
 
     for (let i = 1; i <= 5; i++) {
         assets.selectClouds.push(loadImage(`assets/select_cloud/Cloud-${i}.png`, itemLoaded));

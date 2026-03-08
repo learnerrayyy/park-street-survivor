@@ -111,6 +111,8 @@ class Environment {
                 // Seamless scrolling with two tiles (cycle selection does not change scroll math)
                 image(bgA, 0, scrollY);
                 image(bgB, 0, scrollY - bgHeight);
+            } else {
+                this.displayFallbackRoad(this.colors);
             }
         }
         else if (levelPhase === "VICTORY_TRANSITION") {
@@ -126,6 +128,8 @@ class Environment {
                 // Continue scrolling the default background normally
                 image(bgA, 0, scrollY);
                 image(bgB, 0, scrollY - bgHeight);
+            } else {
+                this.displayFallbackRoad(this.colors);
             }
 
             if (destinationBg) {
@@ -160,33 +164,34 @@ class Environment {
                     image(destinationBg, 0, victoryY + bgHeight);
                 }
                 this.drawVictoryCatchupText(0, false);
+            } else {
+                this.displayFallbackRoad(this.victoryColors);
             }
         }
         else {
             // FALLBACK: Render colored rectangles if images aren't loaded
             console.warn("[Environment] Background images not loaded, using fallback colors");
-            noStroke();
-            rectMode(CORNER);
-
             const colors = (levelPhase === "RUNNING") ? this.colors : this.victoryColors;
-
-            // 1. LAYER: SCENERY (The outer "2" zones - 500px each)
-            fill(colors.scenery);
-            rect(0, 0, this.layout.sceneryW, height);
-            rect(1420, 0, this.layout.sceneryW, height);
-
-            // 2. LAYER: SIDEWALKS (The middle "2" zones - 200px each)
-            fill(colors.sidewalk);
-            rect(500, 0, this.layout.sidewalkW, height);
-            rect(1220, 0, this.layout.sidewalkW, height);
-
-            // 3. LAYER: ROAD (The inner "2" zones - 260px lanes, 520px total)
-            fill(colors.road);
-            rect(this.layout.roadStart, 0, this.layout.laneW * 2, height);
-
-            // 4. LAYER: CENTER LINE DIVIDER
-            this.drawCenterLine(colors);
+            this.displayFallbackRoad(colors);
         }
+    }
+
+    displayFallbackRoad(colors = this.colors) {
+        noStroke();
+        rectMode(CORNER);
+
+        fill(colors.scenery);
+        rect(0, 0, this.layout.sceneryW, height);
+        rect(1420, 0, this.layout.sceneryW, height);
+
+        fill(colors.sidewalk);
+        rect(500, 0, this.layout.sidewalkW, height);
+        rect(1220, 0, this.layout.sidewalkW, height);
+
+        fill(colors.road);
+        rect(this.layout.roadStart, 0, this.layout.laneW * 2, height);
+
+        this.drawCenterLine(colors);
     }
 
     /**
