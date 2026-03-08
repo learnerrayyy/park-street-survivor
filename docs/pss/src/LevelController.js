@@ -104,6 +104,9 @@ class LevelController {
          env.defaultBgHeadIndex = 0;
          env.defaultBg = env.defaultBgCycle[0] || null;
          env.destinationBg = preloadedDestination;
+         if (env && typeof env.configureWeather === "function") {
+            env.configureWeather(themeKey);
+         }
 
          if (!env.defaultBg) {
             console.warn(`[LevelController] Missing preloaded run backgrounds for theme "${themeKey}"`);
