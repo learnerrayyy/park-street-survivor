@@ -131,7 +131,7 @@ const PLAYER_DEFAULTS = {
  */
 const DAYS_CONFIG = {
     1: {
-        description: "Monday, So good to enjoy the sun day!",
+        description: "1",
         totalDistance: 1000,
         // Deprecated: obstacleSpawnInterval is not consumed by current spawn logic.
         // obstacleSpawnInterval: 60,
@@ -155,7 +155,7 @@ const DAYS_CONFIG = {
         type: "NORMAL"
     },
     2: {
-        description: "Tuesday, Keep the momentum going!",
+        description: "2",
         totalDistance: 1500,
         // Deprecated: obstacleSpawnInterval is not consumed by current spawn logic.
         // obstacleSpawnInterval: 60,
@@ -179,7 +179,7 @@ const DAYS_CONFIG = {
         type: "NORMAL"
     },
     3: {
-        description: "Wednesday, Midweek Rush!",
+        description: "3",
         totalDistance: 2500,
         // Deprecated: obstacleSpawnInterval is not consumed by current spawn logic.
         // obstacleSpawnInterval: 60,
@@ -212,7 +212,7 @@ const DAYS_CONFIG = {
         type: "NORMAL"
     },
     4: {
-        description: "Thursday, It drizzled a little today—like every day I can’t stand.",
+        description: "4",
         totalDistance: 4500,
         // Deprecated: obstacleSpawnInterval is not consumed by current spawn logic.
         // obstacleSpawnInterval: 60,
@@ -236,7 +236,7 @@ const DAYS_CONFIG = {
         type: "NORMAL"
     },
     5: {
-        description: "Friday, The start or the end?",
+        description: "5",
         totalDistance: 5500,
         // Deprecated: obstacleSpawnInterval is not consumed by current spawn logic.
         // obstacleSpawnInterval: 60,
