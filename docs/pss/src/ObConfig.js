@@ -133,7 +133,7 @@ const OBSTACLE_CONFIG = {
          5: "people don't want to look at the weak, because it remind them of their own weakness, but they don't get is that when someone struggling, it's means she's strong, he's strong, because the weak don't struggling, they just die."
       },
       bubbleOffsetX: 0,      // Horizontal offset relative to homeless X (pixels)
-      bubbleTextSize: 14,    // Speech bubble font size
+      bubbleTextSize: 35,    // Speech bubble font size
 
       // Generation constraints
       allowedLanes: [1, 4], // Only on the edges of the sidewalk

@@ -363,7 +363,7 @@ class TestingPanel {
     initializeHomelessDebugFields() {
         if (!OBSTACLE_CONFIG.HOMELESS) return;
         if (OBSTACLE_CONFIG.HOMELESS.bubbleOffsetX === undefined) OBSTACLE_CONFIG.HOMELESS.bubbleOffsetX = 0;
-        if (OBSTACLE_CONFIG.HOMELESS.bubbleTextSize === undefined) OBSTACLE_CONFIG.HOMELESS.bubbleTextSize = 14;
+        if (OBSTACLE_CONFIG.HOMELESS.bubbleTextSize === undefined) OBSTACLE_CONFIG.HOMELESS.bubbleTextSize = 18;
     }
 
     toggle() {

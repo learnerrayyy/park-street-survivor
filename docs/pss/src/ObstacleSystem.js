@@ -1259,14 +1259,15 @@ class ObstacleManager {
         // ── Image dimensions (510×200 source, displayed at fixed scale) ──────
         const IMG_W      = 300;
         const IMG_H      = Math.round(IMG_W * (200 / 510)); // ≈ 118
-        // Tail tip sits at roughly (80, 200) in source → (47, IMG_H) in display
-        const TAIL_TIP_X = Math.round(IMG_W * (80 / 510));  // ≈ 47 from left
+        // Bias the bubble closer to center so it reads as attached to the character,
+        // not hanging too far to one side.
+        const TAIL_TIP_X = Math.round(IMG_W * 0.42);
         const BODY_FRAC  = 0.78;   // main body occupies top 78 % of the image
         const PAD_X      = Math.round(IMG_W * 0.07);        // ≈ 21
         const PAD_Y      = Math.round(IMG_H * 0.10);        // ≈ 12
 
         const cfg          = (obs && obs.config) || {};
-        const bubbleTextSize = Math.max(10, Number(cfg.bubbleTextSize || 14));
+        const bubbleTextSize = Math.max(12, Number(cfg.bubbleTextSize || 18));
         const headY        = obs.y - obs.height / 2;
         const bubbleGap    = 6;
 
@@ -1299,17 +1300,18 @@ class ObstacleManager {
         // Draw text inside the content area (body only, above the tail)
         const textMaxW = IMG_W - PAD_X * 2;
         const lines    = this.wrapTextToWidth(textContent, textMaxW);
-        const lineH    = Math.round(bubbleTextSize * 1.35);
+        const lineH    = Math.round(bubbleTextSize * 1.42);
         textAlign(LEFT, TOP);
         textStyle(BOLD);
         textSize(bubbleTextSize);
-        fill(25, 25, 35);
-        noStroke();
+        fill(20, 20, 28);
+        stroke(255, 245, 235, 150);
+        strokeWeight(1.4);
         for (let i = 0; i < lines.length; i++) {
             const tx = imgX + PAD_X;
             const ty = imgY + PAD_Y + i * lineH;
             text(lines[i], tx, ty);
-            text(lines[i], tx + 0.8, ty);
+            text(lines[i], tx + 1.0, ty);
         }
     }
 
@@ -1318,13 +1320,13 @@ class ObstacleManager {
         // Matches the fixed-size image layout used in displayHomelessDialogueBubble.
         const IMG_W      = 300;
         const IMG_H      = Math.round(IMG_W * (200 / 510)); // ≈ 118
-        const TAIL_TIP_X = Math.round(IMG_W * (80 / 510));  // ≈ 47
+        const TAIL_TIP_X = Math.round(IMG_W * 0.42);
         const BODY_FRAC  = 0.78;
         const PAD_X      = Math.round(IMG_W * 0.07);
         const PAD_Y      = Math.round(IMG_H * 0.10);
 
         const cfg          = (obs && obs.config) || {};
-        const bubbleTextSize = Math.max(10, Number(cfg.bubbleTextSize || 14));
+        const bubbleTextSize = Math.max(12, Number(cfg.bubbleTextSize || 18));
         const headY        = obs.y - obs.height / 2;
         const bubbleGap    = 6;
 
@@ -1334,7 +1336,7 @@ class ObstacleManager {
         // No clamp: matches the render guard so hitbox is only active when bubble is visible.
 
         const bodyH    = Math.round(IMG_H * BODY_FRAC);
-        const lineH    = Math.round(bubbleTextSize * 1.35);
+        const lineH    = Math.round(bubbleTextSize * 1.42);
         const textMaxW = IMG_W - PAD_X * 2;
         const lines    = this.wrapTextToWidth(textContent, textMaxW);
 
