@@ -106,8 +106,8 @@ const BGM = (() => {
             return 'TimeRoom';
         }
 
-        // 3) Day run -> by day id (1-2 / 3-4 / 5)
-        if (state === STATE_DAY_RUN) {
+        // 3) Day run + tutorial slides -> by day id (1-2 / 3-4 / 5)
+        if (state === STATE_DAY_RUN || state === STATE_TUTORIAL_SLIDES) {
             const day = (typeof currentDayID === 'number') ? currentDayID : 1;
             if (day <= 2) return 'Level12';
             if (day <= 4) return 'Level34';
