@@ -15,8 +15,8 @@ class MainMenu {
         this.setupButtons();
 
         this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => this.handleBackAction());
-        this.bgmSlider = new UISlider(width / 2, height / 2 - 80, 480, 0, 1, masterVolumeBGM, "MUSIC VOLUME");
-        this.sfxSlider = new UISlider(width / 2, height / 2 + 100, 480, 0, 1, masterVolumeSFX, "SOUND EFFECTS");
+        this.bgmSlider = new UISlider(width / 2 - 43, height / 2 - 80, 480, 0, 1, masterVolumeBGM, "MUSIC VOLUME");
+        this.sfxSlider = new UISlider(width / 2 - 43, height / 2 + 100, 480, 0, 1, masterVolumeSFX, "SOUND EFFECTS");
 
         // Difficulty selector state (kept for save-system compatibility)
         this.difficultyIndex = gameDifficulty;  // 0=EASY, 1=NORMAL, 2=HARD
@@ -41,7 +41,7 @@ class MainMenu {
             { id: 'move_combo', a: "MOVEMENT", d: "WASD or Arrows to navigate." },
             { id: 'enter', a: "NEXT PAGE", d: "Cycle through system intel." },
             { id: 'space', a: "PARKOUR", d: "Interact during the run." },
-            { id: 'e', a: "INTERACT", d: "Talk to NPCs or use items." },
+            { id: 'e', a: "INTERACT", d: "Interact with objects." },
             { id: 'p', a: "PAUSE", d: "Freeze time & system menu." }
         ];
         // Character index for the wiki sub-navigation (page 1)
@@ -813,7 +813,7 @@ class MainMenu {
                 this.bgmSlider.handlePress(mx, my);
                 this.sfxSlider.handlePress(mx, my);
 
-                let iconXOffset = 260;
+                let iconXOffset = 300;
                 let hitR = 28;
 
                 // Check Music mute toggle click

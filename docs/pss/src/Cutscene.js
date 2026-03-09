@@ -54,11 +54,10 @@ let _endingTimer    = 0;
 let _onEndingDone   = null;
 let _csLastSyncIndex = -1;   // tracks last index synced to _csBox to avoid re-triggering
 
-// ─── ITEM RECEIVED TOAST ────────────────────────────────────────────────────
-// A small top-right popup shown when an NPC gives the player an item.
-// Triggered by an `onShow: { type: 'item_received', name: '...' }` field
-// on any dialogue line in dialogue_data.js.
-// Example usage: { speaker: 'WIOLA', text: '...', onShow: { type: 'item_received', name: 'VITAMIN GUMMIES' } }
+// ─── ITEM RECEIVED NOTICE BOX ───────────────────────────────────────────────
+// Uses assets/dialogue/notice_box.png (520×150 px, design space x:1400 y:100).
+// Light-purple item frame inside the image: 104×112 px.
+// Triggered by an `onShow: { type: 'item_received', name: '...' }` field.
 let _itemToast = { active: false, name: '', timer: 0, alpha: 0 };
 const _ITEM_TOAST_DURATION = 210; // frames (~3.5 s at 60 fps)
 const _ITEM_TOAST_FADE_IN  = 20;
@@ -71,12 +70,22 @@ function _showItemToast(name) {
     _itemToast.alpha  = 0;
 }
 
+/** Maps a display name string to the matching inventory item image. */
+function _getItemImage(displayName) {
+    if (!displayName || typeof assets === 'undefined') return null;
+    const n = String(displayName).toUpperCase();
+    if (n.includes('VITAMIN') || n.includes('GUMM'))  return assets.vitaminImg   || null;
+    if (n.includes('TANGLE'))                          return assets.tangleImg    || null;
+    if (n.includes('HEADPHONE'))                       return assets.headphoneImg || null;
+    return null;
+}
+
 function _drawItemToast() {
     if (!_itemToast.active) return;
     _itemToast.timer--;
     if (_itemToast.timer <= 0) { _itemToast.active = false; return; }
 
-    // Alpha: fade in, hold, fade out
+    // Alpha: fade in → hold → fade out
     const t = _itemToast.timer;
     if (t > _ITEM_TOAST_DURATION - _ITEM_TOAST_FADE_IN) {
         _itemToast.alpha = map(t, _ITEM_TOAST_DURATION, _ITEM_TOAST_DURATION - _ITEM_TOAST_FADE_IN, 0, 255);
@@ -86,47 +95,75 @@ function _drawItemToast() {
         _itemToast.alpha = 255;
     }
 
-    const s   = min(width / 1920, height / 1080);
-    const a   = _itemToast.alpha;
-    const pad = 22 * s;
-    const toastW = 380 * s;
-    const toastH = 90 * s;
-    const toastX = width - toastW - 32 * s;
-    const toastY = 28 * s;
+    const s = min(width / 1920, height / 1080);
+    const a = _itemToast.alpha;
+
+    // ── Design-space layout (spec: 520×150 px at x:1400, y:100) ──────────────
+    // Item frame (light purple, 104×112) is inset on the left of the notice box.
+    const BOX_X  = 1400 * s;
+    const BOX_Y  = 100  * s;
+    const BOX_W  = 520  * s;
+    const BOX_H  = 150  * s;
+    // Frame inset: 18 px left margin, vertically centred → top at (150-112)/2=19 px
+    const FRM_X  = (1400 + 18) * s;
+    const FRM_Y  = (100  + 19) * s;
+    const FRM_W  = 104  * s;
+    const FRM_H  = 112  * s;
+    const FRM_CX = FRM_X + FRM_W * 0.5;
+    const FRM_CY = FRM_Y + FRM_H * 0.5;
+    // Text area starts right of the frame
+    const TXT_X  = FRM_X + FRM_W + 16 * s;
+    const TXT_CY = BOX_Y + BOX_H * 0.5;
 
     push();
-    rectMode(CORNER);
+    imageMode(CORNER);
 
-    // Shadow
-    noStroke();
-    fill(0, 0, 0, a * 0.45);
-    rect(toastX + 4 * s, toastY + 4 * s, toastW, toastH, 12 * s);
+    // Notice box background image
+    if (typeof assets !== 'undefined' && assets.noticeBox) {
+        tint(255, a);
+        image(assets.noticeBox, BOX_X, BOX_Y, BOX_W, BOX_H);
+        noTint();
+    } else {
+        // Fallback: plain rect
+        noStroke();
+        fill(15, 8, 42, a * 0.92);
+        rect(BOX_X, BOX_Y, BOX_W, BOX_H, 12 * s);
+        noFill();
+        stroke(255, 200, 60, a * 0.85);
+        strokeWeight(1.8 * s);
+        rect(BOX_X, BOX_Y, BOX_W, BOX_H, 12 * s);
+    }
 
-    // Background
-    fill(15, 8, 42, a * 0.92);
-    rect(toastX, toastY, toastW, toastH, 12 * s);
-
-    // Gold border
-    noFill();
-    stroke(255, 200, 60, a * 0.85);
-    strokeWeight(1.8 * s);
-    rect(toastX, toastY, toastW, toastH, 12 * s);
+    // Item image — centred inside the frame, scaled to fit with padding
+    const itemImg = _getItemImage(_itemToast.name);
+    if (itemImg) {
+        const pad    = 10 * s;
+        const maxW   = FRM_W - pad * 2;
+        const maxH   = FRM_H - pad * 2;
+        const ratio  = min(maxW / itemImg.width, maxH / itemImg.height);
+        const iW     = itemImg.width  * ratio;
+        const iH     = itemImg.height * ratio;
+        imageMode(CENTER);
+        tint(255, a);
+        image(itemImg, FRM_CX, FRM_CY, iW, iH);
+        noTint();
+    }
 
     // "Received" label
     noStroke();
-    let fT = (typeof fonts !== 'undefined') ? (fonts.body || fonts.title) : null;
-    if (fT) textFont(fT);
-    textSize(18 * s);
+    imageMode(CORNER);
+    let fDB = (typeof fonts !== 'undefined') ? (fonts.jersey20 || fonts.dialogueBlue || fonts.body || fonts.title) : null;
+    if (fDB) textFont(fDB);
+    textSize(20 * s);
     textAlign(LEFT, CENTER);
     fill(180, 165, 220, a);
-    text("Received", toastX + pad, toastY + toastH * 0.35);
+    text("Received", TXT_X, TXT_CY - 18 * s);
 
     // Item name in gold
-    let fN = (typeof fonts !== 'undefined') ? (fonts.time || fonts.body) : null;
-    if (fN) textFont(fN);
+    if (fDB) textFont(fDB);
     textSize(28 * s);
     fill(255, 215, 0, a);
-    text("\u300C" + _itemToast.name + "\u300D", toastX + pad, toastY + toastH * 0.68);
+    text("\u300C" + _itemToast.name + "\u300D", TXT_X, TXT_CY + 14 * s);
 
     pop();
 }
@@ -323,21 +360,7 @@ function drawCutsceneScreen() {
         }
         _csBox.display();
 
-        // "Click to continue" prompt — visible once typing finishes.
-        // Hidden on the last line when choices are about to appear.
-        let isLastWithChoices = (
-            _cs.index === _cs.lines.length - 1 &&
-            _cs.choices && _cs.choices.length > 0
-        );
-        if (_csBox.isFinishedTyping() && !isLastWithChoices) {
-            let fB = (typeof fonts !== 'undefined' && fonts.body) ? fonts.body : null;
-            if (fB) textFont(fB);
-            textSize(16 * s);
-            textAlign(RIGHT, BOTTOM);
-            noStroke();
-            fill(160, 148, 115, 160 + sin(frameCount * 0.1) * 55);
-            text('Click to continue', width - 28 * s, height - 18 * s);
-        }
+        // "CLICK TO CONTINUE" is now rendered inside DialogueBox below the arrow indicator.
 
     } else {
         // Show the last line in the box (still visible), overlay choice buttons

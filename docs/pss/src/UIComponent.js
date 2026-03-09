@@ -810,13 +810,13 @@ class UISlider {
         rect(0, 0, this.knobSize, this.knobSize + 10, 5);
         pop();
 
-        // Percentage text — larger for legibility
+        // Percentage text
         textFont(fonts.time);
         textAlign(CENTER, CENTER);
         stroke(0, 0, 0, 160);
         strokeWeight(3);
         fill(255, 215, 0);
-        textSize(48);
+        textSize(30);
         text(floor(this.value * 100) + "%", sliderX, this.y + 50);
         noStroke();
         fill(255, 215, 0);

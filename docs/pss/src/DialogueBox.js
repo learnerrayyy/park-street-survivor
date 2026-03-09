@@ -202,7 +202,7 @@ class DialogueBox {
 
             // Strip punctuation for matching but keep original word for display
             const clean = w.toLowerCase().replace(/[.,!?…:;'"]/g, '');
-            fill(hlWords.has(clean) ? color(255, 215, 0) : color(255));
+            fill(hlWords.has(clean) ? color(255, 60, 60) : color(255));
             text(w, cx, cy);
             cx += wW + spW;
         }
@@ -277,14 +277,14 @@ class DialogueBox {
             frame: { x: 35, y: 722, w: 320, h: 320 },
             name: { xPortrait: 400, xNarrative: 100, y: 722, minW: 172, h: 65, cap: 13 },
             text: {
-                xPortrait: 393,
+                xPortrait: 400,
                 yPortrait: 814,
-                xNarrative: 92,
+                xNarrative: 100,
                 yNarrative: 813,
                 rightPad: 92,
                 bottomPad: 24
             },
-            triangle: { x: 1768, y: 989, w: 50, h: 35, amp: 10, speed: 0.06 }
+            triangle: { x: 1814, y: 989, w: 50, h: 35, amp: 10, speed: 0.06 }
         };
 
         const hasPortrait = this.hasRenderablePortrait(this.portraitImg);
@@ -334,7 +334,7 @@ class DialogueBox {
             text(this.speakerName, tagX + tagW * 0.5, tagY + tagH * 0.5);
         }
 
-        // Character portrait (masked), then portrait frame image on top
+        // Portrait frame first, then character portrait on top (portrait must be topmost layer)
         imageMode(CORNER);
         if (hasPortrait) {
             const frameX = UI.frame.x * s;
@@ -342,15 +342,6 @@ class DialogueBox {
             const frameW = UI.frame.w * s;
             const frameH = UI.frame.h * s;
             const maskInset = 8 * s;
-
-            this.drawPortraitMasked(
-                this.portraitImg,
-                frameX + maskInset,
-                frameY + maskInset,
-                frameW - maskInset * 2,
-                frameH - maskInset * 2,
-                40 * s
-            );
 
             if (typeof assets !== 'undefined' && assets.dialogueFrameBox) {
                 image(assets.dialogueFrameBox, frameX, frameY, frameW, frameH);
@@ -360,13 +351,22 @@ class DialogueBox {
                 strokeWeight(2 * s);
                 rect(frameX, frameY, frameW, frameH, 40 * s);
             }
+
+            this.drawPortraitMasked(
+                this.portraitImg,
+                frameX + maskInset,
+                frameY + maskInset,
+                frameW - maskInset * 2,
+                frameH - maskInset * 2,
+                40 * s
+            );
         }
 
         // Dialogue text — use word-by-word highlight render when done typing
         let fB = (typeof fonts !== 'undefined') ? (fonts.jersey20 || fonts.dialogueBlue || fonts.body || fonts.title) : null;
         if (fB) textFont(fB);
-        textSize(45 * s);
-        textLeading(45 * s);
+        textSize(58 * s);
+        textLeading(58 * s);
         noStroke();
         textAlign(LEFT, TOP);
         if (this.highlight && this.highlight.size > 0 && this.isFinishedTyping()) {

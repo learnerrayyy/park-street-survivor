@@ -57,6 +57,13 @@ class RoomScene {
         this._roomBgScale = null;
         this._roomTopY = null; // derived from roomBg scale, also cached
 
+        // Tutorial state tracking
+        this._uiIntroLastStep = -1;
+        this._backpackIdleTimer = 0;
+        this._backpackIdleTriggered = false;
+        this._doorIdleTimer = 0;
+        this._doorIdleTriggered = false;
+
         // Back arrow button — returns to level select
         this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => {
             triggerTransition(() => {
@@ -84,6 +91,11 @@ class RoomScene {
         this.doorBlockTimer = 0;
         this.doorBlockMessage = "";
         this.dialogueBox.reset();
+        this._uiIntroLastStep = -1;
+        this._backpackIdleTimer = 0;
+        this._backpackIdleTriggered = false;
+        this._doorIdleTimer = 0;
+        this._doorIdleTriggered = false;
     }
 
     // ─── COLLISION ───────────────────────────────────────────────────────────
@@ -164,13 +176,15 @@ class RoomScene {
             if (typeof tutorialHints !== 'undefined' &&
                 tutorialHints.roomPhase !== 'DOOR' &&
                 tutorialHints.roomPhase !== 'DONE') {
-                this.triggerDialog("I should finish getting ready first.");
+                this.dialogueBox.persistent = true;
+                this.dialogueBox.trigger("I should get ready first — I still need to sort out my bag!", null, "IRIS");
                 return;
             }
             // Check required items before leaving
             if (typeof backpackUI !== 'undefined' && backpackUI && !backpackUI.hasRequiredItems()) {
                 let missing = backpackUI.getMissingRequiredItems();
-                this.triggerDialog("I haven't packed my bag yet.");
+                this.dialogueBox.persistent = true;
+                this.dialogueBox.trigger("I can't leave without my " + missing.join(" and ") + "! I need to pack them first.", null, "IRIS");
                 console.log("[RoomScene] Exit blocked — missing: " + missing.join(", "));
                 return;
             }
@@ -250,21 +264,37 @@ class RoomScene {
         if (!_inCutscene) {
             this.checkInteraction();
 
-            // Dismiss the movement tutorial once the player has walked 50px from spawn
-            if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'MOVE' &&
-                typeof player !== 'undefined') {
-                let dx = player.x - this.playerSpawnX;
-                let dy = player.y - this.playerSpawnY;
-                if (dx * dx + dy * dy > 50 * 50) {
-                    tutorialHints.roomPhase = 'DESK';
-                    tutorialHints.moveTutorialDone = true;
+            // Backpack idle timer: if player hasn't opened backpack within 10 s on DESK phase
+            if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'DESK') {
+                if (!this._backpackIdleTriggered) {
+                    this._backpackIdleTimer++;
+                    if (this._backpackIdleTimer >= 600) {
+                        this._backpackIdleTriggered = true;
+                        this.dialogueBox.persistent = true;
+                        this.dialogueBox.trigger("Wait — I'm going to be late! I need to sort out my bag first...", null, "IRIS");
+                    }
                 }
+            } else {
+                this._backpackIdleTimer = 0;
+                this._backpackIdleTriggered = false;
+            }
+
+            // Door idle timer: prompt Iris if player hasn't left within 10 s of reaching DOOR phase
+            if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'DOOR') {
+                if (!this._doorIdleTriggered) {
+                    this._doorIdleTimer++;
+                    if (this._doorIdleTimer >= 600) {
+                        this._doorIdleTriggered = true;
+                        this.dialogueBox.persistent = true;
+                        this.dialogueBox.trigger("Come on, we're going to be late! Head to the door and press [E] to leave!", null, "IRIS");
+                    }
+                }
+            } else {
+                this._doorIdleTimer = 0;
+                this._doorIdleTriggered = false;
             }
 
             this.drawInteractionIndicators();
-
-            // 4. Door-blocked dialogue box
-            this.dialogueBox.display();
             this.drawTutorialHints();
 
             // 5. Back button
@@ -295,10 +325,21 @@ class RoomScene {
                 } else {
                     tutorialHints.uiTutorialDone = true;
                     tutorialHints.uiIntroStep    = 0;
-                    tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+                    tutorialHints.roomPhase      = 'DESK';
+                    tutorialHints.moveTutorialDone = true;
+                    this.dialogueBox.persistent = false;
+                    this.dialogueBox.active = false;
+                    this._uiIntroLastStep = -1;
                 }
                 return true;
             }
+        }
+
+        // Dismiss any persistent dialogue on click (e.g. backpack idle reminder)
+        if (this.dialogueBox.active && this.dialogueBox.persistent) {
+            this.dialogueBox.persistent = false;
+            this.dialogueBox.active = false;
+            return true;
         }
 
         if (this.backButton.checkMouse(mx, my)) {
@@ -354,12 +395,21 @@ class RoomScene {
         }
 
         if (promptLabel) {
-            textAlign(CENTER, CENTER);
-            textFont(fonts.title);
-            textSize(22);
-            fill(255, 216, 0, 180 + pulse * 75);
+            // Styled prompt bar — same style as difficulty select screen
+            const promptText = `[E] / [ENTER]  TO ${promptLabel}`;
+            const promptW = 520, promptH = 52, promptY = roomTopY;
+            rectMode(CENTER);
+            fill(101, 63, 191, 204);
+            stroke('#E2CAF8'); strokeWeight(3);
+            rect(width / 2, promptY, promptW, promptH, 15);
             noStroke();
-            text(`[E] / [ENTER]  TO ${promptLabel}`, width / 2, roomTopY);
+            textAlign(CENTER, CENTER);
+            textFont(fonts.body || fonts.title);
+            textSize(24);
+            stroke(0, 0, 0, 180); strokeWeight(4);
+            fill(220, 185, 255);
+            text(promptText, width / 2, promptY);
+            noStroke();
 
             // Show E icon and ENTER icon side by side above the text
             let iconY  = roomTopY - 60;
@@ -402,9 +452,9 @@ class RoomScene {
             return;
         }
 
-        if (phase === 'MOVE') {
+        // On Day 1 the move guide is always visible (persists through all phases)
+        if (typeof currentDayID !== 'undefined' && currentDayID === 1) {
             this.drawMoveTutorial();
-            return;
         }
 
         if (!assets.warningImg) return;
@@ -413,7 +463,7 @@ class RoomScene {
         // Same pulse as the yellow box in drawInteractionIndicators()
         let pulse   = (sin(frameCount * 0.1) + 1) * 0.5;
         let breathe = 0.85 + pulse * 0.15;
-        let size    = 52;
+        let size    = 72;
         let img     = assets.warningImg;
         let renderW = size * (img.width / img.height) * breathe;
         let renderH = size * breathe;
@@ -444,6 +494,17 @@ class RoomScene {
 
         let step = tutorialHints.uiIntroStep;
 
+        // Trigger the dialogue box whenever the step changes
+        if (this._uiIntroLastStep !== step) {
+            this._uiIntroLastStep = step;
+            const MSGS = [
+                "There's a PAUSE button in the top-right corner. Click it — or press [P] on your keyboard — anytime during gameplay.",
+                "From the pause menu: HELP (controls guide), SETTINGS (volume), STORY (journal), EXIT (main menu). Click anywhere to continue!"
+            ];
+            this.dialogueBox.persistent = true;
+            this.dialogueBox.trigger(MSGS[step]);
+        }
+
         // ── Breathing yellow outline frame around the pause button ──
         push();
         let bx     = width - 65;
@@ -455,92 +516,6 @@ class RoomScene {
         strokeWeight(4);
         rectMode(CENTER);
         rect(bx, by, frameS, frameS, 10);
-        pop();
-
-        // ── VN-style tutorial panel (橙光 visual novel format) ──
-        const DESIGN_W = 1920;
-        const DESIGN_H = 1080;
-        const s = min(width / DESIGN_W, height / DESIGN_H);
-
-        const panelW = 1440 * s;
-        const panelH = 280  * s;
-        const panelX = width  / 2;
-        const panelY = height - (panelH / 2) - (30 * s);
-
-        push();
-        rectMode(CENTER);
-
-        // Panel shadow
-        noStroke();
-        fill(0, 0, 0, 80);
-        rect(panelX + 4 * s, panelY + 6 * s, panelW, panelH, 18 * s);
-
-        // Panel background
-        fill(18, 8, 42, 220);
-        rect(panelX, panelY, panelW, panelH, 18 * s);
-
-        // Gold outer border
-        noFill();
-        stroke(255, 200, 60, 180);
-        strokeWeight(2.5);
-        rect(panelX, panelY, panelW, panelH, 18 * s);
-
-        // Inner border (decorative inset)
-        stroke(255, 200, 60, 60);
-        strokeWeight(1);
-        rect(panelX, panelY, panelW - 14 * s, panelH - 14 * s, 13 * s);
-
-        // ── Page indicator (1/2 · 2/2) ──
-        if (typeof fonts !== 'undefined' && fonts.body) textFont(fonts.body);
-        textSize(22 * s);
-        textAlign(RIGHT, TOP);
-        noStroke();
-        fill(255, 200, 80, 170);
-        text((step + 1) + " / 2",
-            panelX + panelW / 2 - 26 * s,
-            panelY - panelH / 2 + 16 * s);
-
-        // ── Main text (line-by-line to guarantee text stays inside the panel) ──
-        textSize(28 * s);
-        fill(235, 230, 255);
-        noStroke();
-        textAlign(LEFT, TOP);
-
-        const MSGS = [
-            [
-                "There's a PAUSE button in the top-right corner of the screen.",
-                "Click it — or press [P] on your keyboard — anytime during gameplay."
-            ],
-            [
-                "From the pause menu you can access:",
-                "HELP — Controls guide, character wiki & item list",
-                "SETTINGS — BGM and sound effects volume",
-                "STORY — Day recap and narrative journal",
-                "EXIT — Return to the main menu"
-            ]
-        ];
-
-        const lineH = 42 * s;
-        let tx = panelX - panelW / 2 + 50 * s;
-        let ty = panelY - panelH / 2 + 30 * s;
-        let maxY = panelY + panelH / 2 - 30 * s;   // keep above the hint text
-        let lines = MSGS[step];
-        for (let i = 0; i < lines.length; i++) {
-            let lineY = ty + i * lineH;
-            if (lineY + lineH > maxY) break;        // safety: stop before overflow
-            text(lines[i], tx, lineY);
-        }
-
-        // ── "Click to continue" indicator ──
-        let pulse = (sin(frameCount * 0.1) + 1) * 0.5;
-        textSize(21 * s);
-        fill(255, 215, 0, 130 + pulse * 125);
-        textAlign(RIGHT, BOTTOM);
-        let hint = (step === 0) ? "click anywhere to continue" : "click anywhere to start";
-        text(hint,
-            panelX + panelW / 2 - 26 * s,
-            panelY + panelH / 2 - 14 * s);
-
         pop();
     }
 
@@ -556,7 +531,7 @@ class RoomScene {
 
         const panelW = 310 * s;
         const panelH = 480 * s;
-        const panelX = panelW / 2 + 28 * s;   // anchored to left edge
+        const panelX = 462.5 * s;  // centre of the gap between background left (0) and room left wall (925)
         const panelY = height / 2;
 
         let pulse    = (sin(frameCount * 0.08) + 1) * 0.5;
@@ -610,7 +585,7 @@ class RoomScene {
         let titleY = panelY - panelH / 2 + 30 * s;
         textAlign(CENTER, CENTER);
         textFont(fonts.body);
-        textSize(18 * s);
+        textSize(22 * s);
         stroke(0, 0, 0, 160); strokeWeight(3);
         fill(255, 220, 80, keyAlpha);
         text("MOVE TO NAVIGATE", panelX, titleY);
@@ -629,7 +604,7 @@ class RoomScene {
 
         // ── "OR" divider ──
         let orY = panelY + 10 * s;
-        textSize(16 * s);
+        textSize(20 * s);
         stroke(0, 0, 0, 120); strokeWeight(2);
         fill(180, 160, 220, keyAlpha * 0.8);
         text("─── OR ───", panelX, orY);
@@ -646,12 +621,15 @@ class RoomScene {
         drawKey(assets.keys.down,  panelX,            arrBotY);
         drawKey(assets.keys.right, panelX + colGap,   arrBotY);
 
-        // ── Dismiss hint ──
-        textSize(16 * s);
-        fill(200, 175, 255, keyAlpha * 0.75);
-        text("MOVE TO DISMISS", panelX, panelY + panelH / 2 - 22 * s);
-
         pop();
+    }
+
+    /**
+     * Renders the dialogue box on top of everything (player, tutorial panels).
+     * Must be called from sketch.js AFTER player.display() for correct layering.
+     */
+    displayOverlay() {
+        this.dialogueBox.display();
     }
 
     /**

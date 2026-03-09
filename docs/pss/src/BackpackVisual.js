@@ -108,6 +108,12 @@ class BackpackVisual {
         this._tutNeedsID     = true;
         this._tutNeedsLaptop = true;
 
+        // In-backpack dialogue box (Iris messages)
+        this.dialogueBox = new DialogueBox();
+        // Day 1 narrative state
+        this._day1IntroDone      = false;   // intro "bring ID + laptop every day" message
+        this._packingDoneMsgDone = false;   // "all packed, let's go" message
+
         // ── DEV DRAG STATE ────────────────────────────────────────────────────
         // Tracks interactive manipulation of debug zones and backpack in dev mode.
         this.devDrag = {
@@ -152,6 +158,9 @@ class BackpackVisual {
         this.tutorialAnimT     = 0;
         this._tutNeedsID       = true;
         this._tutNeedsLaptop   = true;
+        this._day1IntroDone      = false;
+        this._packingDoneMsgDone = false;
+        this.dialogueBox.reset();
         this.initScatteredItems();
     }
 
@@ -289,6 +298,27 @@ class BackpackVisual {
      */
     display() {
         this.shimmer = (this.shimmer + 1) % 360;
+
+        // ── Day 1 intro dialogue ──────────────────────────────────────────────
+        if (currentDayID === 1 && !this._day1IntroDone) {
+            this._day1IntroDone = true;
+            this.dialogueBox.persistent = true;
+            this.dialogueBox.trigger(
+                "Every day I need to bring my Student ID and Laptop — they're essential! Drag them into my backpack to get ready.",
+                null, "IRIS"
+            );
+        }
+
+        // ── Once all required items are packed, prompt to leave ───────────────
+        if (this.hasRequiredItems() && !this._packingDoneMsgDone) {
+            this._packingDoneMsgDone = true;
+            this.dialogueBox.persistent = true;
+            this.dialogueBox.trigger(
+                "Great, I've got everything I need! Time to head out — press the arrow in the top-left to close my bag.",
+                null, "IRIS"
+            );
+        }
+
         push();
         this.drawRoomBackground();
         this.drawBackpack();
@@ -296,7 +326,6 @@ class BackpackVisual {
         this.drawDragTutorial();
         this.drawTopBar();
         if (this.draggedItem) this.drawDraggedItem();
-        if (this.showReplaceDialog) this.drawReplaceDialog();
         if (this.messageTimer > 0) {
             this.drawMessage();
             this.messageTimer--;
@@ -325,6 +354,13 @@ class BackpackVisual {
         }
         // Dev overlays are drawn last so they are always on top
         if (developerMode) this.drawDevOverlays();
+
+        // Back-button arrow guide — shown once required items are packed
+        if (this.hasRequiredItems()) this._drawBackButtonArrow();
+
+        // Dialogue box rendered on top of everything
+        this.dialogueBox.display();
+
         pop();
     }
 
@@ -787,6 +823,31 @@ class BackpackVisual {
         pop();
     }
 
+    /**
+     * Draws a pulsing gold ring + label around the back button to guide
+     * the player to close the backpack after packing required items.
+     */
+    _drawBackButtonArrow() {
+        let pulse = (sin(frameCount * 0.08) + 1) * 0.5;
+        let bx = this.backButton.x, by = this.backButton.y;
+        push();
+        // Pulsing ring around the back button
+        noFill();
+        stroke(255, 215, 0, 140 + pulse * 115);
+        strokeWeight(3 + pulse * 1.5);
+        ellipseMode(CENTER);
+        circle(bx, by, 90 + pulse * 12);
+        // "CLOSE BAG" label below
+        noStroke();
+        fill(255, 215, 0, 160 + pulse * 95);
+        let fB = (typeof fonts !== 'undefined') ? (fonts.body || fonts.title) : null;
+        if (fB) textFont(fB);
+        textSize(17);
+        textAlign(CENTER, TOP);
+        text("CLOSE BAG", bx, by + 48);
+        pop();
+    }
+
     // ─── DEV OVERLAYS ────────────────────────────────────────────────────────
 
     /**
@@ -1092,6 +1153,12 @@ class BackpackVisual {
      * In dev mode, checks for dev handles first before normal game interaction.
      */
     handleMousePressed(mx, my) {
+        // Dismiss persistent dialogue on click
+        if (this.dialogueBox && this.dialogueBox.active && this.dialogueBox.persistent) {
+            this.dialogueBox.persistent = false;
+            this.dialogueBox.active = false;
+            return;
+        }
         // Back arrow click
         if (this.backButton.checkMouse(mx, my)) {
             this.backButton.handleClick();
@@ -1253,17 +1320,32 @@ class BackpackVisual {
         let npcCount = this.topSlots.filter(id => id && id !== "UoB Student ID" && id !== "Laptop Computer").length;
 
         if (isRequired) {
-            let emptySlot = this.topSlots.indexOf(null);
-            if (emptySlot !== -1) {
-                this.topSlots[emptySlot] = item.name;
-                this.removeFromDesk(item.name);
-                this.showMessage(item.name + " packed!");
+            // Pack the dragged item if not already in a slot
+            if (!this.topSlots.includes(item.name)) {
+                let slot = this.topSlots.indexOf(null);
+                if (slot !== -1) {
+                    this.topSlots[slot] = item.name;
+                    this.removeFromDesk(item.name);
+                }
             }
+            // Binding: auto-pack the partner required item if it's still on the desk
+            let partner = (item.name === "UoB Student ID") ? "Laptop Computer" : "UoB Student ID";
+            let partnerOnDesk = this.scatteredItems.some(s => s.item.name === partner);
+            if (partnerOnDesk && !this.topSlots.includes(partner)) {
+                let slot = this.topSlots.indexOf(null);
+                if (slot !== -1) {
+                    this.topSlots[slot] = partner;
+                    this.removeFromDesk(partner);
+                }
+            }
+            this.showMessage("Student ID & Laptop packed!");
         } else if (npcCount >= 1) {
-            let existingIndex = this.topSlots.findIndex(id => id && id !== "UoB Student ID" && id !== "Laptop Computer");
-            this.showReplaceDialog = true;
-            this.replaceNewItem = item;
-            this.replaceSlotIndex = existingIndex;
+            // Already have a friend's gift — block and notify via dialogue
+            this.dialogueBox.persistent = true;
+            this.dialogueBox.trigger(
+                "There's no more room in my bag! I can only bring one friend's gift to school.",
+                null, "IRIS"
+            );
         } else {
             let emptySlot = this.topSlots.indexOf(null);
             if (emptySlot !== -1) {
@@ -1278,6 +1360,19 @@ class BackpackVisual {
      * Places an item into a specific slot, swapping the occupant back to the desk if needed.
      */
     tryAddToSlot(item, slotIndex) {
+        // Guard: prevent a second NPC item from being added to an empty slot
+        if (!this.topSlots[slotIndex]) {
+            let isNPC = item.name !== "UoB Student ID" && item.name !== "Laptop Computer";
+            let npcCount = this.topSlots.filter(id => id && id !== "UoB Student ID" && id !== "Laptop Computer").length;
+            if (isNPC && npcCount >= 1) {
+                this.dialogueBox.persistent = true;
+                this.dialogueBox.trigger(
+                    "There's no more room in my bag! I can only bring one friend's gift to school.",
+                    null, "IRIS"
+                );
+                return;
+            }
+        }
         if (this.topSlots[slotIndex]) {
             let oldItemName = this.topSlots[slotIndex];
             this.topSlots[slotIndex] = item.name;

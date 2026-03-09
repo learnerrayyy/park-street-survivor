@@ -765,6 +765,8 @@ function draw() {
                     }
                     player.display();
                 }
+                // Dialogue box drawn last so it appears above player and tutorial panels
+                if (roomScene) roomScene.displayOverlay();
                 drawPauseButton();
                 break;
 
@@ -785,6 +787,7 @@ function draw() {
                 if (gameState.previousState === STATE_ROOM) {
                     if (roomScene) roomScene.display();
                     if (player) player.display();
+                    if (roomScene) roomScene.displayOverlay();
                 } else if (gameState.previousState === STATE_DAY_RUN) {
                     if (env) env.display();
                     if (obstacleManager) obstacleManager.display();
