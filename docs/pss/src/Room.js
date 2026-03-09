@@ -264,8 +264,14 @@ class RoomScene {
         if (!_inCutscene) {
             this.checkInteraction();
 
+            // Idle timers only count while the player is actively in the room
+            // (not while paused, in a cutscene, or in any other overlay state).
+            let _inRoom = (typeof gameState !== 'undefined' &&
+                           typeof STATE_ROOM !== 'undefined' &&
+                           gameState.currentState === STATE_ROOM);
+
             // Backpack idle timer: if player hasn't opened backpack within 10 s on DESK phase
-            if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'DESK') {
+            if (_inRoom && typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'DESK') {
                 if (!this._backpackIdleTriggered) {
                     this._backpackIdleTimer++;
                     if (this._backpackIdleTimer >= 600) {
@@ -274,13 +280,13 @@ class RoomScene {
                         this.dialogueBox.trigger("Wait — I'm going to be late! I need to sort out my bag first...", null, "IRIS");
                     }
                 }
-            } else {
+            } else if (!_inRoom || (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase !== 'DESK')) {
                 this._backpackIdleTimer = 0;
                 this._backpackIdleTriggered = false;
             }
 
             // Door idle timer: prompt Iris if player hasn't left within 10 s of reaching DOOR phase
-            if (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'DOOR') {
+            if (_inRoom && typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'DOOR') {
                 if (!this._doorIdleTriggered) {
                     this._doorIdleTimer++;
                     if (this._doorIdleTimer >= 600) {
@@ -289,7 +295,7 @@ class RoomScene {
                         this.dialogueBox.trigger("Come on, we're going to be late! Head to the door and press [E] to leave!", null, "IRIS");
                     }
                 }
-            } else {
+            } else if (!_inRoom || (typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase !== 'DOOR')) {
                 this._doorIdleTimer = 0;
                 this._doorIdleTriggered = false;
             }
@@ -505,18 +511,7 @@ class RoomScene {
             this.dialogueBox.trigger(MSGS[step]);
         }
 
-        // ── Breathing yellow outline frame around the pause button ──
-        push();
-        let bx     = width - 65;
-        let by     = 65;
-        let breathe = sin(frameCount * 0.05);
-        let frameS  = 105 + breathe * 8;
-        noFill();
-        stroke(255, 215, 0, 130 + breathe * 70);
-        strokeWeight(4);
-        rectMode(CENTER);
-        rect(bx, by, frameS, frameS, 10);
-        pop();
+        // Yellow frame removed — new-content badge on the pause button serves as the indicator.
     }
 
     /**

@@ -193,8 +193,41 @@ let showRestartChoice = false;
 let restartChoiceIndex = 0;
 const RESTART_OPTIONS = ["BACK TO ROOM", "RESTART RUN"];
 
+// Exit-to-main-menu confirmation dialog
+let showExitConfirm = false;
+let exitConfirmIndex = -1;
+const EXIT_CONFIRM_OPTIONS = ["YES, EXIT", "CANCEL"];
+
 // Pause button breathing scale (smooth lerp)
 let pauseBtnScale = 1.0;
+
+// ─── NEW-CONTENT BADGE SYSTEM ─────────────────────────────────────────────────
+// A Set of string keys marks UI elements with unseen / new content.
+// Keys: "pause_btn" | "pause.SETTINGS" | "pause.STORY" | "pause.HELP" | "help.pages"
+const newBadges = new Set();
+let helpPagesVisited = new Set();   // page indices 0-3 visited in current help session
+
+/** Initialize all first-play badges. Call once when starting a new game on Day 1. */
+function initNewGameBadges() {
+    newBadges.clear();
+    newBadges.add("pause_btn");
+    newBadges.add("pause.SETTINGS");
+    newBadges.add("pause.STORY");
+    newBadges.add("pause.HELP");
+    helpPagesVisited.clear();
+}
+
+/** Call after completing a level — new story content is unlocked. */
+function addPostLevelBadges() {
+    newBadges.add("pause_btn");
+    newBadges.add("pause.STORY");
+}
+
+/** Draws the game's warning/exclamation asset as a new-content badge at (x, y). */
+function _drawBadge(x, y, size) {
+    size = size || 36;
+    drawWarningIcon(x, y, size);
+}
 
 // Story recap state
 let showStoryRecap = false;
@@ -787,7 +820,10 @@ function draw() {
                 if (gameState.previousState === STATE_ROOM) {
                     if (roomScene) roomScene.display();
                     if (player) player.display();
-                    if (roomScene) roomScene.displayOverlay();
+                    // Don't show the UI_INTRO dialogue while the pause menu is open
+                    // (that dialogue is introducing the pause button — no need inside the menu itself)
+                    let _inUIIntro = typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'UI_INTRO';
+                    if (roomScene && !_inUIIntro) roomScene.displayOverlay();
                 } else if (gameState.previousState === STATE_DAY_RUN) {
                     if (env) env.display();
                     if (obstacleManager) obstacleManager.display();
@@ -834,6 +870,7 @@ function draw() {
                             currentUnlockedDay = Math.max(currentUnlockedDay, currentDayID + 1);
                         }
                         endScreenManager.activateSuccess();
+                        addPostLevelBadges();
                     }
                     endScreenManager.display();
                 }
@@ -1314,6 +1351,7 @@ function keyPressed() {
             pauseIndex = -1;
             showRestartChoice = false;
             showStoryRecap = false;
+            showExitConfirm = false;
             return;
         }
     }
@@ -1346,6 +1384,18 @@ function keyPressed() {
             } else if (keyCode === ESCAPE) {
                 showStoryRecap = false;
                 pauseIndex = -1;
+            }
+            return;
+        } else if (showExitConfirm) {
+            if (keyCode === UP_ARROW || keyCode === 87 || keyCode === DOWN_ARROW || keyCode === 83) {
+                if (typeof playSFX === 'function') playSFX(sfxSelect);
+                exitConfirmIndex = (exitConfirmIndex < 0) ? 0 : (exitConfirmIndex + 1) % EXIT_CONFIRM_OPTIONS.length;
+            } else if ((keyCode === ENTER || keyCode === 13) && exitConfirmIndex >= 0) {
+                if (typeof playSFX === 'function') playSFX(sfxClick);
+                handleExitConfirm();
+            } else if (keyCode === ESCAPE) {
+                showExitConfirm = false;
+                exitConfirmIndex = -1;
             }
             return;
         } else if (showRestartChoice) {
@@ -1429,6 +1479,7 @@ function keyPressed() {
 
     // Close inventory with ESC
     if (gameState.currentState === STATE_INVENTORY && keyCode === ESCAPE) {
+        if (backpackUI) backpackUI.onClose();
         if (tutorialHints.roomPhase === 'CLOSE_BP') {
             if (backpackUI && backpackUI.hasRequiredItems()) {
                 tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
@@ -1460,6 +1511,7 @@ function handlePauseSelection() {
             tutorialHints.uiIntroStep = 0;
             tutorialHints.roomPhase = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
+        newBadges.delete("pause.STORY");
         showStoryRecap = true;
         storyRecapDay = 0;   // open at Prologue (day 0); Days 1-5 follow
         storyScrollOffset = 0;
@@ -1471,6 +1523,7 @@ function handlePauseSelection() {
             tutorialHints.uiIntroStep = 0;
             tutorialHints.roomPhase = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
+        newBadges.delete("pause.SETTINGS");
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         mainMenu.diffToastTimer = 0;
@@ -1484,6 +1537,9 @@ function handlePauseSelection() {
             tutorialHints.uiIntroStep = 0;
             tutorialHints.roomPhase = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
+        helpPagesVisited.clear();
+        helpPagesVisited.add(0);  // page 0 is shown on open
+        if (helpPagesVisited.size < 4) newBadges.add("help.pages");
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         gameState.currentState = STATE_HELP;
@@ -1502,13 +1558,24 @@ function handlePauseSelection() {
         showRestartChoice = true;
         restartChoiceIndex = -1;
     } else if (selected === "EXIT") {
+        showExitConfirm = true;
+        exitConfirmIndex = -1;
+    }
+}
+
+function handleExitConfirm() {
+    if (EXIT_CONFIRM_OPTIONS[exitConfirmIndex] === "YES, EXIT") {
         triggerTransition(() => {
             gameState.setState(STATE_MENU);
             mainMenu.menuState = STATE_MENU;
             pauseFromState = null;
             showRestartChoice = false;
             showStoryRecap = false;
+            showExitConfirm = false;
         });
+    } else if (EXIT_CONFIRM_OPTIONS[exitConfirmIndex] === "CANCEL") {
+        showExitConfirm = false;
+        exitConfirmIndex = -1;
     }
 }
 
@@ -1635,6 +1702,9 @@ function mousePressed() {
             if (showStoryRecap) {
                 showStoryRecap = false;
                 pauseIndex = -1;
+            } else if (showExitConfirm) {
+                showExitConfirm = false;
+                exitConfirmIndex = -1;
             } else if (showRestartChoice) {
                 showRestartChoice = false;
                 pauseIndex = -1;
@@ -1643,7 +1713,11 @@ function mousePressed() {
             }
             return;
         }
-        if (showRestartChoice && restartChoiceIndex >= 0) {
+        if (showExitConfirm && exitConfirmIndex >= 0) {
+            if (typeof playSFX === 'function') playSFX(sfxClick);
+            handleExitConfirm();
+            return;
+        } else if (showRestartChoice && restartChoiceIndex >= 0) {
             if (typeof playSFX === 'function') playSFX(sfxClick);
             handleRestartChoice();
         } else if (showStoryRecap) {
@@ -1816,6 +1890,7 @@ function setupRun(dayID) {
         if (dayID === 1 && !tutorialHints.uiTutorialDone) {
             tutorialHints.roomPhase = 'UI_INTRO';
             tutorialHints.uiIntroStep = 0;
+            initNewGameBadges();
         } else if (dayID === 1 && !tutorialHints.moveTutorialDone) {
             tutorialHints.roomPhase = 'MOVE';
         } else {
@@ -1823,6 +1898,7 @@ function setupRun(dayID) {
         }
     }
     if (backpackUI) backpackUI.resetForNewDay();
+    clearItemToast();
     if (endScreenManager) endScreenManager._activeScreen = null;
     if (gameState && typeof gameState.clearRunUtilityItemSnapshot === "function") {
         gameState.clearRunUtilityItemSnapshot();
@@ -1869,6 +1945,7 @@ function setupRunDirectly(dayID, runMode = RUN_MODE_STORY) {
 
     if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DONE';
     if (backpackUI) backpackUI.resetForNewDay();
+    clearItemToast();
     if (endScreenManager) endScreenManager._activeScreen = null;
 
     gameState.setState(STATE_DAY_RUN);
@@ -1962,7 +2039,7 @@ let _menuEnterT = 1;    // 0→1: splash-to-menu enter animation progress
 let _menuFromSplash = false; // true while the splash→menu title animation is running
 let _splashEnterCY = 480;  // titleDrop.y captured at the moment of entering menu from splash
 const _WARN_FADE_IN = 90;  // frames for fade-in  (~1.5 s)
-const _WARN_HOLD = 180; // frames to hold at full opacity  (~9 s)
+const _WARN_HOLD = 240; // frames to hold at full opacity  (~9 s)
 const _WARN_FADE_OUT = 90;  // frames for fade-out (~1.5 s)
 const _WARN_TOTAL = _WARN_FADE_IN + _WARN_HOLD + _WARN_FADE_OUT; // 600 ≈ 10 s
 
@@ -2006,7 +2083,9 @@ function drawWarningScreen() {
     let panelW = 1200 * s;
     let panelH = 800 * s;
     let panelX = cx;
-    let panelY = cy;
+    // Shift up so the page area (bottom 655 px of the image) is centred,
+    // leaving the cat (top 145 px) sitting above the visual centre.
+    let panelY = cy - 72.5 * s;
 
     if (assets.warningBox) {
         imageMode(CENTER);
@@ -2585,6 +2664,12 @@ function drawPauseButton() {
         rect(10, 0, 8, 28);
         pop();
     }
+
+    // New-content badge at top-right of the pause icon
+    if (newBadges.has("pause_btn")) {
+        _drawBadge(bx + 26, by - 26, 44);
+    }
+
     pop();
 }
 
@@ -2592,6 +2677,11 @@ function drawPauseButton() {
  * Renders the pause menu overlay with background, title, and selectable options.
  */
 function renderPauseOverlay() {
+    // Clear pause_btn badge only when all sub-badges are gone
+    if (!newBadges.has("pause.SETTINGS") && !newBadges.has("pause.STORY") && !newBadges.has("pause.HELP")) {
+        newBadges.delete("pause_btn");
+    }
+
     push();
     drawOtherBgWithOverlay();
 
@@ -2609,6 +2699,70 @@ function renderPauseOverlay() {
 
     if (showStoryRecap) {
         renderStoryRecap();
+    } else if (showExitConfirm) {
+        // ── Centred confirmation box ──────────────────────────────────────────
+        let btnW = (assets.btnImg ? assets.btnImg.width : 240) * 1.5;
+        let btnH = (assets.btnImg ? assets.btnImg.height : 60) * 1.5;
+        let spacing = 150;
+
+        let boxW = 820;
+        let boxH = 400;
+        let boxX = width / 2 - boxW / 2;
+        let boxY = height / 2 - boxH / 2;
+
+        // Container panel
+        push();
+        rectMode(CORNER);
+        fill(14, 8, 38, 240);
+        stroke(200, 80, 80, 200);
+        strokeWeight(3);
+        rect(boxX, boxY, boxW, boxH, 18);
+        noStroke();
+        pop();
+
+        let cx = width / 2;
+        let titleY  = boxY + 60;
+        let warnY   = titleY + 70;
+        let hintY   = warnY + 40;
+        let btnsY   = boxY + boxH - 80;
+
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title); textSize(40);
+        stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 100, 100);
+        text("EXIT TO MAIN MENU?", cx, titleY);
+        noStroke(); fill(255, 100, 100);
+        text("EXIT TO MAIN MENU?", cx, titleY);
+
+        textFont(fonts.jersey20 || fonts.body); textSize(26); noStroke();
+        fill(255, 210, 80);
+        text("Warning: unsaved progress may be lost.", cx, warnY);
+        textSize(22); fill(180, 180, 220);
+        text("Tip: click the back arrow (top-left) to return without exiting.", cx, hintY);
+
+        let anyExitHover = false;
+        let totalBtnW = (EXIT_CONFIRM_OPTIONS.length - 1) * spacing + btnW;
+        let btnStartX = cx - totalBtnW / 2 + btnW / 2;
+        for (let i = 0; i < EXIT_CONFIRM_OPTIONS.length; i++) {
+            let ox = btnStartX + i * spacing;
+            let isHover = (mouseX > ox - btnW / 2 && mouseX < ox + btnW / 2 &&
+                mouseY > btnsY - btnH / 2 && mouseY < btnsY + btnH / 2);
+            if (isHover) { exitConfirmIndex = i; anyExitHover = true; }
+            let isSelected = (i === exitConfirmIndex) && exitConfirmIndex >= 0;
+
+            push();
+            translate(ox, btnsY);
+            if (isSelected) scale(1.15);
+            imageMode(CENTER);
+            if (assets.btnImg) image(assets.btnImg, 0, 0, btnW, btnH);
+            textFont(fonts.jersey20 || fonts.body); textSize(36); textAlign(CENTER, CENTER);
+            let btnColor = (EXIT_CONFIRM_OPTIONS[i] === "YES, EXIT") ? color(255, 100, 100) : color(255, 215, 0);
+            stroke(0, 0, 0, 180); strokeWeight(5); fill(btnColor);
+            text(EXIT_CONFIRM_OPTIONS[i], 0, -6);
+            noStroke(); fill(btnColor);
+            text(EXIT_CONFIRM_OPTIONS[i], 0, -6);
+            pop();
+        }
+        if (!anyExitHover && !keyIsPressed) exitConfirmIndex = -1;
     } else if (showRestartChoice) {
         let btnW = (assets.btnImg ? assets.btnImg.width : 240) * 1.5;
         let btnH = (assets.btnImg ? assets.btnImg.height : 60) * 1.5;
@@ -2685,6 +2839,11 @@ function renderPauseOverlay() {
             noStroke(); fill(255, 215, 0);
             text(options[i], 0, -6);
             pop();
+
+            // New-content badge at the top-right corner of the button
+            if (newBadges.has("pause." + options[i])) {
+                _drawBadge(ox + btnW / 2 - 18, oy - btnH / 2 + 18, 46);
+            }
         }
         if (!anyPauseHover && !keyIsPressed) pauseIndex = -1;
     }
@@ -2892,7 +3051,10 @@ function renderStoryRecap() {
         textFont(fonts.body);
         textSize(20);
         fill(200);
-        text("COMPLETE TODAY TO REVEAL", textX, textY + 40);
+        let _unlockDayHint = (storyRecapDay === 0)
+            ? "COMPLETE DAY 1 TO UNLOCK"
+            : "COMPLETE DAY " + storyRecapDay + " TO UNLOCK";
+        text(_unlockDayHint, textX, textY + 40);
         pop();
     }
 

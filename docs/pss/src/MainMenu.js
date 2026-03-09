@@ -646,6 +646,11 @@ class MainMenu {
                 imageMode(CENTER);
                 image(assets.backImg, 0, 0, arrowSz, arrowSz);
                 pop();
+
+                // New-content badge at top-right of right arrow
+                if (typeof newBadges !== 'undefined' && newBadges.has("help.pages")) {
+                    if (typeof _drawBadge === 'function') _drawBadge(arrowRightX + 20, arrowY - 20, 44);
+                }
             }
         }
 
@@ -667,6 +672,19 @@ class MainMenu {
     // ─── INPUT HANDLERS ──────────────────────────────────────────────────────
 
     /**
+     * Records that the player has visited a help page.
+     * Once all 4 pages have been seen the "help.pages" new-content badge is cleared.
+     */
+    _markHelpPageVisited(pageIndex) {
+        if (typeof helpPagesVisited === 'undefined' || typeof newBadges === 'undefined') return;
+        helpPagesVisited.add(pageIndex);
+        if (helpPagesVisited.size >= 4) {
+            newBadges.delete("help.pages");
+            newBadges.delete("pause.HELP");
+        }
+    }
+
+    /**
      * Routes keyboard input to the correct sub-system based on the active menu state.
      */
     handleKeyPress(_key, keyCode) {
@@ -682,6 +700,7 @@ class MainMenu {
                     // Move to next help page (reset char index when entering wiki)
                     playSFX(sfxSelect); this.helpPage++;
                     if (this.helpPage === 1) this._helpCharIndex = 0;
+                    this._markHelpPageVisited(this.helpPage);
                 }
             } else if (keyCode === LEFT_ARROW || keyCode === 65) {
                 if (this.helpPage === 1 && this._helpCharIndex > 0) {
@@ -790,6 +809,7 @@ class MainMenu {
                 if (this.helpPage < 3 && dist(mx, my, arrowRightX, arrowY) < 35) {
                     playSFX(sfxSelect); this.helpPage++;
                     if (this.helpPage === 1) this._helpCharIndex = 0;
+                    this._markHelpPageVisited(this.helpPage);
                     return;
                 }
 
@@ -950,13 +970,12 @@ class MainMenu {
         playSFX(sfxClick);
 
         if (typeof pauseFromState !== 'undefined' && pauseFromState !== null) {
-            // Return to pause overlay with a fade so there's no instant snap.
+            // Return directly to pause overlay (no fade — there's no matching fade-in on the other side).
             const _prevState = pauseFromState;
-            triggerTransition(() => {
-                gameState.setState(STATE_PAUSED);
-                gameState.previousState = _prevState;
-                this.helpPage = 0;
-            });
+            pauseFromState = null;
+            gameState.setState(STATE_PAUSED);
+            gameState.previousState = _prevState;
+            this.helpPage = 0;
         } else if (this.menuState === STATE_DIFF_SELECT) {
             triggerTransition(() => {
                 this.menuState = STATE_MENU;

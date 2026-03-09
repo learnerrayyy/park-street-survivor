@@ -59,7 +59,7 @@ let _csLastSyncIndex = -1;   // tracks last index synced to _csBox to avoid re-t
 // Light-purple item frame inside the image: 104×112 px.
 // Triggered by an `onShow: { type: 'item_received', name: '...' }` field.
 let _itemToast = { active: false, name: '', timer: 0, alpha: 0 };
-const _ITEM_TOAST_DURATION = 210; // frames (~3.5 s at 60 fps)
+const _ITEM_TOAST_DURATION = 330; // frames (~5.5 s at 60 fps)
 const _ITEM_TOAST_FADE_IN  = 20;
 const _ITEM_TOAST_FADE_OUT = 40;
 
@@ -68,6 +68,12 @@ function _showItemToast(name) {
     _itemToast.name   = name;
     _itemToast.timer  = _ITEM_TOAST_DURATION;
     _itemToast.alpha  = 0;
+}
+
+/** Immediately hides the item-received notice box. Call when leaving a cutscene/level. */
+function clearItemToast() {
+    _itemToast.active = false;
+    _itemToast.timer  = 0;
 }
 
 /** Maps a display name string to the matching inventory item image. */
@@ -154,16 +160,16 @@ function _drawItemToast() {
     imageMode(CORNER);
     let fDB = (typeof fonts !== 'undefined') ? (fonts.jersey20 || fonts.dialogueBlue || fonts.body || fonts.title) : null;
     if (fDB) textFont(fDB);
-    textSize(20 * s);
+    textSize(34 * s);
     textAlign(LEFT, CENTER);
     fill(180, 165, 220, a);
-    text("Received", TXT_X, TXT_CY - 18 * s);
+    text("Received", TXT_X, TXT_CY - 26 * s);
 
     // Item name in gold
     if (fDB) textFont(fDB);
-    textSize(28 * s);
+    textSize(36 * s);
     fill(255, 215, 0, a);
-    text("\u300C" + _itemToast.name + "\u300D", TXT_X, TXT_CY + 14 * s);
+    text(_itemToast.name, TXT_X, TXT_CY + 20 * s);
 
     pop();
 }

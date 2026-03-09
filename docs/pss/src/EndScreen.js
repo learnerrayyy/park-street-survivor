@@ -154,10 +154,34 @@ class EndScreenBase {
         pop();
     }
 
-    /** * Draws the back arrow in the top-left corner, only during MODE_SELECT.
-     */
+    /** Draws exit-confirm prompt box + text above the YES/CANCEL buttons. */
+    drawExitConfirmText(cx, y) {
+        let f = fonts.jersey20 || fonts.body;
+        let boxW = 720, boxH = 200;
+        push();
+        rectMode(CENTER);
+        fill(14, 8, 38, 240);
+        stroke(200, 80, 80, 200);
+        strokeWeight(3);
+        rect(cx, y - 90, boxW, boxH, 16);
+
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title); textSize(38);
+        stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 100, 100);
+        text("EXIT TO MAIN MENU?", cx, y - 138);
+        noStroke(); fill(255, 100, 100);
+        text("EXIT TO MAIN MENU?", cx, y - 138);
+        textFont(f); textSize(24); noStroke(); fill(255, 210, 80);
+        text("Warning: unsaved progress may be lost.", cx, y - 82);
+        textSize(20); fill(180, 180, 220);
+        text("Tip: click the back arrow (top-left) to return without exiting.", cx, y - 48);
+        pop();
+    }
+
+    /** Draws the back arrow in the top-left corner, during MODE_SELECT and EXIT_CONFIRM. */
     drawBackButton() {
-        if (this.stateStep !== "MODE_SELECT" || !assets.backImg) return;
+        if (this.stateStep !== "MODE_SELECT" && this.stateStep !== "EXIT_CONFIRM") return;
+        if (!assets.backImg) return;
         
         let bx = 70, by = 65; 
         let isHover = dist(mouseX, mouseY, bx, by) < 40;
@@ -185,9 +209,9 @@ class EndScreenBase {
                 if (typeof playSFX === 'function') playSFX(sfxClick);
                 this.executeSelection();
             }
-        } else if (keyCode === ESCAPE || keyCode === 8) { 
-            // Allow returning to the main button options from the sub-menu
-            if (this.stateStep === "MODE_SELECT") {
+        } else if (keyCode === ESCAPE || keyCode === 8) {
+            // Allow returning to the main button options from the sub-menu or exit confirm
+            if (this.stateStep === "MODE_SELECT" || this.stateStep === "EXIT_CONFIRM") {
                 this.stateStep = "MAIN";
                 this.options = this.mainOptions;
                 this.selectedIndex = -1;
@@ -198,7 +222,7 @@ class EndScreenBase {
 
     /** Forward mouse click to horizontally laid out buttons. */
     handleClick(mx, my) {
-        if (this.stateStep === "MODE_SELECT" && assets.backImg) {
+        if ((this.stateStep === "MODE_SELECT" || this.stateStep === "EXIT_CONFIRM") && assets.backImg) {
             let bx = 70, by = 65;
             if (dist(mx, my, bx, by) < 40) {
                 if (typeof playSFX === 'function') playSFX(sfxClick);
@@ -333,7 +357,10 @@ class FailScreen extends EndScreenBase {
             this.drawProgressBar(cx, box.y + box.h * 0.55, box.w * 0.6);
         }
         }
-        this.drawButtons(cx, this._getButtonStartY()); 
+        if (this.stateStep === "EXIT_CONFIRM") {
+            this.drawExitConfirmText(cx, this._getButtonStartY());
+        }
+        this.drawButtons(cx, this._getButtonStartY());
 
         this.drawBackButton();
     }
@@ -342,12 +369,12 @@ class FailScreen extends EndScreenBase {
         let boxH = height * END_SCREEN_BOX_H_RATIO;
         let boxY = (height - boxH) / 2;
 
-        if (this.stateStep === "MODE_SELECT") {
-            return boxY + boxH * 0.5; 
+        if (this.stateStep === "MODE_SELECT" || this.stateStep === "EXIT_CONFIRM") {
+            return boxY + boxH * 0.7;
         }
 
         // Moved down significantly to make room for the larger buttons and centered UI
-        return boxY + boxH * 0.85; 
+        return boxY + boxH * 0.85;
     }
     _getReasonText() {
         switch (this.failType) {
@@ -385,10 +412,15 @@ class FailScreen extends EndScreenBase {
                 this.options = this.modeOptions;
                 this.selectedIndex = -1;
             } else if (option === "EXIT") {
-                triggerTransition(() => {
-                    gameState.resetFlags();
-                    gameState.setState(STATE_MENU);
-                });
+                this.stateStep = "EXIT_CONFIRM";
+                this.options = ["YES, EXIT", "CANCEL"];
+                this.selectedIndex = -1;
+            }
+        } else if (this.stateStep === "EXIT_CONFIRM") {
+            if (option === "YES, EXIT") {
+                triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+            } else if (option === "CANCEL") {
+                this.stateStep = "MAIN"; this.options = this.mainOptions; this.selectedIndex = -1;
             }
         } else if (this.stateStep === "MODE_SELECT") {
             if (option === "BACK TO ROOM") {
@@ -481,6 +513,9 @@ class SuccessScreen extends EndScreenBase {
         pop();
         }
         }
+        if (this.stateStep === "EXIT_CONFIRM") {
+            this.drawExitConfirmText(cx, this._getButtonStartY());
+        }
         this.drawButtons(cx, this._getButtonStartY());
 
         this.drawBackButton();
@@ -490,12 +525,12 @@ class SuccessScreen extends EndScreenBase {
         let boxH = height * END_SCREEN_BOX_H_RATIO;
         let boxY = (height - boxH) / 2;
 
-        if (this.stateStep === "MODE_SELECT") {
-            return boxY + boxH * 0.5; 
+        if (this.stateStep === "MODE_SELECT" || this.stateStep === "EXIT_CONFIRM") {
+            return boxY + boxH * 0.7;
         }
-        
+
         // Moved down to match FailScreen
-        return boxY + boxH * 0.85; 
+        return boxY + boxH * 0.85;
     }
 
     executeSelection() {
@@ -527,10 +562,15 @@ class SuccessScreen extends EndScreenBase {
                 this.options = this.modeOptions;
                 this.selectedIndex = -1;
             } else if (option === "EXIT") {
-                triggerTransition(() => {
-                    gameState.resetFlags();
-                    gameState.setState(STATE_MENU);
-                });
+                this.stateStep = "EXIT_CONFIRM";
+                this.options = ["YES, EXIT", "CANCEL"];
+                this.selectedIndex = -1;
+            }
+        } else if (this.stateStep === "EXIT_CONFIRM") {
+            if (option === "YES, EXIT") {
+                triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+            } else if (option === "CANCEL") {
+                this.stateStep = "MAIN"; this.options = this.mainOptions; this.selectedIndex = -1;
             }
         } else if (this.stateStep === "MODE_SELECT") {
             if (option === "BACK TO ROOM") {
