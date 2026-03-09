@@ -159,7 +159,7 @@ class ProceduralLevel {
   constructor(dayID, config) {
     this.dayID = dayID;
     this.config = config;
-    this.levelText = `Day ${dayID} - ${DIFFICULTY_PROGRESSION[dayID]?.description || 'Unknown'}`;
+    this.levelText = `${DIFFICULTY_PROGRESSION[dayID]?.description || 'Unknown'}`;
     this.frameCounter = 0;
     this.displayDuration = 180; // 3 seconds display (60fps)
     // Get current level difficulty config
