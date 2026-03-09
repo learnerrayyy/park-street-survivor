@@ -67,7 +67,7 @@ let assets = {
     }
 };
 let fonts = {};
-let sfxSelect, sfxClick, sfxDialogue;
+let sfxSelect, sfxClick, sfxDialogue, sfxItemNotification;
 let sfxHitNpc, sfxHitBigCar, sfxHitSmallCar, sfxHitFantasyCoffee, sfxPuddleNoBoots, sfxSmallBusiness; 
 let sfxPickupCoffee, sfxPickupScooter, sfxPuddleBoots, sfxPaperCrumple, sfxScooterBrake;
 let sfxDoorOpen, sfxAmbulance, sfxHeartbeat, sfxGameWin;
@@ -592,6 +592,7 @@ function preload() {
     sfxSmallBusiness = loadSound('assets/audio/effects/HitSmallBusiness.mp3', itemLoaded);
     sfxPaperCrumple = loadSound('assets/audio/effects/HitPoster.mp3', itemLoaded);
     sfxDoorOpen = loadSound('assets/audio/effects/LibraryDoorOpen.mp3', itemLoaded);
+    sfxItemNotification = loadSound('assets/audio/effects/ItemPop.wav', itemLoaded);
     sfxAmbulance = loadSound('assets/audio/effects/GameOverAmbulance.wav', itemLoaded);
     sfxHeartbeat = loadSound('assets/audio/effects/GameOverHeartbeat.mp3', itemLoaded);
     sfxGameWin = loadSound('assets/audio/effects/GameWin.mp3', itemLoaded);

@@ -62,12 +62,30 @@ let _itemToast = { active: false, name: '', timer: 0, alpha: 0 };
 const _ITEM_TOAST_DURATION = 330; // frames (~5.5 s at 60 fps)
 const _ITEM_TOAST_FADE_IN  = 20;
 const _ITEM_TOAST_FADE_OUT = 40;
+let _lastItemToastSfxName = '';
+let _lastItemToastSfxAt   = 0;
 
 function _showItemToast(name) {
     _itemToast.active = true;
     _itemToast.name   = name;
     _itemToast.timer  = _ITEM_TOAST_DURATION;
     _itemToast.alpha  = 0;
+
+    const now = performance.now();
+    const sameToastTriggeredTooSoon =
+        _lastItemToastSfxName === name && (now - _lastItemToastSfxAt) < 500;
+
+    if (!sameToastTriggeredTooSoon) {
+        if (typeof playSFX === 'function' && typeof sfxItemNotification !== 'undefined' && sfxItemNotification) {
+            playSFX(sfxItemNotification, {
+                id: 'item_toast_notification',
+                cooldownMs: 250,
+                monophonic: true
+            });
+        }
+        _lastItemToastSfxName = name;
+        _lastItemToastSfxAt   = now;
+    }
 }
 
 /** Immediately hides the item-received notice box. Call when leaving a cutscene/level. */
