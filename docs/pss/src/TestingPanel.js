@@ -297,7 +297,6 @@ class TestingPanel {
             { key: "description", label: "Description", valueType: "text" },
             { key: "totalDistance", label: "Length(totalDistance)", valueType: "int", min: 1 },
             { key: "realTimeLimit", label: "realTimeLimit", valueType: "int", min: 1 },
-            { key: "obstacleSpawnInterval", label: "obstacleSpawnInterval", valueType: "int", min: 0 },
             { key: "baseScrollSpeed", label: "baseScrollSpeed", valueType: "number", min: 0 },
             { key: "basePlayerSpeed", label: "basePlayerSpeed", valueType: "number", min: 0 },
             { key: "healthDecay", label: "healthDecay", valueType: "number", min: 0 },
@@ -310,9 +309,7 @@ class TestingPanel {
         this.modeFieldDefs = [
             { key: "avgobPerWindow", label: "avgobPerWindow", valueType: "number", min: 0 },
             { key: "obTypeMinGapSec", label: "obTypeMinGapSec (JSON)", valueType: "json" },
-            { key: "obWeights", label: "obWeights (JSON)", valueType: "json" },
-            { key: "minOnScreenOb", label: "minOnScreenOb", valueType: "int", min: 0 },
-            { key: "maxOnScreenOb", label: "maxOnScreenOb", valueType: "int", min: 0 }
+            { key: "obWeights", label: "obWeights (JSON)", valueType: "json" }
         ];
         this.buffControlDefs = [
             { key: "avgRespawnSec", label: "avgBuffRespawnSec", valueType: "number", min: 0.2 },
@@ -412,9 +409,7 @@ class TestingPanel {
         return {
             avgobPerWindow: 2.4,
             obTypeMinGapSec: {},
-            obWeights: obWeights,
-            minOnScreenOb: 1,
-            maxOnScreenOb: 4
+            obWeights: obWeights
         };
     }
 
@@ -463,8 +458,6 @@ class TestingPanel {
             }
             const rawAvgOb = Number(m.avgobPerWindow);
             m.avgobPerWindow = Number.isFinite(rawAvgOb) ? Math.max(0, rawAvgOb) : def.avgobPerWindow;
-            m.minOnScreenOb = Math.max(0, Math.round(Number(m.minOnScreenOb || 0)));
-            m.maxOnScreenOb = Math.max(m.minOnScreenOb, Math.round(Number(m.maxOnScreenOb || 0)));
             if (!m.obTypeMinGapSec || typeof m.obTypeMinGapSec !== "object") m.obTypeMinGapSec = {};
             if (!m.obWeights || typeof m.obWeights !== "object") m.obWeights = {};
             delete m.avgbuffPerWindow;
@@ -472,6 +465,8 @@ class TestingPanel {
             delete m.buffGlobalMinGapSec;
             delete m.buffTypeMinGapSec;
             delete m.obPerWindowMean;
+            delete m.minOnScreenOb;
+            delete m.maxOnScreenOb;
         }
 
         const buffCfg = this.getCurrentBuffControlConfigByDay(dayID);
@@ -773,12 +768,6 @@ class TestingPanel {
                     if (def.valueType === "int") num = Math.round(num);
                     if (typeof def.min === "number") num = Math.max(def.min, num);
                     modeCfg[def.key] = num;
-                    if (def.key === "maxOnScreenOb") {
-                        modeCfg.maxOnScreenOb = Math.max(modeCfg.minOnScreenOb || 0, modeCfg.maxOnScreenOb || 0);
-                    }
-                    if (def.key === "minOnScreenOb") {
-                        modeCfg.maxOnScreenOb = Math.max(modeCfg.minOnScreenOb || 0, modeCfg.maxOnScreenOb || 0);
-                    }
                 }
                 this.applyLiveConfigIfActiveDay();
             }
