@@ -566,14 +566,13 @@ class Player {
     drawTopBar() {
         push();
 
-        this.drawHealthBar(165, 65);
-        this.drawUtilityItemCharges(165, 65);
-        this.drawBackpackIcon(98, 85);
+        // Align energy bar bottom edge with inventory frame bottom edge.
+        this.drawHealthBar(this.hudX(210), this.hudY(111));
+        this.drawBackpackIcon(this.hudX(30), this.hudY(21));
+        this.drawUtilityItemCharges(this.hudX(146), this.hudY(7));
 
-        const leftMargin = 70;
-        const topBarH = 170;
         if (!isEndlessRunMode()) {
-            this.drawProgressBar(leftMargin, topBarH + 100);
+            this.drawProgressBar(this.hudX(30), this.hudY(300));
         }
 
         pop();
@@ -613,21 +612,56 @@ class Player {
      * Renders the energy bar with a green fill that depletes as stamina drops.
      */
     drawHealthBar(x, y) {
-        textAlign(CENTER, CENTER);
-        fill(255);
-        textSize(32);
-        textStyle(BOLD);
-        // Centred above the bar, clear of the backpack icon on the left
-        text("ENERGY", x + 200, y - 22);
+        const frameW = this.hudW(410);
+        const frameH = this.hudH(70);
+        const frameR = this.hudU(40);
+        const strokeW = this.hudU(7);
+        const inset = this.hudU(6);
+        const innerX = x + inset;
+        const innerY = y + inset;
+        const innerW = frameW - inset * 2;
+        const innerH = frameH - inset * 2;
+        const pct = constrain(this.health / this.maxHealth, 0, 1);
+        const fillW = innerW * pct;
 
-        fill(50);
-        stroke(0);
-        strokeWeight(5);
-        rect(x, y, 400, 50, 4);
+        this.drawHudRoundedPanel(x, y, frameW, frameH, frameR, {
+            bg: "#F5F0FF",
+            stroke: "#9B8FB8",
+            strokeWeight: strokeW,
+            outerShadowColor: "#000000",
+            outerShadowAlpha: 0.5,
+            outerShadowDistance: this.hudU(7),
+            outerShadowAngleDeg: 100,
+            innerShadowColor: "#FFFFFF",
+            innerShadowAlpha: 0.8,
+            innerShadowDistance: this.hudU(11),
+            innerShadowAngleDeg: 90
+        });
 
-        let pct = constrain(this.health / this.maxHealth, 0, 1);
-        fill(0, 255, 100);
-        rect(x + 2, y + 2, (400 - 4) * pct, 45, 3);
+        if (fillW > 0) {
+            push();
+            this.clipRoundedRect(innerX, innerY, innerW, innerH, max(this.hudU(8), frameR - inset));
+            const grad = drawingContext.createLinearGradient(innerX, innerY, innerX, innerY + innerH);
+            grad.addColorStop(0, "#FF85C0");
+            grad.addColorStop(0.55, "#FF5AA8");
+            grad.addColorStop(1, "#E64A96");
+            drawingContext.fillStyle = grad;
+            noStroke();
+            rect(innerX, innerY, fillW, innerH, max(this.hudU(8), frameR - inset));
+            pop();
+        }
+
+        const textShadow = this.shadowOffset(this.hudU(6), 45);
+        push();
+        textFont(fonts.jersey20 || 'sans-serif');
+        textSize(this.hudU(48));
+        textAlign(LEFT, TOP);
+        noStroke();
+        fill(this.colorWithAlpha("#000000", 0.5));
+        text("ENERGY", this.hudX(230) + textShadow.x, this.hudY(21) + textShadow.y);
+        fill("#FFFFFF");
+        text("ENERGY", this.hudX(230), this.hudY(21));
+        pop();
     }
 
     /**
@@ -635,40 +669,48 @@ class Player {
      * Label is displayed to the left of the dots.
      */
     drawUtilityItemCharges(x, y) {
-        if (!this.hasUsableUtilityItem()) return;
+        const d = this.hudU(73);
+        const r = d / 2;
+        const cx = x + r;
+        const cy = y + r;
+        const count = this.hasUsableUtilityItem() ? max(0, floor(this.utilityItemCharges || 0)) : 0;
 
-        const count = max(0, floor(this.utilityItemCharges || 0));
-        if (count <= 0) return;
+        const outerOff = this.shadowOffset(this.hudU(7), 45);
+        const innerOff = this.shadowOffset(this.hudU(11), 45);
 
-        const dotSize = 14;
-        const dotGap = 10;
-
-        // Move dots slightly lower to avoid health bar overlap
-        const dotY = y + 90;
-
-        const totalW = count * dotSize + (count - 1) * dotGap;
-        const dotsStartX = x + 200 - totalW / 2;
+        // Draw shadows first so they stay beneath the badge fill.
+        push();
+        noStroke();
+        fill(this.colorWithAlpha("#CC5555", 0.5));
+        circle(cx + outerOff.x, cy + outerOff.y, d);
+        pop();
 
         push();
-
-        // Draw label on the left
-        textAlign(RIGHT, CENTER);
-        textSize(32);
-        textStyle(BOLD);
         noStroke();
-        fill(255, 215, 0);
-        text("USES", dotsStartX - 14, dotY);
+        fill(this.colorWithAlpha("#FF9999", 0.5));
+        circle(cx + innerOff.x, cy + innerOff.y, d);
+        pop();
 
-        // Draw dots
-        for (let i = 0; i < count; i++) {
-            const cx = dotsStartX + i * (dotSize + dotGap) + dotSize / 2;
+        push();
+        noStroke();
+        fill("#FF6B6B");
+        circle(cx, cy, d);
+        pop();
 
-            fill(255, 215, 0);
-            stroke(0);
-            strokeWeight(2);
-            circle(cx, dotY, dotSize);
-        }
+        push();
+        noFill();
+        stroke("#FFFFFF");
+        strokeWeight(this.hudU(7));
+        circle(cx, cy, d);
+        pop();
 
+        push();
+        textFont(fonts.jersey20 || 'sans-serif');
+        textSize(this.hudU(48));
+        textAlign(CENTER, CENTER);
+        noStroke();
+        fill("#FFFFFF");
+        text(String(count), cx, cy - this.hudU(2));
         pop();
     }
 
@@ -683,102 +725,206 @@ class Player {
         const backpackImg = assets.backpackImg || null;
         const utilityImg = this.getEquippedUtilityItemIcon();
 
-        const mainPlateD = lerp(136, 150, swap);
-        const secondaryPlateD = lerp(76, 84, swap);
-        const mainIconD = lerp(188, 202, swap);
-        const secondaryIconD = lerp(84, 92, swap);
+        const frameW = this.hudW(160);
+        const frameH = this.hudH(160);
+        const frameR = this.hudU(34);
 
-        const mainX = x;
-        const mainY = y;
-        const secondaryX = x + 52;
-        const secondaryY = y + 48;
+        this.drawHudRoundedPanel(x, y, frameW, frameH, frameR, {
+            bg: "#F5F0FF",
+            stroke: "#9B8FB8",
+            strokeWeight: this.hudU(7),
+            outerShadowColor: "#000000",
+            outerShadowAlpha: 0.5,
+            outerShadowDistance: this.hudU(7),
+            outerShadowAngleDeg: 100,
+            innerShadowColor: "#FFFFFF",
+            innerShadowAlpha: 0.8,
+            innerShadowDistance: this.hudU(11),
+            innerShadowAngleDeg: 90
+        });
 
-        const drawHudPlate = (cx, cy, plateD, iconImg, iconD, rotDeg, alpha = 255) => {
-            push();
-            ellipseMode(CENTER);
-            stroke(0, alpha);
-            strokeWeight(5);
-            fill(255, alpha);
-            circle(cx, cy, plateD);
+        const cx = x + frameW / 2;
+        const cy = y + frameH / 2;
+        const pulse = 1 + sin(frameCount * 0.18) * 0.04 * swap;
+        const scaledH = this.hudU(120) * pulse;
 
-            if (iconImg) {
-                push();
-                tint(255, alpha);
-                imageMode(CENTER);
-                translate(cx, cy);
-                rotate(radians(rotDeg));
-                image(iconImg, 0, -8, iconD, iconD);
-                pop();
-                noTint();
-            }
-            pop();
-        };
-
-        push();
         if (!hasUtility) {
-            drawHudPlate(mainX, mainY, 136, backpackImg, 188, -20);
-            pop();
+            this.drawHudIconFitted(backpackImg, cx, cy, scaledH, 255, -8);
             return;
         }
 
-        const pulse = sin(frameCount * 0.18) * 0.04 * swap;
-
-        drawHudPlate(mainX, mainY, mainPlateD * (1 + pulse), backpackImg, mainIconD * (1 + pulse), -20, 255 * (1 - swap));
-        drawHudPlate(mainX, mainY, mainPlateD * (1 + pulse), utilityImg, mainIconD * (1 + pulse), -8, 255 * swap);
-        drawHudPlate(secondaryX, secondaryY, secondaryPlateD, utilityImg, secondaryIconD, -8, 230 * (1 - swap));
-        drawHudPlate(secondaryX, secondaryY, secondaryPlateD, backpackImg, secondaryIconD, -20, 230 * swap);
-        pop();
+        this.drawHudIconFitted(backpackImg, cx, cy, scaledH, 255 * (1 - swap), -8);
+        this.drawHudIconFitted(utilityImg, cx, cy, scaledH, 255 * swap, -3);
     }
    
     /**
      * Renders the distance progress bar mapped against the level's total distance target.
      */
     drawProgressBar(x, y) {
-        const barWidth = 70;
-        const barHeight = 500;
-        const padding = 4;
-
-        fill(255);
-        stroke(0);
-        strokeWeight(5);
-        rect(x, y, barWidth, barHeight, padding);
+        const frameW = this.hudW(70);
+        const frameH = this.hudH(480);
+        const frameR = this.hudU(20);
+        const inset = this.hudU(6);
 
         let total = DAYS_CONFIG[currentDayID].totalDistance;
-        let pct   = constrain(this.distanceRun / total, 0, 1);
+        let pct = constrain(this.distanceRun / total, 0, 1);
+        const innerX = x + inset;
+        const innerY = y + inset;
+        const innerW = frameW - inset * 2;
+        const innerH = frameH - inset * 2;
+        const fillH = innerH * pct;
 
-        fill(255, 212, 104);
-        let innerMaxH = barHeight - padding; // Maximum internal height
-        let currentH = innerMaxH * pct;      // Current progress height
-        rect(x + 2, y + barHeight - 2, barWidth - 4, -currentH, 3);
+        this.drawHudRoundedPanel(x, y, frameW, frameH, frameR, {
+            bg: "#F5F0FF",
+            stroke: "#9B8FB8",
+            strokeWeight: this.hudU(7),
+            outerShadowColor: "#000000",
+            outerShadowAlpha: 0.5,
+            outerShadowDistance: this.hudU(7),
+            outerShadowAngleDeg: 100,
+            innerShadowColor: "#FFFFFF",
+            innerShadowAlpha: 0.8,
+            innerShadowDistance: this.hudU(11),
+            innerShadowAngleDeg: 90
+        });
+
+        if (fillH > 0) {
+            push();
+            this.clipRoundedRect(innerX, innerY, innerW, innerH, max(this.hudU(8), frameR - inset));
+            const grad = drawingContext.createLinearGradient(innerX, innerY + innerH, innerX, innerY);
+            grad.addColorStop(0, "#F9A825");
+            grad.addColorStop(0.55, "#FFC107");
+            grad.addColorStop(1, "#FFD93D");
+            drawingContext.fillStyle = grad;
+            noStroke();
+            rect(innerX, innerY + innerH - fillH, innerW, fillH, max(this.hudU(8), frameR - inset));
+            pop();
+        }
+
+        const flagImg = assets.distanceFlagImg || null;
+        if (flagImg) {
+            imageMode(CORNER);
+            image(flagImg, this.hudX(38), this.hudY(255), this.hudW(79), this.hudH(91));
+        }
     }
 
-    drawSpeedBoostBanner() {
-        if (this.speedBoostFramesRemaining <= 0) return;
+    getHudScale() {
+        const sx = width / 1920;
+        const sy = height / 1080;
+        const su = min(sx, sy);
+        return { sx, sy, su };
+    }
+
+    hudX(v) {
+        return v * (width / 1920);
+    }
+
+    hudY(v) {
+        return v * (height / 1080);
+    }
+
+    hudW(v) {
+        return v * (width / 1920);
+    }
+
+    hudH(v) {
+        return v * (height / 1080);
+    }
+
+    hudU(v) {
+        const s = min(width / 1920, height / 1080);
+        return v * s;
+    }
+
+    drawHudRoundedPanel(x, y, w, h, r, style) {
+        const outer = this.shadowOffset(style.outerShadowDistance, style.outerShadowAngleDeg);
 
         push();
-        textAlign(CENTER, CENTER);
-        textSize(48);
-        textStyle(BOLD);
-        fill(255, 230, 80, 235);
-        stroke(30, 30, 30, 160);
-        strokeWeight(4);
-        text("SPEED UP", width / 2, height * 0.38);
+        noStroke();
+        fill(this.colorWithAlpha(style.outerShadowColor, style.outerShadowAlpha));
+        rect(x + outer.x, y + outer.y, w, h, r);
+        pop();
+
+        push();
+        noStroke();
+        fill(style.bg);
+        rect(x, y, w, h, r);
+        pop();
+
+        push();
+        this.clipRoundedRect(x, y, w, h, r);
+        const inner = this.shadowOffset(style.innerShadowDistance, style.innerShadowAngleDeg);
+        noStroke();
+        fill(this.colorWithAlpha(style.innerShadowColor, style.innerShadowAlpha));
+        rect(x + inner.x, y + inner.y, w, h, r);
+        pop();
+
+        push();
+        noFill();
+        stroke(style.stroke);
+        strokeWeight(style.strokeWeight);
+        rect(x, y, w, h, r);
         pop();
     }
 
-    applyRunScrollSpeed() {
-        if (this.baseRunScrollSpeed === null) {
-            this.baseRunScrollSpeed = GLOBAL_CONFIG.scrollSpeed;
-        }
+    drawHudIconFitted(img, cx, cy, targetH, alpha, rotDeg) {
+        if (!img || alpha <= 0) return;
 
-        const puddleMul = this.puddleTrapActive ? this.puddleSlowMultiplier : 1;
-        if (this.speedBoostFramesRemaining > 0) {
-            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed * this.activeSpeedMultiplier * puddleMul;
-            this.wasSpeedBoostActive = true;
-        } else if (this.wasSpeedBoostActive || this.puddleTrapActive) {
-            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed * puddleMul;
-            this.wasSpeedBoostActive = false;
-        }
+        const ratio = img.width > 0 && img.height > 0 ? (img.width / img.height) : 1;
+        const drawH = targetH;
+        const drawW = drawH * ratio;
+
+        push();
+        imageMode(CENTER);
+        tint(255, constrain(alpha, 0, 255));
+        translate(cx, cy);
+        rotate(radians(rotDeg || 0));
+        image(img, 0, 0, drawW, drawH);
+        noTint();
+        pop();
+    }
+
+    clipRoundedRect(x, y, w, h, r) {
+        const ctx = drawingContext;
+        const rr = min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + rr, y);
+        ctx.lineTo(x + w - rr, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+        ctx.lineTo(x + w, y + h - rr);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+        ctx.lineTo(x + rr, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+        ctx.lineTo(x, y + rr);
+        ctx.quadraticCurveTo(x, y, x + rr, y);
+        ctx.closePath();
+        ctx.clip();
+    }
+
+    clipCircle(cx, cy, d) {
+        const ctx = drawingContext;
+        ctx.beginPath();
+        ctx.arc(cx, cy, d / 2, 0, TWO_PI);
+        ctx.closePath();
+        ctx.clip();
+    }
+
+    shadowOffset(distance, angleDeg) {
+        return {
+            x: cos(radians(angleDeg)) * distance,
+            y: sin(radians(angleDeg)) * distance
+        };
+    }
+
+    colorWithAlpha(hex, alpha) {
+        const clean = String(hex || "#000000").replace("#", "");
+        const full = clean.length === 3
+            ? clean.split("").map(c => c + c).join("")
+            : clean;
+        const r = parseInt(full.slice(0, 2), 16) || 0;
+        const g = parseInt(full.slice(2, 4), 16) || 0;
+        const b = parseInt(full.slice(4, 6), 16) || 0;
+        return `rgba(${r}, ${g}, ${b}, ${constrain(alpha, 0, 1)})`;
     }
 
     drawSpeedBoostBanner() {

@@ -404,9 +404,33 @@ class FeedbackLayer {
         if (this.healthBarFlashFrames <= 0) return;
         const t = this.healthBarFlashFrames / this.healthBarFlashMax;
         const c = this.theme.uiHealthFlash;
+        const x = this.hudX(206);
+        const y = this.hudY(107);
+        const w = this.hudW(418);
+        const h = this.hudH(78);
         noFill();
         stroke(c[0], c[1], c[2], 220 * t);
-        strokeWeight(6);
-        rect(161, 61, 408, 58, 8);
+        strokeWeight(this.hudU(6));
+        rect(x, y, w, h, this.hudU(8));
+    }
+
+    hudX(v) {
+        return v * (width / 1920);
+    }
+
+    hudY(v) {
+        return v * (height / 1080);
+    }
+
+    hudW(v) {
+        return v * (width / 1920);
+    }
+
+    hudH(v) {
+        return v * (height / 1080);
+    }
+
+    hudU(v) {
+        return v * min(width / 1920, height / 1080);
     }
 }

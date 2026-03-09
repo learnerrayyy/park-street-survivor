@@ -469,7 +469,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 57;
+const totalAssetsToLoad = 58;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -502,6 +502,7 @@ function preload() {
     assets.tangleImg = loadImage('assets/inventory/tangle.png', itemLoaded);
     assets.headphoneImg = loadImage('assets/inventory/headphone.png', itemLoaded);
     assets.rainbootImg = loadImage('assets/inventory/rainboot.png', itemLoaded);
+    assets.distanceFlagImg = loadImage('assets/HUD/distance_flag.png', itemLoaded);
 
     assets.bbg = loadImage('assets/background/bbg.png', itemLoaded);
     assets.libraryBg = loadImage('assets/background/library.jpg', itemLoaded);
