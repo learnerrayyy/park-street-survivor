@@ -14,8 +14,9 @@ const MODE_PRESETS = {
       PROMOTER: 0.9,
       SMALL_BUSINESS: 1.0,
     },
-    minOnScreenOb: 2,
-    maxOnScreenOb: 4
+    // Deprecated: not consumed by ObstacleManager spawn logic.
+    // minOnScreenOb: 2,
+    // maxOnScreenOb: 4
   },
   2: {
     avgobPerWindow: 5.0,
@@ -30,8 +31,9 @@ const MODE_PRESETS = {
       FANTASY_COFFEE: 0.5,
       PUDDLE: 0.8
     },
-    minOnScreenOb: 3,
-    maxOnScreenOb: 6
+    // Deprecated: not consumed by ObstacleManager spawn logic.
+    // minOnScreenOb: 3,
+    // maxOnScreenOb: 6
   },
   3: {
     avgobPerWindow: 6.0,
@@ -45,8 +47,9 @@ const MODE_PRESETS = {
       SMALL_BUSINESS: 2.1,
       FANTASY_COFFEE: 0.8,
     },
-    minOnScreenOb: 6,
-    maxOnScreenOb: 7
+    // Deprecated: not consumed by ObstacleManager spawn logic.
+    // minOnScreenOb: 6,
+    // maxOnScreenOb: 7
   },
   4: {
     avgobPerWindow: 3.6,
@@ -61,8 +64,9 @@ const MODE_PRESETS = {
       FANTASY_COFFEE: 1.0,
       PUDDLE: 1.2
     },
-    minOnScreenOb: 2,
-    maxOnScreenOb: 6
+    // Deprecated: not consumed by ObstacleManager spawn logic.
+    // minOnScreenOb: 2,
+    // maxOnScreenOb: 6
   },
   5: {
     avgobPerWindow: 3.6,
@@ -77,8 +81,9 @@ const MODE_PRESETS = {
       FANTASY_COFFEE: 1.0,
       PUDDLE: 1.2
     },
-    minOnScreenOb: 2,
-    maxOnScreenOb: 6
+    // Deprecated: not consumed by ObstacleManager spawn logic.
+    // minOnScreenOb: 2,
+    // maxOnScreenOb: 6
   }
 
 };
@@ -100,7 +105,7 @@ function createModeCycleConfig(modePattern, modePresets, windowSec = 5) {
 const DIFFICULTY_PROGRESSION = {
   //level 1 is tutorial, so no procedural generation config needed
   1: {
-    description: "Day 1 - The Morning Commute",
+    description: "Such a nice sunny Monday",
     availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
       minObstacleInterval: 30
@@ -110,7 +115,7 @@ const DIFFICULTY_PROGRESSION = {
   },
 
   2: {
-    description: "Day 2 - Running Late",
+    description: "Tuesday, Keep the momentum going!",
     availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "SMALL_BUSINESS", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
       minObstacleInterval: 50
@@ -120,7 +125,7 @@ const DIFFICULTY_PROGRESSION = {
   },
 
   3: {
-    description: "Day 3 - Midweek Rush",
+    description: "Wednesday, Midweek Rush!",
     availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "FANTASY_COFFEE", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
       minObstacleInterval: 40
@@ -130,7 +135,7 @@ const DIFFICULTY_PROGRESSION = {
   },
 
   4: {
-    description: "Day 4 - Deadline Pressure",
+    description: "Thursday, It drizzled a little today—like every day I can’t stand.",
     availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "FANTASY_COFFEE", "PUDDLE", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
       minObstacleInterval: 35
@@ -140,7 +145,7 @@ const DIFFICULTY_PROGRESSION = {
   },
 
   5: {
-    description: "Day 5 - Final Challenge",
+    description: "Friday, The start or the end?",
     availableObstacles: ["LARGE_CAR", "SMALL_CAR", "SCOOTER_RIDER", "HOMELESS", "PROMOTER", "SMALL_BUSINESS", "FANTASY_COFFEE", "PUDDLE", "COFFEE", "EMPTY_SCOOTER"],
     spawnConfig: {
       minObstacleInterval: 30

@@ -131,9 +131,10 @@ const PLAYER_DEFAULTS = {
  */
 const DAYS_CONFIG = {
     1: {
-        description: "Day 1 - Learn the Basics",
+        description: "Monday, So good to enjoy the sun day!",
         totalDistance: 1000,
-        obstacleSpawnInterval: 60,
+        // Deprecated: obstacleSpawnInterval is not consumed by current spawn logic.
+        // obstacleSpawnInterval: 60,
         baseScrollSpeed: 14,
         basePlayerSpeed: 10,
         healthDecay: 0.02,
@@ -154,9 +155,10 @@ const DAYS_CONFIG = {
         type: "NORMAL"
     },
     2: {
-        description: "Day 2 - Running Late",
+        description: "Tuesday, Keep the momentum going!",
         totalDistance: 1500,
-        obstacleSpawnInterval: 60,
+        // Deprecated: obstacleSpawnInterval is not consumed by current spawn logic.
+        // obstacleSpawnInterval: 60,
         baseScrollSpeed: 15,
         basePlayerSpeed: 17,
         healthDecay: 0.04,
@@ -177,9 +179,10 @@ const DAYS_CONFIG = {
         type: "NORMAL"
     },
     3: {
-        description: "Day 3 - Midweek Rush",
+        description: "Wednesday, Midweek Rush!",
         totalDistance: 2500,
-        obstacleSpawnInterval: 60,
+        // Deprecated: obstacleSpawnInterval is not consumed by current spawn logic.
+        // obstacleSpawnInterval: 60,
         baseScrollSpeed: 16,
         basePlayerSpeed: 17,
         healthDecay: 0.03,
@@ -209,9 +212,10 @@ const DAYS_CONFIG = {
         type: "NORMAL"
     },
     4: {
-        description: "Day 4 - Deadline Pressure",
+        description: "Thursday, It drizzled a little today—like every day I can’t stand.",
         totalDistance: 4500,
-        obstacleSpawnInterval: 60,
+        // Deprecated: obstacleSpawnInterval is not consumed by current spawn logic.
+        // obstacleSpawnInterval: 60,
         baseScrollSpeed: 17,
         basePlayerSpeed: 19,
         healthDecay: 0.08,
@@ -232,9 +236,10 @@ const DAYS_CONFIG = {
         type: "NORMAL"
     },
     5: {
-        description: "Day 5 - Final Challenge",
+        description: "Friday, The start or the end?",
         totalDistance: 5500,
-        obstacleSpawnInterval: 60,
+        // Deprecated: obstacleSpawnInterval is not consumed by current spawn logic.
+        // obstacleSpawnInterval: 60,
         baseScrollSpeed: 18,
         basePlayerSpeed: 20,
         healthDecay: 0.10,
