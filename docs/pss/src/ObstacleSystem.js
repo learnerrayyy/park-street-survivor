@@ -1,6 +1,27 @@
 // Hazard & Entity Management
 // Responsibilities: Management of obstacle spawning, lifecycle, and collision detection logic.
 
+const HAZARD_PATTERNS = {
+    easy: [
+        "..X...X.",
+        ".X...X..",
+        "...X....",
+        "..X..X.."
+    ],
+    normal: [
+        ".X.X.X..",
+        "X..X..X.",
+        ".XX...X.",
+        "X.X...X."
+    ],
+    hard: [
+        "X.X.XX.X",
+        ".XXX..X.",
+        "XX..XX..",
+        "X.XX.X.X"
+    ]
+};
+
 class ObstacleManager {
     /**
      * CONSTRUCTOR: INITIALIZATION
@@ -28,6 +49,7 @@ class ObstacleManager {
         };
         this.promoterCooldownFramesRemaining = 0;
         this.modeCycleState = null;
+        this.spawnSchedulerState = null;
         this.elapsedSpawnFrames = 0;
         this.typeLastSpawnFrame = {};
         this.buffSpawnState = {
@@ -60,6 +82,9 @@ class ObstacleManager {
             intervalJitter: 0.35,
             minIntervalFrames: 10,
             maxIntervalFrames: 180,
+            patternStepSec: 0.4,
+            maxEmptyTimeSec: 1.2,
+            minReactionTimeSec: 1.05,
             spawnRetryFramesWhenBlocked: 8,
             diversityRerollChance: 0.72,
             sameTypePenaltyImmediate: 0.22,
@@ -394,10 +419,9 @@ class ObstacleManager {
             modeDisplayMap,
             elapsedFrames: 0,
             windowIndex: 0,
-            currentModeId: pattern[0],
-            hazardSpawnCountdownFrames: 0
+            currentModeId: pattern[0]
         };
-        this.scheduleNextHazardSpawn(this.getActiveModeConfig(), true);
+        this.initializeSpawnScheduler(this.getActiveModeConfig(), this.modeCycleState.currentModeId);
     }
 
     updateModeCycleWindowProgress() {
@@ -413,12 +437,7 @@ class ObstacleManager {
         if (nextModeId !== state.currentModeId) {
             state.currentModeId = nextModeId;
             this.triggerModeSwitchIndicator(nextModeId);
-            const modeCfg = this.getActiveModeConfig();
-            const suggested = this.computeHazardSpawnIntervalFrames(modeCfg);
-            state.hazardSpawnCountdownFrames = Math.min(
-                Number(state.hazardSpawnCountdownFrames || suggested),
-                suggested
-            );
+            this.initializeSpawnScheduler(this.getActiveModeConfig(), nextModeId, true);
         }
     }
 
@@ -430,6 +449,82 @@ class ObstacleManager {
 
     isModeCycleEnabled() {
         return !!(this.modeCycleState && this.getActiveModeConfig());
+    }
+
+    buildDifficultyProfile(modeConfig, modeId = null) {
+        const resolvedModeId = Number(modeId || (this.modeCycleState && this.modeCycleState.currentModeId) || 1);
+        let patternPool = modeConfig && typeof modeConfig.patternPool === "string"
+            ? modeConfig.patternPool
+            : null;
+        let speedMultiplier = Number(modeConfig && modeConfig.speedMultiplier);
+
+        if (!patternPool) {
+            if (resolvedModeId <= 2) patternPool = "easy";
+            else if (resolvedModeId === 3) patternPool = "normal";
+            else patternPool = "hard";
+        }
+        if (!Number.isFinite(speedMultiplier) || speedMultiplier <= 0) {
+            if (resolvedModeId <= 1) speedMultiplier = 0.9;
+            else if (resolvedModeId === 2) speedMultiplier = 1.0;
+            else if (resolvedModeId === 3) speedMultiplier = 1.05;
+            else speedMultiplier = 1.1;
+        }
+
+        return { patternPool, speedMultiplier };
+    }
+
+    initializeSpawnScheduler(modeConfig, modeId = null, resetPattern = false) {
+        const stepSec = Math.max(0.2, Number(this.hazardRhythmConfig.patternStepSec ?? 0.4));
+        const maxEmptySec = Math.max(stepSec, Number(this.hazardRhythmConfig.maxEmptyTimeSec ?? 1.2));
+        const profile = this.buildDifficultyProfile(modeConfig, modeId);
+
+        this.spawnSchedulerState = {
+            currentPattern: resetPattern || !this.spawnSchedulerState ? null : this.spawnSchedulerState.currentPattern,
+            lastPatternKey: resetPattern || !this.spawnSchedulerState ? "" : (this.spawnSchedulerState.lastPatternKey || ""),
+            stepIndex: resetPattern || !this.spawnSchedulerState ? 0 : (this.spawnSchedulerState.stepIndex || 0),
+            stepFrames: Math.max(1, this.secondsToFrames(stepSec)),
+            stepCountdownFrames: 0,
+            maxEmptyFrames: Math.max(1, this.secondsToFrames(maxEmptySec)),
+            framesSinceLastHazardSpawn: 0,
+            pendingSpawnRequests: 0,
+            profile
+        };
+    }
+
+    selectRhythmPattern(profile) {
+        const poolName = profile && profile.patternPool ? profile.patternPool : "normal";
+        const pool = Array.isArray(HAZARD_PATTERNS[poolName]) && HAZARD_PATTERNS[poolName].length > 0
+            ? HAZARD_PATTERNS[poolName]
+            : HAZARD_PATTERNS.normal;
+        if (pool.length === 1) return pool[0];
+
+        const lastPatternKey = this.spawnSchedulerState ? this.spawnSchedulerState.lastPatternKey : "";
+        const candidates = pool.filter(p => p !== lastPatternKey);
+        const source = candidates.length > 0 ? candidates : pool;
+        return source[Math.floor(Math.random() * source.length)];
+    }
+
+    advancePatternSchedulerStep() {
+        if (!this.spawnSchedulerState) return false;
+        const state = this.spawnSchedulerState;
+        if (!state.currentPattern) {
+            state.currentPattern = this.selectRhythmPattern(state.profile);
+            state.lastPatternKey = state.currentPattern;
+            state.stepIndex = 0;
+        }
+        if (!state.currentPattern || state.stepIndex >= state.currentPattern.length) {
+            state.currentPattern = null;
+            state.stepIndex = 0;
+            return false;
+        }
+
+        const symbol = state.currentPattern[state.stepIndex];
+        state.stepIndex++;
+        if (state.stepIndex >= state.currentPattern.length) {
+            state.currentPattern = null;
+            state.stepIndex = 0;
+        }
+        return symbol === "X";
     }
 
     initializeBuffControlState(difficultyConfig) {
@@ -650,30 +745,6 @@ class ObstacleManager {
         return occupied;
     }
 
-    computeHazardSpawnIntervalFrames(modeConfig) {
-        const windowFrames = Math.max(1, Number(this.modeCycleState && this.modeCycleState.windowFrames) || this.secondsToFrames(5));
-        const rawAvgOb = Number(modeConfig && (modeConfig.avgobPerWindow ?? modeConfig.obPerWindowMean));
-        const avgOb = Number.isFinite(rawAvgOb) && rawAvgOb > 0 ? rawAvgOb : 2.2;
-        const ideal = windowFrames / avgOb;
-        const densityMultiplier = Number(this.hazardRhythmConfig.densityMultiplier ?? 0.88);
-        const interval = ideal * densityMultiplier;
-        const minFrames = Number(this.hazardRhythmConfig.minIntervalFrames ?? 10);
-        const maxFrames = Number(this.hazardRhythmConfig.maxIntervalFrames ?? 180);
-        return constrain(Math.round(interval), minFrames, maxFrames);
-    }
-
-    scheduleNextHazardSpawn(modeConfig, immediate = false) {
-        if (!this.modeCycleState) return;
-        if (immediate) {
-            this.modeCycleState.hazardSpawnCountdownFrames = 0;
-            return;
-        }
-        const base = this.computeHazardSpawnIntervalFrames(modeConfig);
-        const jitter = Math.max(0, Math.min(0.95, Number(this.hazardRhythmConfig.intervalJitter ?? 0.35)));
-        const mul = 1 + ((Math.random() * 2 - 1) * jitter);
-        this.modeCycleState.hazardSpawnCountdownFrames = Math.max(1, Math.round(base * mul));
-    }
-
     passesSpawnLaneGap(lane, obstacleType, obstacleSize, config, spawnSpeed = 0) {
         const newY = -obstacleSize.height;
         const topBandY = Number(this.spawnSafety.topBandY ?? 520);
@@ -803,50 +874,121 @@ class ObstacleManager {
         return (variant && variant.sprite) ? variant.sprite : config.sprite;
     }
 
-    tryModeCycleSpawning(canSpawn) {
+    chooseLaneForSpawn(config, obstacleType, obstacleSize, spawnSpeed = 0, forceLane = 0) {
+        return this.selectSafeSpawnLane(config, obstacleType, obstacleSize, {
+            forceLane,
+            spawnSpeed
+        });
+    }
+
+    passesReactionTimeSafety(obstacleType, obstacleSize, spawnSpeed = 0) {
+        const config = OBSTACLE_CONFIG[obstacleType] || {};
+        if (config.type === "BUFF") return true;
+
+        const reactionTimeSec = Math.max(0.2, Number(this.hazardRhythmConfig.minReactionTimeSec ?? 1.05));
+        const baseSpeed = PLAYER_DEFAULTS.baseSpeed;
+        const effectiveScrollSpeed = Math.max(1, Number(GLOBAL_CONFIG.scrollSpeed || 12));
+        let obstacleMoveSpeed = Number(spawnSpeed || 0) * baseSpeed;
+        if (obstacleMoveSpeed <= 0.01) obstacleMoveSpeed = effectiveScrollSpeed;
+        if (config.type !== "BUFF" && Number(spawnSpeed || 0) > 0) {
+            obstacleMoveSpeed = Math.max(
+                obstacleMoveSpeed,
+                effectiveScrollSpeed * Number(this.spawnSafety.movingHazardMinScrollMultiplier ?? 1.10)
+            );
+        }
+
+        const spawnY = -Math.max(1, Number(obstacleSize && obstacleSize.height ? obstacleSize.height : 100));
+        const playerY = Number((typeof PLAYER_RUN_FOOT_Y !== "undefined" && PLAYER_RUN_FOOT_Y) ? PLAYER_RUN_FOOT_Y : 940);
+        const distanceToReach = Math.max(1, playerY - spawnY);
+        const timeToReach = distanceToReach / Math.max(1, obstacleMoveSpeed * 60);
+        return timeToReach >= reactionTimeSec;
+    }
+
+    requestHazardSpawn(options = {}) {
         const modeConfig = this.getActiveModeConfig();
-        if (!modeConfig || !this.modeCycleState) return false;
-        if (this.modeCycleState.hazardSpawnCountdownFrames > 0) {
-            this.modeCycleState.hazardSpawnCountdownFrames--;
+        if (!modeConfig || !this.spawnSchedulerState) return false;
+
+        const forceLane = Number(options.forceLane || 0);
+        const requestedObstacleType = options.obstacleType ? String(options.obstacleType) : null;
+        const profile = this.spawnSchedulerState.profile || this.buildDifficultyProfile(modeConfig);
+        let obstacleType = requestedObstacleType || this.selectDifficultyObstacle(modeConfig);
+        if (!obstacleType) {
             return false;
         }
-        if (!canSpawn) return false;
+
+        const config = OBSTACLE_CONFIG[obstacleType];
+        if (!config) return false;
+        const variant = config.variants && config.variants.length > 0
+            ? config.variants[Math.floor(Math.random() * config.variants.length)]
+            : config.variants?.[0];
+        const obstacleSize = (variant && variant.size) ? variant.size : config.size;
+        const baseSpawnSpeed = Number(config.speed.min) + Math.random() * (Number(config.speed.max) - Number(config.speed.min));
+        const spawnSpeed = Math.max(0, baseSpawnSpeed * Number(profile.speedMultiplier || 1));
+        if (!this.passesReactionTimeSafety(obstacleType, obstacleSize, spawnSpeed)) return false;
+
+        const lane = this.chooseLaneForSpawn(config, obstacleType, obstacleSize, spawnSpeed, forceLane);
+        if (!lane) return false;
+
+        const spawned = this.spawnObstacle({
+            obstacleType,
+            forceLane: lane,
+            speedMultiplier: Number(profile.speedMultiplier || 1),
+            speed: spawnSpeed,
+            variant
+        });
+        if (!spawned) {
+            return false;
+        }
+
+        if (this.centerLaneFlowState && forceLane > 0) {
+            this.centerLaneFlowState.nextLaneIndex++;
+            this.centerLaneFlowState.cooldownFrames = Math.max(
+                0,
+                Math.floor(Number(this.centerLaneFlowConfig.minFramesBetweenFlowSpawns ?? 8))
+            );
+        }
+        this.spawnSchedulerState.framesSinceLastHazardSpawn = 0;
+        return true;
+    }
+
+    tryModeCycleSpawning(canSpawn) {
+        const modeConfig = this.getActiveModeConfig();
+        if (!modeConfig || !this.spawnSchedulerState) return false;
+        const state = this.spawnSchedulerState;
+        state.framesSinceLastHazardSpawn++;
+
+        let shouldRequestSpawn = false;
+        if (state.stepCountdownFrames <= 0) {
+            shouldRequestSpawn = this.advancePatternSchedulerStep() || shouldRequestSpawn;
+            state.stepCountdownFrames = state.stepFrames;
+        } else {
+            state.stepCountdownFrames--;
+        }
+
+        const forceSpawnDueToEmpty = state.framesSinceLastHazardSpawn >= state.maxEmptyFrames;
+        if (forceSpawnDueToEmpty) {
+            shouldRequestSpawn = true;
+        }
+        if (!shouldRequestSpawn || !canSpawn) return false;
 
         const centerFlowReq = this.getCenterLaneFlowSpawnRequest();
         if (centerFlowReq) {
-            const spawnedByFlow = this.spawnObstacle({
+            const spawnedByFlow = this.requestHazardSpawn({
                 obstacleType: centerFlowReq.obstacleType,
                 forceLane: centerFlowReq.primaryLane
-            }) || this.spawnObstacle({
+            }) || this.requestHazardSpawn({
                 obstacleType: centerFlowReq.obstacleType,
                 forceLane: (centerFlowReq.fallbackLanes && centerFlowReq.fallbackLanes[0]) || centerFlowReq.primaryLane
             });
-            if (spawnedByFlow) {
-                this.centerLaneFlowState.nextLaneIndex++;
-                this.centerLaneFlowState.cooldownFrames = Math.max(
-                    0,
-                    Math.floor(Number(this.centerLaneFlowConfig.minFramesBetweenFlowSpawns ?? 8))
-                );
-                this.scheduleNextHazardSpawn(modeConfig, false);
-                return true;
-            }
+            if (spawnedByFlow) return true;
         }
 
-        const hazardType = this.selectDifficultyObstacle(modeConfig);
-        if (!hazardType) {
-            this.scheduleNextHazardSpawn(modeConfig, false);
-            return false;
+        const spawned = this.requestHazardSpawn();
+        if (spawned) return true;
+
+        if (forceSpawnDueToEmpty) {
+            state.framesSinceLastHazardSpawn = Math.max(0, state.maxEmptyFrames - Math.floor(state.stepFrames * 0.5));
         }
-        const spawned = this.spawnObstacle({ obstacleType: hazardType });
-        if (spawned) {
-            this.scheduleNextHazardSpawn(modeConfig, false);
-            return true;
-        }
-        // If blocked by lane safety this frame, retry quickly.
-        this.modeCycleState.hazardSpawnCountdownFrames = Math.max(
-            1,
-            Math.floor(Number(this.hazardRhythmConfig.spawnRetryFramesWhenBlocked ?? 8))
-        );
         return false;
     }
 
@@ -890,11 +1032,15 @@ class ObstacleManager {
 
 
         const variantId = this.getVariantForObstacle(obstacleType);
-        const variant = config.variants && config.variants.length > 0
+        const variant = normalized.variant || (config.variants && config.variants.length > 0
             ? config.variants[Math.floor(Math.random() * config.variants.length)]
-            : config.variants?.[0];
+            : config.variants?.[0]);
         const obstacleSize = (variant && variant.size) ? variant.size : config.size;
-        const spawnSpeed = Number(config.speed.min) + Math.random() * (Number(config.speed.max) - Number(config.speed.min));
+        const speedMultiplier = Math.max(0, Number(normalized.speedMultiplier || 1));
+        const providedSpeed = Number(normalized.speed);
+        const spawnSpeed = Number.isFinite(providedSpeed)
+            ? Math.max(0, providedSpeed)
+            : (Number(config.speed.min) + Math.random() * (Number(config.speed.max) - Number(config.speed.min))) * speedMultiplier;
         const forcedLane = Number(normalized.forceLane ?? 0);
         const lane = this.selectSafeSpawnLane(config, obstacleType, obstacleSize, {
             forceLane: forcedLane,

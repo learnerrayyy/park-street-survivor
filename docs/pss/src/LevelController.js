@@ -86,7 +86,7 @@ class LevelController {
          const backgroundThemeByDay = {
             1: "sunny",
             2: "sunny",
-            3: "sunny",
+            3: "lightRain",
             4: "lightRain",
             5: "heavyRain"
          };
@@ -105,7 +105,9 @@ class LevelController {
          env.defaultBg = env.defaultBgCycle[0] || null;
          env.destinationBg = preloadedDestination;
          if (env && typeof env.configureWeather === "function") {
-            env.configureWeather(themeKey);
+            // Day 3 uses lightRain backgrounds but should not have rain effects
+            const weatherTheme = dayID === 3 ? "sunny" : themeKey;
+            env.configureWeather(weatherTheme);
          }
 
          if (!env.defaultBg) {

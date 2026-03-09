@@ -307,7 +307,8 @@ class TestingPanel {
             { key: "bubbleTextSize", label: "bubbleTextSize", valueType: "number", min: 10 }
         ];
         this.modeFieldDefs = [
-            { key: "avgobPerWindow", label: "avgobPerWindow", valueType: "number", min: 0 },
+            { key: "patternPool", label: "patternPool", valueType: "text" },
+            { key: "speedMultiplier", label: "speedMultiplier", valueType: "number", min: 0.1 },
             { key: "obTypeMinGapSec", label: "obTypeMinGapSec (JSON)", valueType: "json" },
             { key: "obWeights", label: "obWeights (JSON)", valueType: "json" }
         ];
@@ -398,7 +399,7 @@ class TestingPanel {
         return DAYS_CONFIG[this.selectedDay] || null;
     }
 
-    createDefaultModeConfigForDay(dayID) {
+    createDefaultModeConfigForDay(dayID, modeId = 1) {
         const dcfg = DIFFICULTY_PROGRESSION[dayID] || {};
         const available = Array.isArray(dcfg.availableObstacles) ? dcfg.availableObstacles : [];
         const obWeights = {};
@@ -406,8 +407,10 @@ class TestingPanel {
             const cfg = OBSTACLE_CONFIG[type];
             if (cfg && cfg.type !== "BUFF") obWeights[type] = 1;
         }
+        const preset = (typeof MODE_PRESETS !== "undefined" && MODE_PRESETS && MODE_PRESETS[modeId]) ? MODE_PRESETS[modeId] : null;
         return {
-            avgobPerWindow: 2.4,
+            patternPool: String((preset && preset.patternPool) || "easy"),
+            speedMultiplier: Math.max(0.1, Number((preset && preset.speedMultiplier) || 1.0)),
             obTypeMinGapSec: {},
             obWeights: obWeights
         };
@@ -420,7 +423,7 @@ class TestingPanel {
             cfg.difficultyModeCycleConfig = cfg.modeCycleConfig;
         }
         if (!cfg.difficultyModeCycleConfig || typeof cfg.difficultyModeCycleConfig !== "object") {
-            cfg.difficultyModeCycleConfig = { windowSec: 5, modePattern: [1], modes: { 1: this.createDefaultModeConfigForDay(dayID) } };
+            cfg.difficultyModeCycleConfig = { windowSec: 5, modePattern: [1], modes: { 1: this.createDefaultModeConfigForDay(dayID, 1) } };
         }
 
         const modeCfg = cfg.difficultyModeCycleConfig;
@@ -434,14 +437,15 @@ class TestingPanel {
         if (!modeCfg.modes || typeof modeCfg.modes !== "object") modeCfg.modes = {};
 
         for (const modeId of modeCfg.modePattern) {
-            if (!modeCfg.modes[modeId]) modeCfg.modes[modeId] = this.createDefaultModeConfigForDay(dayID);
+            if (!modeCfg.modes[modeId]) modeCfg.modes[modeId] = this.createDefaultModeConfigForDay(dayID, modeId);
         }
 
         const ids = Object.keys(modeCfg.modes);
         let migratedBuffAvgPerWindow = null;
         for (const id of ids) {
             const m = modeCfg.modes[id];
-            const def = this.createDefaultModeConfigForDay(dayID);
+            const numericId = Number(id);
+            const def = this.createDefaultModeConfigForDay(dayID, numericId);
             if (!m || typeof m !== "object") {
                 modeCfg.modes[id] = def;
                 continue;
@@ -456,8 +460,11 @@ class TestingPanel {
             if (migratedBuffAvgPerWindow === null && Number.isFinite(legacyAvg) && legacyAvg > 0) {
                 migratedBuffAvgPerWindow = legacyAvg;
             }
-            const rawAvgOb = Number(m.avgobPerWindow);
-            m.avgobPerWindow = Number.isFinite(rawAvgOb) ? Math.max(0, rawAvgOb) : def.avgobPerWindow;
+            const validPatternPools = ["easy", "normal", "hard"];
+            const rawPatternPool = String(m.patternPool || "").trim();
+            m.patternPool = validPatternPools.includes(rawPatternPool) ? rawPatternPool : def.patternPool;
+            const rawSpeedMultiplier = Number(m.speedMultiplier);
+            m.speedMultiplier = Number.isFinite(rawSpeedMultiplier) ? Math.max(0.1, rawSpeedMultiplier) : def.speedMultiplier;
             if (!m.obTypeMinGapSec || typeof m.obTypeMinGapSec !== "object") m.obTypeMinGapSec = {};
             if (!m.obWeights || typeof m.obWeights !== "object") m.obWeights = {};
             delete m.avgbuffPerWindow;
@@ -465,6 +472,7 @@ class TestingPanel {
             delete m.buffGlobalMinGapSec;
             delete m.buffTypeMinGapSec;
             delete m.obPerWindowMean;
+            delete m.avgobPerWindow;
             delete m.minOnScreenOb;
             delete m.maxOnScreenOb;
         }
@@ -535,7 +543,7 @@ class TestingPanel {
         const cycle = this.getCurrentModeCycleConfig();
         if (!cycle || !cycle.modes) return;
         const id = Math.max(1, Math.min(10, Math.round(Number(modeId || 1))));
-        if (!cycle.modes[id]) cycle.modes[id] = this.createDefaultModeConfigForDay(this.selectedDay);
+        if (!cycle.modes[id]) cycle.modes[id] = this.createDefaultModeConfigForDay(this.selectedDay, id);
     }
 
     parseModeSequenceInput(rawText) {
@@ -739,7 +747,7 @@ class TestingPanel {
                 if (parsed && parsed.length > 0) {
                     cycle.modePattern = parsed;
                     for (const modeId of parsed) {
-                        if (!cycle.modes[modeId]) cycle.modes[modeId] = this.createDefaultModeConfigForDay(this.selectedDay);
+                        if (!cycle.modes[modeId]) cycle.modes[modeId] = this.createDefaultModeConfigForDay(this.selectedDay, modeId);
                     }
                     if (!cycle.modes[this.selectedModeId]) this.selectedModeId = parsed[0];
                     this.applyLiveConfigIfActiveDay();
@@ -761,6 +769,16 @@ class TestingPanel {
                         }
                     } catch (err) {
                         // Ignore invalid JSON and keep old value.
+                    }
+                } else if (def.valueType === "text") {
+                    const textVal = String(this.inputBuffer || "").trim();
+                    if (def.key === "patternPool") {
+                        const normalized = textVal.toLowerCase();
+                        if (["easy", "normal", "hard"].includes(normalized)) {
+                            modeCfg[def.key] = normalized;
+                        }
+                    } else if (textVal.length > 0) {
+                        modeCfg[def.key] = textVal;
                     }
                 } else {
                     let num = parseFloat(this.inputBuffer);
@@ -877,7 +895,7 @@ class TestingPanel {
 
         if (this.editTarget.kind === "modeField") {
             const def = this.modeFieldDefs.find(d => d.key === this.editTarget.fieldKey);
-            if (def && def.valueType === "json") {
+            if (def && (def.valueType === "json" || def.valueType === "text")) {
                 if (k && k.length === 1) {
                     this.inputBuffer += k;
                     return true;
@@ -1035,7 +1053,7 @@ class TestingPanel {
             const cycle = diffCfg ? (diffCfg.difficultyModeCycleConfig || diffCfg.modeCycleConfig) : null;
             if (!cycle || typeof cycle !== "object") return;
             if (!cycle.modes || typeof cycle.modes !== "object") cycle.modes = {};
-            if (!cycle.modes[safeModeId]) cycle.modes[safeModeId] = this.createDefaultModeConfigForDay(safeDay);
+            if (!cycle.modes[safeModeId]) cycle.modes[safeModeId] = this.createDefaultModeConfigForDay(safeDay, safeModeId);
             cycle.modePattern = [safeModeId];
             if (!cycle.modeDisplayMap || typeof cycle.modeDisplayMap !== "object") cycle.modeDisplayMap = {};
             if (cycle.modeDisplayMap[safeModeId] === undefined) cycle.modeDisplayMap[safeModeId] = safeModeId;
