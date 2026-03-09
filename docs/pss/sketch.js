@@ -14,7 +14,9 @@ let tutorialSlidePlayback = {
     active: false,
     frameStart: 0,
     currentIndex: 0,
-    framesPerSlide: 60
+    framesPerSlide: 60,
+    keyframeHoldFrames: 180,
+    textKeyframes: new Set([2, 5, 8, 11, 14, 17, 21, 22, 25, 26, 29])
 };
 
 // ─── GAME PROGRESS STATE ─────────────────────────────────────────────────────
@@ -2003,7 +2005,21 @@ function drawTutorialSlidesScreen() {
     }
 
     const elapsedFrames = Math.max(0, frameCount - tutorialSlidePlayback.frameStart);
-    const slideIndex = Math.floor(elapsedFrames / tutorialSlidePlayback.framesPerSlide);
+    const defaultFrames = Math.max(1, Number(tutorialSlidePlayback.framesPerSlide || 60));
+    const keyframeHoldFrames = Math.max(defaultFrames, Number(tutorialSlidePlayback.keyframeHoldFrames || 180));
+    const textKeyframes = tutorialSlidePlayback.textKeyframes instanceof Set
+        ? tutorialSlidePlayback.textKeyframes
+        : new Set();
+
+    let slideIndex = 0;
+    let remainingFrames = elapsedFrames;
+    while (slideIndex < slides.length) {
+        const slideNumber = slideIndex + 1;
+        const durationFrames = textKeyframes.has(slideNumber) ? keyframeHoldFrames : defaultFrames;
+        if (remainingFrames < durationFrames) break;
+        remainingFrames -= durationFrames;
+        slideIndex++;
+    }
     tutorialSlidePlayback.currentIndex = slideIndex;
 
     if (slideIndex >= slides.length) {
@@ -2030,7 +2046,7 @@ function drawTutorialSlidesScreen() {
     textFont(fonts.jersey20 || fonts.body);
     textSize(28);
     fill(255, 235, 200);
-    text("Click anywhere to continue", width / 2, height - 54);
+    text("Tutorial will continue automatically", width / 2, height - 54);
     pop();
 }
 
