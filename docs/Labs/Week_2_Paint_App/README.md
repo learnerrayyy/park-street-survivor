@@ -28,7 +28,7 @@
 
 ### Live Demo & Source
 
-[**[ Click Here to Run Paint App ]**](https://uob-comsm0166.github.io/2026-group-7/Labs/Week_2_Paint_App/)
+[**[ Click Here to Run Paint App ]**](https://learnerrayyy.github.io/park-street-survivor/Labs/Week_2_Paint_App/)
 
 [**View Source Code (sketch.js)**](./sketch.js)
 
