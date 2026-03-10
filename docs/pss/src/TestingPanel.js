@@ -137,16 +137,21 @@ function devToggle() {
 
 /**
  * Drops the game directly into the Room scene for layout and interaction testing.
- * Call from the browser console: setupRoomTestMode()
+ * @param {number} dayOverride Optional day ID override.
+ * Call from the browser console: setupRoomTestMode() or setupRoomTestMode(4)
  */
-function setupRoomTestMode() {
-    console.log("[DEV] Entering ROOM directly");
+function setupRoomTestMode(dayOverride) {
+    const dayID = Number.isFinite(Number(dayOverride)) ? Number(dayOverride) : DEBUG_DAY_ID;
+    console.log(`[DEV] Entering ROOM directly (Day ${dayID})`);
+    currentDayID = dayID;
+    if (player) player.applyLevelStats(dayID);
     gameState.currentState = STATE_ROOM;
     if (player) {
         player.x = DEBUG_PLAYER_X;
         player.y = DEBUG_PLAYER_Y;
     }
     if (roomScene) roomScene.reset();
+    if (backpackUI) backpackUI.resetForNewDay();
 }
 
 /**
@@ -227,7 +232,7 @@ function devApplyStartupSkip() {
     }
 
     if (DEBUG_START_STATE === STATE_ROOM) {
-        setupRoomTestMode();
+        setupRoomTestMode(DEBUG_DAY_ID);
     } else if (DEBUG_START_STATE === STATE_DAY_RUN) {
         setupRunTestMode();
     } else if (DEBUG_START_STATE === STATE_INVENTORY) {
@@ -265,9 +270,9 @@ class TestingPanel {
         this.selectedModeId = 1;
         this.uiTunerHitboxes = [];
         this.uiTunerDefs = [
-            { key: "devMenuBtnW",     label: "Btn Width"  },
-            { key: "devMenuBtnH",     label: "Btn Height" },
-            { key: "devMenuTextSize", label: "Text Size"  }
+            { key: "devMenuBtnW", label: "Btn Width" },
+            { key: "devMenuBtnH", label: "Btn Height" },
+            { key: "devMenuTextSize", label: "Text Size" }
         ];
 
         const preferredObstacleOrder = [
@@ -292,7 +297,6 @@ class TestingPanel {
             { key: "description", label: "Description", valueType: "text" },
             { key: "totalDistance", label: "Length(totalDistance)", valueType: "int", min: 1 },
             { key: "realTimeLimit", label: "realTimeLimit", valueType: "int", min: 1 },
-            { key: "obstacleSpawnInterval", label: "obstacleSpawnInterval", valueType: "int", min: 0 },
             { key: "baseScrollSpeed", label: "baseScrollSpeed", valueType: "number", min: 0 },
             { key: "basePlayerSpeed", label: "basePlayerSpeed", valueType: "number", min: 0 },
             { key: "healthDecay", label: "healthDecay", valueType: "number", min: 0 },
@@ -303,11 +307,10 @@ class TestingPanel {
             { key: "bubbleTextSize", label: "bubbleTextSize", valueType: "number", min: 10 }
         ];
         this.modeFieldDefs = [
-            { key: "avgobPerWindow", label: "avgobPerWindow", valueType: "number", min: 0 },
+            { key: "patternPool", label: "patternPool", valueType: "text" },
+            { key: "speedMultiplier", label: "speedMultiplier", valueType: "number", min: 0.1 },
             { key: "obTypeMinGapSec", label: "obTypeMinGapSec (JSON)", valueType: "json" },
-            { key: "obWeights", label: "obWeights (JSON)", valueType: "json" },
-            { key: "minOnScreenOb", label: "minOnScreenOb", valueType: "int", min: 0 },
-            { key: "maxOnScreenOb", label: "maxOnScreenOb", valueType: "int", min: 0 }
+            { key: "obWeights", label: "obWeights (JSON)", valueType: "json" }
         ];
         this.buffControlDefs = [
             { key: "avgRespawnSec", label: "avgBuffRespawnSec", valueType: "number", min: 0.2 },
@@ -360,7 +363,7 @@ class TestingPanel {
     initializeHomelessDebugFields() {
         if (!OBSTACLE_CONFIG.HOMELESS) return;
         if (OBSTACLE_CONFIG.HOMELESS.bubbleOffsetX === undefined) OBSTACLE_CONFIG.HOMELESS.bubbleOffsetX = 0;
-        if (OBSTACLE_CONFIG.HOMELESS.bubbleTextSize === undefined) OBSTACLE_CONFIG.HOMELESS.bubbleTextSize = 14;
+        if (OBSTACLE_CONFIG.HOMELESS.bubbleTextSize === undefined) OBSTACLE_CONFIG.HOMELESS.bubbleTextSize = 18;
     }
 
     toggle() {
@@ -396,7 +399,7 @@ class TestingPanel {
         return DAYS_CONFIG[this.selectedDay] || null;
     }
 
-    createDefaultModeConfigForDay(dayID) {
+    createDefaultModeConfigForDay(dayID, modeId = 1) {
         const dcfg = DIFFICULTY_PROGRESSION[dayID] || {};
         const available = Array.isArray(dcfg.availableObstacles) ? dcfg.availableObstacles : [];
         const obWeights = {};
@@ -404,12 +407,12 @@ class TestingPanel {
             const cfg = OBSTACLE_CONFIG[type];
             if (cfg && cfg.type !== "BUFF") obWeights[type] = 1;
         }
+        const preset = (typeof MODE_PRESETS !== "undefined" && MODE_PRESETS && MODE_PRESETS[modeId]) ? MODE_PRESETS[modeId] : null;
         return {
-            avgobPerWindow: 2.4,
+            patternPool: String((preset && preset.patternPool) || "easy"),
+            speedMultiplier: Math.max(0.1, Number((preset && preset.speedMultiplier) || 1.0)),
             obTypeMinGapSec: {},
-            obWeights: obWeights,
-            minOnScreenOb: 1,
-            maxOnScreenOb: 4
+            obWeights: obWeights
         };
     }
 
@@ -420,7 +423,7 @@ class TestingPanel {
             cfg.difficultyModeCycleConfig = cfg.modeCycleConfig;
         }
         if (!cfg.difficultyModeCycleConfig || typeof cfg.difficultyModeCycleConfig !== "object") {
-            cfg.difficultyModeCycleConfig = { windowSec: 5, modePattern: [1], modes: { 1: this.createDefaultModeConfigForDay(dayID) } };
+            cfg.difficultyModeCycleConfig = { windowSec: 5, modePattern: [1], modes: { 1: this.createDefaultModeConfigForDay(dayID, 1) } };
         }
 
         const modeCfg = cfg.difficultyModeCycleConfig;
@@ -434,14 +437,15 @@ class TestingPanel {
         if (!modeCfg.modes || typeof modeCfg.modes !== "object") modeCfg.modes = {};
 
         for (const modeId of modeCfg.modePattern) {
-            if (!modeCfg.modes[modeId]) modeCfg.modes[modeId] = this.createDefaultModeConfigForDay(dayID);
+            if (!modeCfg.modes[modeId]) modeCfg.modes[modeId] = this.createDefaultModeConfigForDay(dayID, modeId);
         }
 
         const ids = Object.keys(modeCfg.modes);
         let migratedBuffAvgPerWindow = null;
         for (const id of ids) {
             const m = modeCfg.modes[id];
-            const def = this.createDefaultModeConfigForDay(dayID);
+            const numericId = Number(id);
+            const def = this.createDefaultModeConfigForDay(dayID, numericId);
             if (!m || typeof m !== "object") {
                 modeCfg.modes[id] = def;
                 continue;
@@ -456,10 +460,11 @@ class TestingPanel {
             if (migratedBuffAvgPerWindow === null && Number.isFinite(legacyAvg) && legacyAvg > 0) {
                 migratedBuffAvgPerWindow = legacyAvg;
             }
-            const rawAvgOb = Number(m.avgobPerWindow);
-            m.avgobPerWindow = Number.isFinite(rawAvgOb) ? Math.max(0, rawAvgOb) : def.avgobPerWindow;
-            m.minOnScreenOb = Math.max(0, Math.round(Number(m.minOnScreenOb || 0)));
-            m.maxOnScreenOb = Math.max(m.minOnScreenOb, Math.round(Number(m.maxOnScreenOb || 0)));
+            const validPatternPools = ["easy", "normal", "hard"];
+            const rawPatternPool = String(m.patternPool || "").trim();
+            m.patternPool = validPatternPools.includes(rawPatternPool) ? rawPatternPool : def.patternPool;
+            const rawSpeedMultiplier = Number(m.speedMultiplier);
+            m.speedMultiplier = Number.isFinite(rawSpeedMultiplier) ? Math.max(0.1, rawSpeedMultiplier) : def.speedMultiplier;
             if (!m.obTypeMinGapSec || typeof m.obTypeMinGapSec !== "object") m.obTypeMinGapSec = {};
             if (!m.obWeights || typeof m.obWeights !== "object") m.obWeights = {};
             delete m.avgbuffPerWindow;
@@ -467,6 +472,9 @@ class TestingPanel {
             delete m.buffGlobalMinGapSec;
             delete m.buffTypeMinGapSec;
             delete m.obPerWindowMean;
+            delete m.avgobPerWindow;
+            delete m.minOnScreenOb;
+            delete m.maxOnScreenOb;
         }
 
         const buffCfg = this.getCurrentBuffControlConfigByDay(dayID);
@@ -535,7 +543,7 @@ class TestingPanel {
         const cycle = this.getCurrentModeCycleConfig();
         if (!cycle || !cycle.modes) return;
         const id = Math.max(1, Math.min(10, Math.round(Number(modeId || 1))));
-        if (!cycle.modes[id]) cycle.modes[id] = this.createDefaultModeConfigForDay(this.selectedDay);
+        if (!cycle.modes[id]) cycle.modes[id] = this.createDefaultModeConfigForDay(this.selectedDay, id);
     }
 
     parseModeSequenceInput(rawText) {
@@ -739,7 +747,7 @@ class TestingPanel {
                 if (parsed && parsed.length > 0) {
                     cycle.modePattern = parsed;
                     for (const modeId of parsed) {
-                        if (!cycle.modes[modeId]) cycle.modes[modeId] = this.createDefaultModeConfigForDay(this.selectedDay);
+                        if (!cycle.modes[modeId]) cycle.modes[modeId] = this.createDefaultModeConfigForDay(this.selectedDay, modeId);
                     }
                     if (!cycle.modes[this.selectedModeId]) this.selectedModeId = parsed[0];
                     this.applyLiveConfigIfActiveDay();
@@ -762,18 +770,22 @@ class TestingPanel {
                     } catch (err) {
                         // Ignore invalid JSON and keep old value.
                     }
+                } else if (def.valueType === "text") {
+                    const textVal = String(this.inputBuffer || "").trim();
+                    if (def.key === "patternPool") {
+                        const normalized = textVal.toLowerCase();
+                        if (["easy", "normal", "hard"].includes(normalized)) {
+                            modeCfg[def.key] = normalized;
+                        }
+                    } else if (textVal.length > 0) {
+                        modeCfg[def.key] = textVal;
+                    }
                 } else {
                     let num = parseFloat(this.inputBuffer);
                     if (!Number.isFinite(num)) num = Number(modeCfg[def.key] ?? 0);
                     if (def.valueType === "int") num = Math.round(num);
                     if (typeof def.min === "number") num = Math.max(def.min, num);
                     modeCfg[def.key] = num;
-                    if (def.key === "maxOnScreenOb") {
-                        modeCfg.maxOnScreenOb = Math.max(modeCfg.minOnScreenOb || 0, modeCfg.maxOnScreenOb || 0);
-                    }
-                    if (def.key === "minOnScreenOb") {
-                        modeCfg.maxOnScreenOb = Math.max(modeCfg.minOnScreenOb || 0, modeCfg.maxOnScreenOb || 0);
-                    }
                 }
                 this.applyLiveConfigIfActiveDay();
             }
@@ -806,9 +818,9 @@ class TestingPanel {
         if (this.editTarget.kind === "uiTuner") {
             let num = parseFloat(this.inputBuffer);
             if (!Number.isFinite(num)) num = 0;
-            if (this.editTarget.key === "devMenuBtnW")     devMenuBtnW     = Math.max(40,  Math.round(num));
-            if (this.editTarget.key === "devMenuBtnH")     devMenuBtnH     = Math.max(10,  Math.round(num));
-            if (this.editTarget.key === "devMenuTextSize") devMenuTextSize = Math.max(8,   Math.round(num));
+            if (this.editTarget.key === "devMenuBtnW") devMenuBtnW = Math.max(40, Math.round(num));
+            if (this.editTarget.key === "devMenuBtnH") devMenuBtnH = Math.max(10, Math.round(num));
+            if (this.editTarget.key === "devMenuTextSize") devMenuTextSize = Math.max(8, Math.round(num));
         }
 
         this.cancelEditing();
@@ -883,7 +895,7 @@ class TestingPanel {
 
         if (this.editTarget.kind === "modeField") {
             const def = this.modeFieldDefs.find(d => d.key === this.editTarget.fieldKey);
-            if (def && def.valueType === "json") {
+            if (def && (def.valueType === "json" || def.valueType === "text")) {
                 if (k && k.length === 1) {
                     this.inputBuffer += k;
                     return true;
@@ -1041,7 +1053,7 @@ class TestingPanel {
             const cycle = diffCfg ? (diffCfg.difficultyModeCycleConfig || diffCfg.modeCycleConfig) : null;
             if (!cycle || typeof cycle !== "object") return;
             if (!cycle.modes || typeof cycle.modes !== "object") cycle.modes = {};
-            if (!cycle.modes[safeModeId]) cycle.modes[safeModeId] = this.createDefaultModeConfigForDay(safeDay);
+            if (!cycle.modes[safeModeId]) cycle.modes[safeModeId] = this.createDefaultModeConfigForDay(safeDay, safeModeId);
             cycle.modePattern = [safeModeId];
             if (!cycle.modeDisplayMap || typeof cycle.modeDisplayMap !== "object") cycle.modeDisplayMap = {};
             if (cycle.modeDisplayMap[safeModeId] === undefined) cycle.modeDisplayMap[safeModeId] = safeModeId;
@@ -1103,7 +1115,7 @@ class TestingPanel {
         }
 
         if (actionId === "goto_room") {
-            if (typeof setupRoomTestMode === "function") setupRoomTestMode();
+            if (typeof setupRoomTestMode === "function") setupRoomTestMode(this.selectedDay);
             return;
         }
 
@@ -1174,6 +1186,10 @@ class TestingPanel {
         if (roomMatch) {
             const day = parseInt(roomMatch[1]);
             this.visible = false;
+            currentDayID = day;
+            if (typeof player !== "undefined" && player) player.applyLevelStats(day);
+            if (typeof roomScene !== "undefined" && roomScene) roomScene.reset();
+            if (typeof backpackUI !== "undefined" && backpackUI) backpackUI.resetForNewDay();
             if (typeof triggerTransition === "function" && typeof startCutscene === "function"
                 && typeof CS_DAY_ROOM !== 'undefined' && CS_DAY_ROOM[day]) {
                 triggerTransition(() => startCutscene('room', CS_DAY_ROOM[day], () => {
@@ -1322,9 +1338,6 @@ class TestingPanel {
         cursorY += sectionGap;
 
         this.drawDevActions(sectionX, cursorY + 6, sectionW, 170);
-        cursorY += 176;
-        const devActionsH = this.drawDevActions(sectionX, cursorY + 6, sectionW, 84);
-        cursorY += devActionsH + 6;
         pop();
     }
 
@@ -1338,7 +1351,7 @@ class TestingPanel {
         fill(0);
         textAlign(LEFT, CENTER);
         textStyle(BOLD);
-        textSize(19);
+        textSize(28);
         const mark = this.isSectionExpanded(sectionKey) ? "[-]" : "[+]";
         text(`${mark} ${label}`, x + 10, y + h / 2 + 1);
         this.sectionHeaderHitboxes.push({ sectionKey, x, y, w, h });
@@ -1364,7 +1377,7 @@ class TestingPanel {
             fill(selected ? 255 : 0);
             textAlign(CENTER, CENTER);
             textStyle(BOLD);
-            textSize(24);
+            textSize(28);
             text(`DAY ${day}`, bx + buttonW / 2, y + buttonH / 2 + 1);
 
             this.dayButtons.push({ day, x: bx, y, w: buttonW, h: buttonH });
@@ -1386,7 +1399,7 @@ class TestingPanel {
         textAlign(LEFT, CENTER);
         text("Difficulty Mode Sequence", x + 12, y + 18);
 
-        textSize(16);
+        textSize(20);
         text("Input example: 1231010 or 1,2,3,10,1,2", x + 12, y + 40);
 
         const valueX = x + 12;
@@ -1447,7 +1460,7 @@ class TestingPanel {
             fill(selected ? 255 : (inPattern ? 0 : 110));
             textAlign(CENTER, CENTER);
             textStyle(BOLD);
-            textSize(16);
+            textSize(20);
             text(`MODE ${modeId}`, bx + btnW / 2, byRow + btnH / 2 + 1);
             this.modeButtons.push({ modeId, x: bx, y: byRow, w: btnW, h: btnH });
         }
@@ -1481,7 +1494,7 @@ class TestingPanel {
 
             fill(0);
             textStyle(BOLD);
-            textSize(17);
+            textSize(20);
             textAlign(LEFT, CENTER);
             text(def.label, cellX, cellY + rowH / 2);
 
@@ -1496,7 +1509,7 @@ class TestingPanel {
             fill(0);
             textAlign(LEFT, CENTER);
             textStyle(BOLD);
-            textSize(15);
+                textSize(18);
             const rawVal = modeCfg[def.key];
             let valueText = isEditing ? `${this.inputBuffer}_` : this.stringifyCompactValue(rawVal);
             if (!isEditing && valueText.length > 64) valueText = `${valueText.slice(0, 64)}...`;
@@ -1525,7 +1538,7 @@ class TestingPanel {
         fill(0);
         textAlign(LEFT, CENTER);
         textStyle(BOLD);
-        textSize(16);
+            textSize(18);
         text("obWeights Preview", innerX + 8, panelY + 12);
 
         const sorted = keys.sort((a, b) => a.localeCompare(b));
@@ -1534,7 +1547,7 @@ class TestingPanel {
         for (let i = 0; i < Math.min(maxLines, sorted.length); i++) {
             const k = sorted[i];
             const v = weightMap[k];
-            textSize(14);
+                textSize(18);
             text(`${k}: ${v}`, innerX + 10, panelY + 26 + i * lineH);
         }
     }
@@ -1565,7 +1578,7 @@ class TestingPanel {
 
             fill(0);
             textStyle(BOLD);
-            textSize(17);
+                textSize(18);
             textAlign(LEFT, CENTER);
             text(def.label, innerX, cellY + rowH / 2);
 
@@ -1580,7 +1593,7 @@ class TestingPanel {
             fill(0);
             textAlign(LEFT, CENTER);
             textStyle(BOLD);
-            textSize(15);
+                textSize(18);
             let valueText = isEditing ? `${this.inputBuffer}_` : this.stringifyCompactValue(cfg[def.key]);
             if (!isEditing && valueText.length > 64) valueText = `${valueText.slice(0, 64)}...`;
             text(valueText, valueX + 6, cellY + rowH / 2 + 1);
@@ -1789,7 +1802,7 @@ class TestingPanel {
         noStroke();
         fill(0);
         textStyle(BOLD);
-        textSize(16);
+            textSize(18);
         textAlign(CENTER, CENTER);
         text("ALL OFF", allOffX + allOffW / 2, allOffY + allOffH / 2 + 1);
 
@@ -1910,7 +1923,7 @@ class TestingPanel {
             stroke(0); strokeWeight(1.2); fill(255);
             rect(bx, r1Y, r1BtnW, btnH, 6);
             noStroke(); fill(0);
-            textAlign(CENTER, CENTER); textStyle(BOLD); textSize(17);
+                textAlign(CENTER, CENTER); textStyle(BOLD); textSize(18);
             text(b.label, bx + r1BtnW / 2, r1Y + btnH / 2 + 1);
             this.devButtons.push({ id: b.id, x: bx, y: r1Y, w: r1BtnW, h: btnH });
         }
@@ -1946,7 +1959,7 @@ class TestingPanel {
             stroke(0, 120); strokeWeight(1); fill(230, 240, 255);
             rect(bx, r2Y, r2BtnW, btnH, 6);
             noStroke(); fill(20, 40, 120);
-            textAlign(CENTER, CENTER); textStyle(BOLD); textSize(16);
+                textAlign(CENTER, CENTER); textStyle(BOLD); textSize(18);
             text(b.label, bx + r2BtnW / 2, r2Y + btnH / 2 + 1);
             this.devButtons.push({ id: b.id, x: bx, y: r2Y, w: r2BtnW, h: btnH });
         }

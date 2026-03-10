@@ -60,6 +60,7 @@ const SaveSystem = {
      */
     tick() {
         if (typeof gameState === 'undefined') return;
+        if (typeof isStoryRunMode === 'function' && !isStoryRunMode()) return;
         const s = gameState.currentState;
         if (s !== STATE_ROOM && s !== STATE_DAY_RUN && s !== STATE_PAUSED) return;
         const now = Date.now();

@@ -15,8 +15,8 @@ class MainMenu {
         this.setupButtons();
 
         this.backButton = new UIButton(70, 65, 60, 60, "BACK_ARROW", () => this.handleBackAction());
-        this.bgmSlider = new UISlider(width / 2, height / 2 - 80, 400, 0, 1, masterVolumeBGM, "MUSIC VOLUME");
-        this.sfxSlider = new UISlider(width / 2, height / 2 + 50, 400, 0, 1, masterVolumeSFX, "SOUND EFFECTS");
+        this.bgmSlider = new UISlider(width / 2 - 43, height / 2 - 80, 480, 0, 1, masterVolumeBGM, "MUSIC VOLUME");
+        this.sfxSlider = new UISlider(width / 2 - 43, height / 2 + 100, 480, 0, 1, masterVolumeSFX, "SOUND EFFECTS");
 
         // Difficulty selector state (kept for save-system compatibility)
         this.difficultyIndex = gameDifficulty;  // 0=EASY, 1=NORMAL, 2=HARD
@@ -41,7 +41,7 @@ class MainMenu {
             { id: 'move_combo', a: "MOVEMENT", d: "WASD or Arrows to navigate." },
             { id: 'enter', a: "NEXT PAGE", d: "Cycle through system intel." },
             { id: 'space', a: "PARKOUR", d: "Interact during the run." },
-            { id: 'e', a: "INTERACT", d: "Talk to NPCs or use items." },
+            { id: 'e', a: "INTERACT", d: "Interact with objects." },
             { id: 'p', a: "PAUSE", d: "Freeze time & system menu." }
         ];
         // Character index for the wiki sub-navigation (page 1)
@@ -83,21 +83,21 @@ class MainMenu {
                 name: "YUKI",
                 unlockDay: 4,
                 portraitKey: "portraitYuki",
-                mbti: "ISFJ",
-                mbtiLabel: "The Defender",
-                description: "Quiet, dependable, observant. Deeply caring but rarely shows it outwardly. Notices things others miss and remembers small details about the people she cares about. Prefers small gatherings over loud social events. Has a deep appreciation for Japanese street food culture — her idea of travelling involves finding the perfect ramen shop. She is calm under pressure, the kind of person who quietly fixes things before anyone realises they were broken.",
-                signature: "Hand cream  ·  Onigiri  ·  Mini succulent plant",
-                story: "Yuki met Iris in their second year at university, through a mutual friend. She was initially the quietest of the group — the one most likely to disappear mid-party and be found feeding stray cats outside. But once she let you in, she was completely loyal. She was also the first to notice when something was genuinely wrong with Iris — long before anyone else said anything aloud. [Story details to be added soon...]"
+                mbti: "ESFJ",
+                mbtiLabel: "The Provider",
+                description: "Friendly, Outgoing, Philanthropist. Loves to integrate with the community and aid in organisational events. In combination with her tech skills, she has a passion for managing big institutions and ethics in her future. On a personal note, she enjoys creating music, soundtracks and background music- that is also one of her current side hustles. She creates new tracks in her studio into the late hours of the night. All of her music profits she dedicates to buying pop-mark figurines. She collects them obsessively and changes her key rings on a daily basis to impress with her vast collection.",
+                signature: "Labubu  ·  AirPods  ·  Chanel perfume",
+                story: "Iris and Yuki met very coincidentally, on one of the breezy summer evenings. Iris was going for a walk around Brandon Hill and spotted that Yuki was frantically retracing her steps after losing something. After helping her find her lost Airpod, the two continued their walk together. After chatting and getting to know each other, Iris discovered Yuki’s musical talent and immediately wanted to discover more. During next year’s summer, Iris and Yuki created their own “Festival Music Network”  that was presented during Bristol Harbourside Festival."
             },
             {
                 name: "CHARLOTTE",
                 unlockDay: 5,
                 portraitKey: "portraitCharlotte",
-                mbti: "ENTJ",
-                mbtiLabel: "The Commander",
-                description: "Decisive, passionate, resourceful. Charlotte commands any room she walks into — not because she demands attention but because she genuinely gives it. She is fiercely protective of the people she loves and doesn't shy away from saying the hard things. She's currently working at a theatre production company and is often found either stress-buying candles or spontaneously planning group trips nobody asked for.",
-                signature: "Planner notebook  ·  Lavender candle  ·  Vintage film camera",
-                story: "Charlotte and Iris first crossed paths during a group study session in the library — Iris had taken the last power socket, and Charlotte had politely but firmly asked her to share it. That was Year 1. By Year 2 they were inseparable. Charlotte became the planner, the organiser, the one who made sure the group actually showed up to things. During Iris's hardest year, Charlotte was the one who refused to stop checking in — even when nothing she said seemed to land. [Story details to be added soon...]"
+                mbti: "ENTP",
+                mbtiLabel: "The Visionary",
+                description: "Inventive, strategic, versatile, enjoys new ideas and challenges. Extremely energy efficient - will only dedicate time and energy to things she considers valuable or fun. One of those things is her study, where she only completes tasks to the highest degree of perfection. She is also intelligent, hence reinforced by her winning first place in the International Mathematics Olympiad. She has a circle of close friends, whom she cares for deeply and spends a lot of time with. She is also a proud member of the wlw community. Aside from this, she is a huge foodie and cat lover.",
+                signature: "Milk tea boba  ·  Swiss army knife  ·  Kitty hair",
+                story: "Charlotte is Iris’s best friend and ex-roommate. They lived together for two years and share the same birthday — the same day and month, just two years apart. Charlotte is older than Iris and tends to take on the role of an older sister. She is mature and gives great advice, which Iris never takes for granted. They’re most likely to be spotted in Gails drinking a coffee and matcha, before gaming for the rest of the evening. Iris looks up to Charlotte, which makes their relationship very special; these two would jump into flames for each other."
             }
         ];
         // Pre-filter ITEM_WIKI once — avoids Array.filter() on every draw frame
@@ -109,9 +109,47 @@ class MainMenu {
      * Registers the three main-menu buttons (START, HELP, SETTINGS) and their transitions.
      */
     setupButtons() {
-        let centerY = height - 250;
-        let spacing = 420;
-        this.buttons.push(new UIButton(width / 2 - spacing, centerY, 256, 96, "START", () => {
+        const spacing = 560;
+        const bottomY = height - 170;
+        const buttonScale = 0.7; // 30% smaller than original uploaded button sizes
+
+        const startW = round(530 * buttonScale);
+        const startH = round(250 * buttonScale);
+        const helpW = round(530 * buttonScale);
+        const helpH = round(250 * buttonScale);
+        const helpActiveH = round(150 * buttonScale);
+        const helpHitOffsetY = (helpH - helpActiveH) / 2;
+
+        const baseBtnStyle = {
+            forceSize: true,
+            labelOffsetY: 0,
+            noLabel: true,
+            noLabelStroke: true,
+            useDepthLayer: true,
+            shadowBlackOffset: { x: 1.5, y: 1.5 },
+            shadowPurpleOffset: { x: 1, y: 1 },
+            hoverLiftOffset: { x: -0.5, y: -0.5 },
+            activePressOffset: { x: 1, y: 1 }
+        };
+
+        const startBtnStyle = {
+            ...baseBtnStyle,
+            imageKey: 'buttonStartImg',
+            hitboxOverride: { w: startW, h: helpActiveH, offsetY: helpHitOffsetY }
+        };
+        const helpBtnStyle = {
+            ...baseBtnStyle,
+            imageKey: 'buttonHelpImg',
+            // button_help has a decorative top frame. Only the bottom strip is interactive.
+            hitboxOverride: { w: helpW, h: helpActiveH, offsetY: helpHitOffsetY }
+        };
+        const settingBtnStyle = {
+            ...baseBtnStyle,
+            imageKey: 'buttonSettingImg',
+            hitboxOverride: { w: startW, h: helpActiveH, offsetY: helpHitOffsetY }
+        };
+
+        this.buttons.push(new UIButton(width / 2 - spacing, bottomY - startH / 2, startW, startH, "START", () => {
             // Go to difficulty selection screen
             triggerTransition(() => {
                 this.diffSelectIndex    = 1;   // default highlight on NORMAL
@@ -119,20 +157,22 @@ class MainMenu {
                 this.selectedDifficulty = -1;
                 gameState.setState(STATE_DIFF_SELECT);
             });
-        }));
-        this.buttons.push(new UIButton(width / 2, centerY, 256, 96, "HELP", () => {
+        }, 'title', 35, startBtnStyle));
+
+        this.buttons.push(new UIButton(width / 2, bottomY - helpH / 2, helpW, helpH, "HELP", () => {
             triggerTransition(() => {
                 this.menuState = STATE_HELP;
                 gameState.currentState = STATE_HELP;
             });
-        }));
-        this.buttons.push(new UIButton(width / 2 + spacing, centerY, 256, 96, "SETTINGS", () => {
+        }, 'title', 35, helpBtnStyle));
+
+        this.buttons.push(new UIButton(width / 2 + spacing, bottomY - startH / 2, startW, startH, "SETTINGS", () => {
             triggerTransition(() => {
                 this.diffToastTimer = 0;   // clear any stale difficulty toast
                 this.menuState = STATE_SETTINGS;
                 gameState.currentState = STATE_SETTINGS;
             });
-        }));
+        }, 'title', 35, settingBtnStyle));
     }
 
     // ─── DISPLAY ─────────────────────────────────────────────────────────────
@@ -176,19 +216,33 @@ class MainMenu {
      * Renders the home screen: logo and the three main action buttons.
      */
     drawHomeScreen() {
-        drawLogoPlaceholder(width / 2, 320);
+        // Splash→menu entering animation state (globals set by sketch.js)
+        let isEntering = (typeof _menuFromSplash !== 'undefined') && _menuFromSplash;
+        let t    = isEntering ? (typeof _menuEnterT !== 'undefined' ? _menuEnterT : 1) : 1;
+        let easy = t * t * (3 - 2 * t); // smoothstep
 
+        // Logo — drawLogoPlaceholder handles both splash-entering and static-menu cases
+        if (typeof drawLogoPlaceholder === 'function') {
+            drawLogoPlaceholder(width / 2, 320);
+        }
+
+        // Buttons fade in during transition, then stay fully opaque
         let anyHover = false;
+        push();
+        drawingContext.globalAlpha = easy;
         for (let i = 0; i < this.buttons.length; i++) {
-            if (!globalFade.isFading && this.buttons[i].checkMouse(mouseX, mouseY)) {
+            // Don't register hover/click while the enter animation is still running
+            if (!isEntering && !globalFade.isFading && this.buttons[i].checkMouse(mouseX, mouseY)) {
                 this.currentIndex = i;
                 anyHover = true;
             }
-            this.buttons[i].isFocused = (this.currentIndex >= 0 && this.currentIndex === i);
+            this.buttons[i].isFocused = (!isEntering && this.currentIndex >= 0 && this.currentIndex === i);
             this.buttons[i].update();
             this.buttons[i].display();
         }
-        // Reset selection when mouse isn't hovering any button
+        drawingContext.globalAlpha = 1;
+        pop();
+
         if (!anyHover && !keyIsPressed) {
             this.currentIndex = -1;
         }
@@ -229,10 +283,10 @@ class MainMenu {
         stroke(0, 0, 0, 200);
         strokeWeight(6);
         fill(255, 215, 0);
-        text("SETTINGS", width / 2, height / 2 - 260);
+        text("SETTINGS", width / 2, height / 2 - 310);
         noStroke();
         fill(255, 215, 0);
-        text("SETTINGS", width / 2, height / 2 - 260);
+        text("SETTINGS", width / 2, height / 2 - 310);
 
         // ── Volume sliders ───────────────────────────────────────────────────
         this.bgmSlider.display();
@@ -240,7 +294,7 @@ class MainMenu {
 
         // Mute toggle icons with hover zoom effect
         let iconSz = 52;
-        let iconXOffset = 260;
+        let iconXOffset = 300;
         let iconHitR = 32;
 
         // Music mute toggle icon
@@ -273,17 +327,17 @@ class MainMenu {
         rectMode(CENTER);
         fill(15, 8, 42, 210);
         stroke(200, 160, 255, 200); strokeWeight(1.5);
-        rect(width / 2, height - 72, 620, 56, 28);
+        rect(width / 2, height - 72, 820, 56, 28);
         noStroke();
         textFont(fonts.body);
-        textSize(28);
+        textSize(24);
         textAlign(CENTER, CENTER);
         stroke(0, 0, 0, 180); strokeWeight(3);
         fill(220, 185, 255);
-        text("Press \u2190 or [ESC] to go back", width / 2, height - 72);
+        text("Press top-left \u2190 button or [ESC] to return to previous screen", width / 2, height - 72);
         noStroke();
         fill(220, 185, 255);
-        text("Press \u2190 or [ESC] to go back", width / 2, height - 72);
+        text("Press top-left \u2190 button or [ESC] to return to previous screen", width / 2, height - 72);
         pop();
     }
 
@@ -364,8 +418,7 @@ class MainMenu {
         else if (this.helpPage === 1) {
             const char      = this._helpCharDetails[this._helpCharIndex];
             const n         = this._helpCharDetails.length;
-            const isUnlocked = char.unlockDay <= currentUnlockedDay ||
-                               (typeof DEBUG_UNLOCK_ALL !== 'undefined' && DEBUG_UNLOCK_ALL);
+            const isUnlocked = true;
 
             // ── Left portrait panel ────────────────────────────────────────
             const lx = 90, ly = 155, lw = 510, lh = 710;
@@ -593,6 +646,11 @@ class MainMenu {
                 imageMode(CENTER);
                 image(assets.backImg, 0, 0, arrowSz, arrowSz);
                 pop();
+
+                // New-content badge at top-right of right arrow
+                if (typeof newBadges !== 'undefined' && newBadges.has("help.pages")) {
+                    if (typeof _drawBadge === 'function') _drawBadge(arrowRightX + 20, arrowY - 20, 44);
+                }
             }
         }
 
@@ -614,6 +672,19 @@ class MainMenu {
     // ─── INPUT HANDLERS ──────────────────────────────────────────────────────
 
     /**
+     * Records that the player has visited a help page.
+     * Once all 4 pages have been seen the "help.pages" new-content badge is cleared.
+     */
+    _markHelpPageVisited(pageIndex) {
+        if (typeof helpPagesVisited === 'undefined' || typeof newBadges === 'undefined') return;
+        helpPagesVisited.add(pageIndex);
+        if (helpPagesVisited.size >= 4) {
+            newBadges.delete("help.pages");
+            newBadges.delete("pause.HELP");
+        }
+    }
+
+    /**
      * Routes keyboard input to the correct sub-system based on the active menu state.
      */
     handleKeyPress(_key, keyCode) {
@@ -629,6 +700,7 @@ class MainMenu {
                     // Move to next help page (reset char index when entering wiki)
                     playSFX(sfxSelect); this.helpPage++;
                     if (this.helpPage === 1) this._helpCharIndex = 0;
+                    this._markHelpPageVisited(this.helpPage);
                 }
             } else if (keyCode === LEFT_ARROW || keyCode === 65) {
                 if (this.helpPage === 1 && this._helpCharIndex > 0) {
@@ -676,21 +748,11 @@ class MainMenu {
                 this.handleBackAction();
             }
         } else if (this.menuState === STATE_DIFF_CONFIRM) {
-            if (this.selectedDifficulty !== 1) {
-                // Coming soon screen — any key returns to diff select
-                if (keyCode === ENTER || keyCode === 13 || keyCode === ESCAPE) {
-                    this.handleBackAction();
-                }
-            } else {
-                if (keyCode === ENTER || keyCode === 13) {
-                    playSFX(sfxClick);
-                    triggerTransition(() => {
-                        this.loadGameIndex = 0;
-                        gameState.setState(STATE_LOAD_GAME);
-                    });
-                } else if (keyCode === ESCAPE) {
-                    this.handleBackAction();
-                }
+            if (keyCode === ENTER || keyCode === 13) {
+                playSFX(sfxClick);
+                this._confirmSelectedDifficulty();
+            } else if (keyCode === ESCAPE) {
+                this.handleBackAction();
             }
         } else if (this.menuState === STATE_LOAD_GAME) {
             const hasSave = typeof SaveSystem !== 'undefined' && SaveSystem.hasSave();
@@ -747,6 +809,7 @@ class MainMenu {
                 if (this.helpPage < 3 && dist(mx, my, arrowRightX, arrowY) < 35) {
                     playSFX(sfxSelect); this.helpPage++;
                     if (this.helpPage === 1) this._helpCharIndex = 0;
+                    this._markHelpPageVisited(this.helpPage);
                     return;
                 }
 
@@ -770,7 +833,7 @@ class MainMenu {
                 this.bgmSlider.handlePress(mx, my);
                 this.sfxSlider.handlePress(mx, my);
 
-                let iconXOffset = 260;
+                let iconXOffset = 300;
                 let hitR = 28;
 
                 // Check Music mute toggle click
@@ -807,29 +870,14 @@ class MainMenu {
             // ── Difficulty confirm screen ────────────────────────────────────
             if (this.menuState === STATE_DIFF_CONFIRM) {
                 const W = width, H = height, cx = W / 2;
-                const btnW = 380, btnH = 90;
-                if (this.selectedDifficulty !== 1) {
-                    // Coming soon — single BACK button
-                    const btnY = H * 0.78;
-                    if (mx > cx - btnW / 2 && mx < cx + btnW / 2 &&
-                        my > btnY - btnH / 2 && my < btnY + btnH / 2) {
-                        playSFX(sfxClick);
-                        this.handleBackAction();
-                    }
-                } else {
-                    // Normal mode — single CONFIRM button
-                    const btnW2 = 420, btnH2 = 90;
-                    const btnY = H * 0.72;
-                    if (mx > cx - btnW2 / 2 && mx < cx + btnW2 / 2 &&
-                        my > btnY - btnH2 / 2 && my < btnY + btnH2 / 2) {
-                        playSFX(sfxClick);
-                        this.diffConfirmBtnIndex = 0;
-                        triggerTransition(() => {
-                            this.loadGameIndex = 0;
-                            gameState.setState(STATE_LOAD_GAME);
-                        });
-                        return;
-                    }
+                const btnW = 420, btnH = 90;
+                const btnY = H * 0.72;
+                if (mx > cx - btnW / 2 && mx < cx + btnW / 2 &&
+                    my > btnY - btnH / 2 && my < btnY + btnH / 2) {
+                    playSFX(sfxClick);
+                    this.diffConfirmBtnIndex = 0;
+                    this._confirmSelectedDifficulty();
+                    return;
                 }
                 return;
             }
@@ -922,9 +970,11 @@ class MainMenu {
         playSFX(sfxClick);
 
         if (typeof pauseFromState !== 'undefined' && pauseFromState !== null) {
-            // Return to pause overlay and restore the correct resume target.
+            // Return directly to pause overlay (no fade — there's no matching fade-in on the other side).
+            const _prevState = pauseFromState;
+            pauseFromState = null;
             gameState.setState(STATE_PAUSED);
-            gameState.previousState = pauseFromState;
+            gameState.previousState = _prevState;
             this.helpPage = 0;
         } else if (this.menuState === STATE_DIFF_SELECT) {
             triggerTransition(() => {
@@ -990,8 +1040,8 @@ class MainMenu {
 
         const diffData = [
             {
-                name: "EASY",
-                tagline: "Endless runner  \u00b7  Relaxed pace  \u00b7  No story",
+                name: "CASUAL",
+                tagline: "Endless mode  \u00b7  Day 1 pattern  \u00b7  Timer challenge",
                 recommended: false
             },
             {
@@ -1000,8 +1050,8 @@ class MainMenu {
                 recommended: true
             },
             {
-                name: "DIFFICULT",
-                tagline: "Endless runner  \u00b7  High-speed  \u00b7  No story",
+                name: "HARD",
+                tagline: "Endless mode  \u00b7  Day 5 pattern  \u00b7  High pressure",
                 recommended: false
             }
         ];
@@ -1073,21 +1123,19 @@ class MainMenu {
         // Prominent prompt bar at bottom
         const promptY = H - 72;
         const promptText = "\u2191\u2193 to select  \u00b7  [ENTER] to confirm  \u00b7  [ESC] to go back";
-        const promptW = 780, promptH = 56;
+        const promptW = W / 2, promptH = 56;
+        const promptTextY = promptY;
         rectMode(CENTER);
-        fill(15, 8, 42, 210);
-        stroke(200, 160, 255, 200); strokeWeight(1.5);
-        rect(cx, promptY, promptW, promptH, 29);
+        fill(101, 63, 191, 204); // #653FBF at 80% opacity (20% transparent)
+        stroke('#E2CAF8'); strokeWeight(3);
+        rect(cx, promptY, promptW, promptH, 15);
         noStroke();
         textAlign(CENTER, CENTER);
         textFont(fonts.body);
         textSize(28);
         stroke(0, 0, 0, 180); strokeWeight(4);
         fill(220, 185, 255);
-        text(promptText, cx, promptY);
-        noStroke();
-        fill(220, 185, 255);
-        text(promptText, cx, promptY);
+        text(promptText, cx, promptTextY);
 
         pop();
     }
@@ -1096,16 +1144,16 @@ class MainMenu {
 
     /**
      * Renders the confirmation screen for the selected difficulty.
-     * Normal → shows CONFIRM / BACK buttons.
-     * Easy / Difficult → shows "Coming Soon" with a BACK button.
+     * All three modes are playable:
+     * - Casual/Hard: endless timer challenge
+     * - Normal: story mode with save/load flow
      */
     drawDiffConfirmScreen() {
         drawOtherBgWithOverlay();
 
         const W = width, H = height, cx = W / 2;
         const d = this.selectedDifficulty >= 0 ? this.selectedDifficulty : 1;
-        const diffNames = ["EASY", "NORMAL", "DIFFICULT"];
-        const isAvailable = d === 1;
+        const diffNames = ["CASUAL", "NORMAL", "HARD"];
 
         push();
 
@@ -1124,113 +1172,71 @@ class MainMenu {
         line(cx - 420, 168, cx + 420, 168);
         noStroke();
 
-        if (!isAvailable) {
-            // ── Coming soon ─────────────────────────────────────────────────
-            textFont(fonts.title);
-            textSize(56);
-            stroke(0, 0, 0, 200); strokeWeight(5);
-            fill(255, 200, 60);
-            text("COMING SOON", cx, 400);
-            noStroke(); fill(255, 200, 60);
-            text("COMING SOON", cx, 400);
+        // Description card (semi-transparent dark background for readability)
+        const cardW = 940, cardH = 240, cardY = 430;
+        rectMode(CENTER);
+        fill(10, 6, 30, 195);
+        stroke(180, 148, 72, 120); strokeWeight(1.5);
+        rect(cx, cardY, cardW, cardH, 14);
+        noStroke();
 
-            textFont(fonts.body);
+        textFont(fonts.body);
+        textSize(33);
+        fill(235, 225, 200);
+        textAlign(CENTER, CENTER);
+        if (d === 0) {
+            text("Endless timer challenge with Day 1 pacing.", cx, cardY - 56);
+            text("No distance victory. Survive as long as possible.", cx, cardY + 8);
             textSize(30);
-            noStroke();
-            fill(210, 195, 165);
-            textAlign(CENTER, CENTER);
-            text("This mode is currently under development.", cx, 510);
-            text("We recommend trying NORMAL mode first!", cx, 560);
-
-            // BACK button
-            const btnW = 380, btnH = 90, btnY = H * 0.76;
-            const bHov  = dist(mouseX, mouseY, cx, btnY) < btnW / 2 + 15 &&
-                          abs(mouseY - btnY) < btnH / 2 + 15;
-            if (bHov && !globalFade.isFading) this.diffConfirmBtnIndex = 0;
-
-            rectMode(CENTER);
-            fill(bHov ? color(75, 50, 135, 230) : color(20, 12, 50, 210));
-            stroke(bHov ? color(255, 215, 0) : color(160, 130, 80));
-            strokeWeight(2);
-            rect(cx, btnY, btnW, btnH, 12);
-            noStroke();
-            textAlign(CENTER, CENTER);
-            textFont(fonts.title);
-            textSize(34);
-            fill(bHov ? color(255, 215, 0) : color(200, 185, 150));
-            text("\u2190 GO BACK", cx, btnY);
-
-            rectMode(CENTER);
-            fill(15, 8, 42, 210);
-            stroke(200, 160, 255, 200); strokeWeight(1.5);
-            rect(cx, H - 72, 680, 56, 28);
-            noStroke();
-            textFont(fonts.body);
-            textSize(28);
-            textAlign(CENTER, CENTER);
-            stroke(0, 0, 0, 180); strokeWeight(3);
-            fill(220, 185, 255);
-            text("[ESC] or [ENTER] to go back", cx, H - 72);
-            noStroke();
-            fill(220, 185, 255);
-            text("[ESC] or [ENTER] to go back", cx, H - 72);
-
-        } else {
-            // ── Normal mode confirmation ─────────────────────────────────────
-
-            // Description card (semi-transparent dark background for readability)
-            const cardW = 940, cardH = 230, cardY = 430;
-            rectMode(CENTER);
-            fill(10, 6, 30, 195);
-            stroke(180, 148, 72, 120); strokeWeight(1.5);
-            rect(cx, cardY, cardW, cardH, 14);
-            noStroke();
-
-            textFont(fonts.body);
-            textSize(33);
-            fill(235, 225, 200);
-            textAlign(CENTER, CENTER);
+            fill(255, 215, 0);
+            text("Settlement shows survival time and hit count.", cx, cardY + 72);
+        } else if (d === 1) {
             text("Story-driven parkour across 5 days.", cx, cardY - 56);
             text("Difficulty increases as you progress through each day.", cx, cardY + 8);
-
             textSize(31);
             fill(255, 215, 0);
             text("\u2605 Recommended for first-time players!", cx, cardY + 72);
-
-            // Single CONFIRM button centered
-            const btnW = 420, btnH = 90, btnY = H * 0.72;
-            const cHov = !globalFade.isFading &&
-                         abs(mouseX - cx) < btnW / 2 + 10 &&
-                         abs(mouseY - btnY) < btnH / 2 + 10;
-            if (cHov) this.diffConfirmBtnIndex = 0;
-
-            rectMode(CENTER);
-            fill(cHov ? color(75, 50, 135, 230) : color(20, 12, 50, 210));
-            stroke(cHov ? color(255, 215, 0) : color(120, 100, 170));
-            strokeWeight(2);
-            rect(cx, btnY, btnW, btnH, 12);
-            noStroke();
-            textAlign(CENTER, CENTER);
-            textFont(fonts.title);
-            textSize(36);
-            fill(cHov ? color(255, 215, 0) : color(200, 185, 150));
-            text("CONFIRM", cx, btnY);
-
-            rectMode(CENTER);
-            fill(15, 8, 42, 210);
-            stroke(200, 160, 255, 200); strokeWeight(1.5);
-            rect(cx, H - 72, 680, 56, 28);
-            noStroke();
-            textFont(fonts.body);
-            textSize(28);
-            textAlign(CENTER, CENTER);
-            stroke(0, 0, 0, 180); strokeWeight(3);
-            fill(220, 185, 255);
-            text("[ENTER] to confirm  \u00b7  [ESC] to go back", cx, H - 72);
-            noStroke();
-            fill(220, 185, 255);
-            text("[ENTER] to confirm  \u00b7  [ESC] to go back", cx, H - 72);
+        } else {
+            text("Endless timer challenge with Day 5 intensity.", cx, cardY - 56);
+            text("No distance victory. Higher pressure obstacle flow.", cx, cardY + 8);
+            textSize(30);
+            fill(255, 215, 0);
+            text("Settlement shows survival time and hit count.", cx, cardY + 72);
         }
+
+        // Single CONFIRM button centered
+        const btnW = 420, btnH = 90, btnY = H * 0.72;
+        const cHov = !globalFade.isFading &&
+                        abs(mouseX - cx) < btnW / 2 + 10 &&
+                        abs(mouseY - btnY) < btnH / 2 + 10;
+        if (cHov) this.diffConfirmBtnIndex = 0;
+
+        rectMode(CENTER);
+        fill(cHov ? color(75, 50, 135, 230) : color(20, 12, 50, 210));
+        stroke(cHov ? color(255, 215, 0) : color(120, 100, 170));
+        strokeWeight(2);
+        rect(cx, btnY, btnW, btnH, 12);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title);
+        textSize(36);
+        fill(cHov ? color(255, 215, 0) : color(200, 185, 150));
+        text("CONFIRM", cx, btnY);
+
+        rectMode(CENTER);
+        fill(15, 8, 42, 210);
+        stroke(200, 160, 255, 200); strokeWeight(1.5);
+        rect(cx, H - 72, 680, 56, 28);
+        noStroke();
+        textFont(fonts.body);
+        textSize(28);
+        textAlign(CENTER, CENTER);
+        stroke(0, 0, 0, 180); strokeWeight(3);
+        fill(220, 185, 255);
+        text("[ENTER] to confirm  \u00b7  [ESC] to go back", cx, H - 72);
+        noStroke();
+        fill(220, 185, 255);
+        text("[ENTER] to confirm  \u00b7  [ESC] to go back", cx, H - 72);
 
         pop();
     }
@@ -1383,6 +1389,25 @@ class MainMenu {
                 this.timeWheel.triggerEntrance();
                 gameState.setState(STATE_LEVEL_SELECT);
             }
+        });
+    }
+
+    _confirmSelectedDifficulty() {
+        const d = this.selectedDifficulty >= 0 ? this.selectedDifficulty : 1;
+        gameDifficulty = d;
+        if (d === 1) {
+            triggerTransition(() => {
+                this.loadGameIndex = 0;
+                gameState.setState(STATE_LOAD_GAME);
+            });
+            return;
+        }
+
+        const day = (d === 0) ? 1 : 5;
+        const mode = (d === 0) ? RUN_MODE_ENDLESS_EASY : RUN_MODE_ENDLESS_HARD;
+        triggerTransition(() => {
+            gameState.resetFlags();
+            setupRunDirectly(day, mode);
         });
     }
 }

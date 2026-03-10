@@ -154,10 +154,34 @@ class EndScreenBase {
         pop();
     }
 
-    /** * Draws the back arrow in the top-left corner, only during MODE_SELECT.
-     */
+    /** Draws exit-confirm prompt box + text above the YES/CANCEL buttons. */
+    drawExitConfirmText(cx, y) {
+        let f = fonts.jersey20 || fonts.body;
+        let boxW = 720, boxH = 200;
+        push();
+        rectMode(CENTER);
+        fill(14, 8, 38, 240);
+        stroke(200, 80, 80, 200);
+        strokeWeight(3);
+        rect(cx, y - 90, boxW, boxH, 16);
+
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title); textSize(38);
+        stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 100, 100);
+        text("EXIT TO MAIN MENU?", cx, y - 138);
+        noStroke(); fill(255, 100, 100);
+        text("EXIT TO MAIN MENU?", cx, y - 138);
+        textFont(f); textSize(24); noStroke(); fill(255, 210, 80);
+        text("Warning: unsaved progress may be lost.", cx, y - 82);
+        textSize(20); fill(180, 180, 220);
+        text("Tip: click the back arrow (top-left) to return without exiting.", cx, y - 48);
+        pop();
+    }
+
+    /** Draws the back arrow in the top-left corner, during MODE_SELECT and EXIT_CONFIRM. */
     drawBackButton() {
-        if (this.stateStep !== "MODE_SELECT" || !assets.backImg) return;
+        if (this.stateStep !== "MODE_SELECT" && this.stateStep !== "EXIT_CONFIRM") return;
+        if (!assets.backImg) return;
         
         let bx = 70, by = 65; 
         let isHover = dist(mouseX, mouseY, bx, by) < 40;
@@ -185,9 +209,9 @@ class EndScreenBase {
                 if (typeof playSFX === 'function') playSFX(sfxClick);
                 this.executeSelection();
             }
-        } else if (keyCode === ESCAPE || keyCode === 8) { 
-            // Allow returning to the main button options from the sub-menu
-            if (this.stateStep === "MODE_SELECT") {
+        } else if (keyCode === ESCAPE || keyCode === 8) {
+            // Allow returning to the main button options from the sub-menu or exit confirm
+            if (this.stateStep === "MODE_SELECT" || this.stateStep === "EXIT_CONFIRM") {
                 this.stateStep = "MAIN";
                 this.options = this.mainOptions;
                 this.selectedIndex = -1;
@@ -198,7 +222,7 @@ class EndScreenBase {
 
     /** Forward mouse click to horizontally laid out buttons. */
     handleClick(mx, my) {
-        if (this.stateStep === "MODE_SELECT" && assets.backImg) {
+        if ((this.stateStep === "MODE_SELECT" || this.stateStep === "EXIT_CONFIRM") && assets.backImg) {
             let bx = 70, by = 65;
             if (dist(mx, my, bx, by) < 40) {
                 if (typeof playSFX === 'function') playSFX(sfxClick);
@@ -288,6 +312,16 @@ class FailScreen extends EndScreenBase {
     }
 
     display() {
+        const endlessMode = (typeof isEndlessRunMode === "function") && isEndlessRunMode();
+        if (endlessMode) {
+            this.mainOptions = ["RETRY", "EXIT"];
+            this.options = this.mainOptions;
+            this.stateStep = "MAIN";
+        } else {
+            this.mainOptions = ["NEW GAME", "EXIT"];
+            if (this.stateStep === "MAIN") this.options = this.mainOptions;
+        }
+
         this.drawOverlay();
         let box = this.drawBox(assets.bbg);
         let cx  = box.x + box.w / 2;
@@ -306,14 +340,27 @@ class FailScreen extends EndScreenBase {
         textFont(fonts.body);
         textSize(22);
         fill(200);
-        // Moved towards the center (from 0.35 to 0.38)
-        text(this._getReasonText(), cx, box.y + box.h * 0.38);
+        if (endlessMode) {
+            const survivalSec = player ? floor(player.playTimeFrames / 60) : 0;
+            const hits = player ? player.carHitCount : 0;
+            text("Survival Time: " + this._formatDuration(survivalSec), cx, box.y + box.h * 0.35);
+            text("You outperformed 99% of players!", cx, box.y + box.h * 0.43);
+            text("Collisions: " + hits, cx, box.y + box.h * 0.51);
+        } else {
+            // Moved towards the center (from 0.35 to 0.38)
+            text(this._getReasonText(), cx, box.y + box.h * 0.38);
+        }
         pop();
 
-        // Moved towards the center (from 0.48 to 0.55)
-        this.drawProgressBar(cx, box.y + box.h * 0.55, box.w * 0.6);
+        if (!endlessMode) {
+            // Moved towards the center (from 0.48 to 0.55)
+            this.drawProgressBar(cx, box.y + box.h * 0.55, box.w * 0.6);
         }
-        this.drawButtons(cx, this._getButtonStartY()); 
+        }
+        if (this.stateStep === "EXIT_CONFIRM") {
+            this.drawExitConfirmText(cx, this._getButtonStartY());
+        }
+        this.drawButtons(cx, this._getButtonStartY());
 
         this.drawBackButton();
     }
@@ -322,12 +369,12 @@ class FailScreen extends EndScreenBase {
         let boxH = height * END_SCREEN_BOX_H_RATIO;
         let boxY = (height - boxH) / 2;
 
-        if (this.stateStep === "MODE_SELECT") {
-            return boxY + boxH * 0.5; 
+        if (this.stateStep === "MODE_SELECT" || this.stateStep === "EXIT_CONFIRM") {
+            return boxY + boxH * 0.7;
         }
 
         // Moved down significantly to make room for the larger buttons and centered UI
-        return boxY + boxH * 0.85; 
+        return boxY + boxH * 0.85;
     }
     _getReasonText() {
         switch (this.failType) {
@@ -338,27 +385,48 @@ class FailScreen extends EndScreenBase {
         }
     }
 
+    _formatDuration(totalSec) {
+        const sec = Math.max(0, Math.floor(totalSec || 0));
+        const mm = Math.floor(sec / 60);
+        const ss = sec % 60;
+        const h = Math.floor(mm / 60);
+        const m = mm % 60;
+        if (h > 0) {
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+        }
+        return `${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    }
+
     executeSelection() {
         let option = this.options[this.selectedIndex];
+        const endlessMode = (typeof isEndlessRunMode === "function") && isEndlessRunMode();
 
         if (this.stateStep === "MAIN") {
-            if (option === "NEW GAME") {
+            if (option === "RETRY" && endlessMode) {
+                triggerTransition(() => {
+                    setupRunDirectly(currentDayID, currentRunMode);
+                });
+            } else if (option === "NEW GAME") {
                 // Show the BACK TO ROOM / START RUN sub-menu
                 this.stateStep = "MODE_SELECT";
                 this.options = this.modeOptions;
                 this.selectedIndex = -1;
             } else if (option === "EXIT") {
-                triggerTransition(() => {
-                    gameState.resetFlags();
-                    gameState.setState(STATE_MENU);
-                });
+                this.stateStep = "EXIT_CONFIRM";
+                this.options = ["YES, EXIT", "CANCEL"];
+                this.selectedIndex = -1;
+            }
+        } else if (this.stateStep === "EXIT_CONFIRM") {
+            if (option === "YES, EXIT") {
+                triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+            } else if (option === "CANCEL") {
+                this.stateStep = "MAIN"; this.options = this.mainOptions; this.selectedIndex = -1;
             }
         } else if (this.stateStep === "MODE_SELECT") {
             if (option === "BACK TO ROOM") {
                 triggerTransition(() => {
                     gameState.resetFlags();
-                    if (player) { player.x = 940; player.y = 550; }
-                    gameState.setState(STATE_ROOM);
+                    setupRun(currentDayID);
                 });
             } else if (option === "START RUN") {
                 triggerTransition(() => {
@@ -445,6 +513,9 @@ class SuccessScreen extends EndScreenBase {
         pop();
         }
         }
+        if (this.stateStep === "EXIT_CONFIRM") {
+            this.drawExitConfirmText(cx, this._getButtonStartY());
+        }
         this.drawButtons(cx, this._getButtonStartY());
 
         this.drawBackButton();
@@ -454,12 +525,12 @@ class SuccessScreen extends EndScreenBase {
         let boxH = height * END_SCREEN_BOX_H_RATIO;
         let boxY = (height - boxH) / 2;
 
-        if (this.stateStep === "MODE_SELECT") {
-            return boxY + boxH * 0.5; 
+        if (this.stateStep === "MODE_SELECT" || this.stateStep === "EXIT_CONFIRM") {
+            return boxY + boxH * 0.7;
         }
-        
+
         // Moved down to match FailScreen
-        return boxY + boxH * 0.85; 
+        return boxY + boxH * 0.85;
     }
 
     executeSelection() {
@@ -491,17 +562,21 @@ class SuccessScreen extends EndScreenBase {
                 this.options = this.modeOptions;
                 this.selectedIndex = -1;
             } else if (option === "EXIT") {
-                triggerTransition(() => {
-                    gameState.resetFlags();
-                    gameState.setState(STATE_MENU);
-                });
+                this.stateStep = "EXIT_CONFIRM";
+                this.options = ["YES, EXIT", "CANCEL"];
+                this.selectedIndex = -1;
+            }
+        } else if (this.stateStep === "EXIT_CONFIRM") {
+            if (option === "YES, EXIT") {
+                triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
+            } else if (option === "CANCEL") {
+                this.stateStep = "MAIN"; this.options = this.mainOptions; this.selectedIndex = -1;
             }
         } else if (this.stateStep === "MODE_SELECT") {
             if (option === "BACK TO ROOM") {
                 triggerTransition(() => {
                     gameState.resetFlags();
-                    if (player) { player.x = 940; player.y = 550; }
-                    gameState.setState(STATE_ROOM);
+                    setupRun(currentDayID);
                 });
             } else if (option === "START RUN") {
                 triggerTransition(() => {
@@ -535,12 +610,22 @@ class EndScreenManager {
         screen.failType = reason; // ensure reason is current
         screen.activate();
         this._activeScreen = screen;
+
+        // New fail-audio rule:
+        // stop current BGM, then play day-specific fail audio.
+        if (typeof playFailEndAudio === 'function') {
+            playFailEndAudio();
+        }
     }
 
     /** Called when entering STATE_WIN. */
     activateSuccess() {
         this.successScreen.activate();
         this._activeScreen = this.successScreen;
+
+        if (typeof playWinEndAudio === 'function') {
+            playWinEndAudio();
+        }
     }
 
     /** Main display dispatcher. */

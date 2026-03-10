@@ -10,6 +10,14 @@ let feedbackLayer;
 let tutorialDialogue;   // global dialogue box for tutorial page explanations
 let __sfxFrame = -1;
 let __sfxCounts = Object.create(null);
+let tutorialSlidePlayback = {
+    active: false,
+    frameStart: 0,
+    currentIndex: 0,
+    framesPerSlide: 60,
+    keyframeHoldFrames: 180,
+    textKeyframes: new Set([2, 5, 8, 11, 14, 17, 21, 22, 25, 26, 29])
+};
 
 // ─── GAME PROGRESS STATE ─────────────────────────────────────────────────────
 let currentUnlockedDay = 1;
@@ -20,22 +28,43 @@ let assets = {
     menuBg: null,
     otherBg: null,
     warningImg: null,
+    warningBox: null,
     bbg: null,
     libraryBg: null,
-    csNewsBg:   null,   // assets/dialogue/news.png  — prologue cutscene bg
+    csNewsBg: null,   // assets/dialogue/news.png  — prologue cutscene bg
     csLibraryBg: null, // assets/dialogue/library.png — NPC cutscene + success screen bg
-    dialogBox:  null,  // assets/obstacles/dialog_box.png — homeless speech bubble
+    csBusBg: null,             // assets/background/bg_bus/bg_bus.png
+    csPhoneImg: null,          // assets/background/bg_bus/phone.png
+    csOperatingTheatreBg: null,// assets/background/bg_operating_theatre.png
+    csBalloonFestivalBg: null, // assets/background/bg_ballon_festival.png
+    dialogBox: null,  // assets/obstacles/dialog_box.png — homeless speech bubble
+    dialogueBox: null,      // assets/dialogue/dialog_box.png — main dialogue bar
+    dialogueFrameBox: null, // assets/dialogue/frame_box.png — portrait frame
+    dialogueNameBox: null,  // assets/dialogue/name_box.png — speaker name tag
+    noticeBox: null,        // assets/dialogue/notice_box.png — menu button background
     irisSuccess: [],
     celebrateSheet: null,
     storyShape: null,
     storyCloud: null,
+    button1Img: null,
     keys: {},
     selectClouds: [],
     selectBg: {
         unlock: null,
         lock: null
     },
+    runBackgrounds: {
+        sunny: [],
+        lightRain: [],
+        heavyRain: []
+    },
+    destinationBackgrounds: {
+        sunny: null,
+        lightRain: null,
+        heavyRain: null
+    },
     previews: [],
+    tutorialSlides: [],
     playerAnim: {
         north: [],
         south: [],
@@ -44,17 +73,41 @@ let assets = {
     }
 };
 let fonts = {};
-let sfxSelect, sfxClick, sfxScold;
-let sfxDialogue, sfxHitBigCar, sfxHitSmallCar, sfxPickupCoffee, sfxPickupScooter;
+let sfxSelect, sfxClick, sfxDialogue, sfxItemNotification;
+let sfxHitNpc, sfxHitBigCar, sfxHitSmallCar, sfxHitFantasyCoffee, sfxPuddleNoBoots, sfxSmallBusiness; 
+let sfxPickupCoffee, sfxPickupScooter, sfxPuddleBoots, sfxPaperCrumple, sfxScooterBrake;
+let sfxDoorOpen, sfxAmbulance, sfxHeartbeat, sfxGameWin, sfxRoomClock;
+
+let failEndAudioTimer = null;
 
 // ─── AUDIO VOLUME CONTROLS ───────────────────────────────────────────────────
 let masterVolumeBGM = 0.25;
 let masterVolumeSFX = 0.7;
 
 // ─── DIFFICULTY SETTING ──────────────────────────────────────────────────────
-// 0 = EASY (locked), 1 = NORMAL (default), 2 = HARD (locked)
+// 0 = CASUAL (endless day 1), 1 = NORMAL (story), 2 = HARD (endless day 5)
 let gameDifficulty = 1;
-const DIFFICULTY_LABELS = ["EASY", "NORMAL", "HARD"];
+const DIFFICULTY_LABELS = ["CASUAL", "NORMAL", "HARD"];
+const RUN_MODE_STORY = "STORY";
+const RUN_MODE_ENDLESS_EASY = "ENDLESS_EASY";
+const RUN_MODE_ENDLESS_HARD = "ENDLESS_HARD";
+let currentRunMode = RUN_MODE_STORY;
+
+function isStoryRunMode() {
+    return currentRunMode === RUN_MODE_STORY;
+}
+
+function isEndlessRunMode() {
+    return currentRunMode === RUN_MODE_ENDLESS_EASY || currentRunMode === RUN_MODE_ENDLESS_HARD;
+}
+
+function shouldShowDay1RoomExitTutorial() {
+    return currentRunMode === RUN_MODE_STORY &&
+        currentDayID === 1 &&
+        assets &&
+        Array.isArray(assets.tutorialSlides) &&
+        assets.tutorialSlides.length > 0;
+}
 
 // ─── WIN-CUTSCENE GUARD ───────────────────────────────────────────────────────
 // Prevents checkSettlementPoint() from triggering the NPC cutscene more than once.
@@ -122,7 +175,11 @@ let globalFade = {
     speed: 255 / (0.3 * 60),
     isFading: false,
     dir: 1,
-    callback: null
+    callback: null,
+
+    // Special-case hold support (used only for library entry transition)
+    holdUntilMs: 0,
+    holdDoneCallback: null
 };
 
 // ─── PAUSE MENU STATE ─────────────────────────────────────────────────────────
@@ -132,7 +189,7 @@ let pauseFromState = null;
 // Pause options vary by context (room vs day-run)
 function getPauseOptions() {
     if (gameState && gameState.previousState === STATE_DAY_RUN) {
-        return ["RESTART","SETTINGS", "STORY", "HELP", "EXIT"];
+        return ["RESTART", "SETTINGS", "STORY", "HELP", "EXIT"];
     }
     return ["SETTINGS", "STORY", "HELP", "EXIT"];
 }
@@ -142,8 +199,41 @@ let showRestartChoice = false;
 let restartChoiceIndex = 0;
 const RESTART_OPTIONS = ["BACK TO ROOM", "RESTART RUN"];
 
+// Exit-to-main-menu confirmation dialog
+let showExitConfirm = false;
+let exitConfirmIndex = -1;
+const EXIT_CONFIRM_OPTIONS = ["YES, EXIT", "CANCEL"];
+
 // Pause button breathing scale (smooth lerp)
 let pauseBtnScale = 1.0;
+
+// ─── NEW-CONTENT BADGE SYSTEM ─────────────────────────────────────────────────
+// A Set of string keys marks UI elements with unseen / new content.
+// Keys: "pause_btn" | "pause.SETTINGS" | "pause.STORY" | "pause.HELP" | "help.pages"
+const newBadges = new Set();
+let helpPagesVisited = new Set();   // page indices 0-3 visited in current help session
+
+/** Initialize all first-play badges. Call once when starting a new game on Day 1. */
+function initNewGameBadges() {
+    newBadges.clear();
+    newBadges.add("pause_btn");
+    newBadges.add("pause.SETTINGS");
+    newBadges.add("pause.STORY");
+    newBadges.add("pause.HELP");
+    helpPagesVisited.clear();
+}
+
+/** Call after completing a level — new story content is unlocked. */
+function addPostLevelBadges() {
+    newBadges.add("pause_btn");
+    newBadges.add("pause.STORY");
+}
+
+/** Draws the game's warning/exclamation asset as a new-content badge at (x, y). */
+function _drawBadge(x, y, size) {
+    size = size || 36;
+    drawWarningIcon(x, y, size);
+}
 
 // Story recap state
 let showStoryRecap = false;
@@ -268,7 +358,7 @@ function getStoryRecap(day) {
     }
 
     if (day === 4) {
-        const help    = ch(4);   // 0 = "give me a sec", 1 = "DON'T TOUCH ME"
+        const help = ch(4);   // 0 = "give me a sec", 1 = "DON'T TOUCH ME"
         const confide = ch(13);  // 0 = confide, 1 = push away
 
         return {
@@ -298,9 +388,9 @@ function getStoryRecap(day) {
     }
 
     if (day === 5) {
-        const voices  = ch(3);   // 0 = continue listening, 1 = snap out
-        const who     = ch(21);  // 0 = keep listening to voices, 1 = listen to Charlotte
-        const ending  = ch(36);  // 0 = "No… I can't keep running", 1 = "Okayy…"
+        const voices = ch(3);   // 0 = continue listening, 1 = snap out
+        const who = ch(21);  // 0 = keep listening to voices, 1 = listen to Charlotte
+        const ending = ch(36);  // 0 = "No… I can't keep running", 1 = "Okayy…"
 
         return {
             title: "Day 5 — Friday",
@@ -385,7 +475,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 56;
+const totalAssetsToLoad = 62;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -413,17 +503,26 @@ function preload() {
     assets.inventoryBg = loadImage('assets/inventory/table.png', itemLoaded);
     assets.backpackImg = loadImage('assets/inventory/backpack.png', itemLoaded);
     assets.studentCardImg = loadImage('assets/inventory/student_card.png', itemLoaded);
-    assets.computerImg    = loadImage('assets/inventory/computer.png', itemLoaded);
-    assets.vitaminImg     = loadImage('assets/inventory/vitamin.png', itemLoaded);
-    assets.tangleImg      = loadImage('assets/inventory/tangle.png', itemLoaded);
-    assets.headphoneImg   = loadImage('assets/inventory/headphone.png', itemLoaded);
-    assets.rainbootImg    = loadImage('assets/inventory/rainboot.png', itemLoaded);
+    assets.computerImg = loadImage('assets/inventory/computer.png', itemLoaded);
+    assets.vitaminImg = loadImage('assets/inventory/vitamin.png', itemLoaded);
+    assets.tangleImg = loadImage('assets/inventory/tangle.png', itemLoaded);
+    assets.headphoneImg = loadImage('assets/inventory/headphone.png', itemLoaded);
+    assets.rainbootImg = loadImage('assets/inventory/rainboot.png', itemLoaded);
+    assets.distanceFlagImg = loadImage('assets/HUD/distance_flag.png', itemLoaded);
 
-    assets.bbg         = loadImage('assets/background/bbg.png', itemLoaded);
-    assets.libraryBg   = loadImage('assets/background/library.jpg', itemLoaded);
-    assets.csNewsBg    = loadImage('assets/dialogue/news.png',              itemLoaded);
-    assets.csLibraryBg = loadImage('assets/dialogue/library.png',           itemLoaded);
-    assets.dialogBox   = loadImage('assets/obstacles/dialog_box.png',       itemLoaded);
+    assets.bbg = loadImage('assets/background/bbg.png', itemLoaded);
+    assets.libraryBg = loadImage('assets/background/library.jpg', itemLoaded);
+    assets.csNewsBg = loadImage('assets/dialogue/news.png', itemLoaded);
+    assets.csLibraryBg = loadImage('assets/dialogue/library.png', itemLoaded);
+    assets.csBusBg             = loadImage('assets/background/bg_bus/bg_bus.png', itemLoaded);
+    assets.csPhoneImg          = loadImage('assets/background/bg_bus/phone.png', itemLoaded);
+    assets.csOperatingTheatreBg= loadImage('assets/background/bg_operating_theatre.png', itemLoaded);
+    assets.csBalloonFestivalBg = loadImage('assets/background/bg_ballon_festival.png', itemLoaded);
+    assets.dialogBox = loadImage('assets/obstacles/dialog_box.png', itemLoaded);
+    assets.dialogueBox = loadImage('assets/dialogue/dialog_box.png', itemLoaded);
+    assets.dialogueFrameBox = loadImage('assets/dialogue/frame_box.png', itemLoaded);
+    assets.dialogueNameBox = loadImage('assets/dialogue/name_box.png', itemLoaded);
+    assets.noticeBox = loadImage('assets/dialogue/notice_box.png', itemLoaded);
 
     loadImage('assets/end_screen/spritesheet_celebrate.png', (img) => {
         let fW = img.width / 5;
@@ -433,11 +532,37 @@ function preload() {
         }
     });
 
-    assets.storyShape  = loadImage('assets/story/frame_shape.png', itemLoaded);
-    assets.storyCloud  = loadImage('assets/story/frame_cloud.png', itemLoaded);
+    assets.storyShape = loadImage('assets/story/frame_shape.png', itemLoaded);
+    assets.storyCloud = loadImage('assets/story/frame_cloud.png', itemLoaded);
+
+    for (let i = 1; i <= 32; i++) {
+        const fileName = `tutorial_${String(i).padStart(2, '0')}.png`;
+        assets.tutorialSlides.push(loadImage(`assets/tutorial/${fileName}`));
+    }
 
     assets.selectBg.unlock = loadImage('assets/select_background/day_unlock.jpg', itemLoaded);
     assets.selectBg.lock = loadImage('assets/select_background/day_lock.jpg', itemLoaded);
+
+    assets.runBackgrounds.sunny = [
+        loadImage('assets/background/bg_sunny/bg_sunny_A.png', itemLoaded),
+        loadImage('assets/background/bg_sunny/bg_sunny_B.png', itemLoaded),
+        loadImage('assets/background/bg_sunny/bg_sunny_C.png', itemLoaded)
+    ];
+    assets.destinationBackgrounds.sunny = loadImage('assets/background/bg_sunny/bg_sunny_destination.png', itemLoaded);
+
+    assets.runBackgrounds.lightRain = [
+        loadImage('assets/background/bg_light_rain/bg_light_rain_A.png', itemLoaded),
+        loadImage('assets/background/bg_light_rain/bg_light_rain_B.png', itemLoaded),
+        loadImage('assets/background/bg_light_rain/bg_light_rain_C.png', itemLoaded)
+    ];
+    assets.destinationBackgrounds.lightRain = loadImage('assets/background/bg_light_rain/bg_light_rain_destination.png', itemLoaded);
+
+    assets.runBackgrounds.heavyRain = [
+        loadImage('assets/background/bg_heavy_rain/bg_heavy_rain_A.png', itemLoaded),
+        loadImage('assets/background/bg_heavy_rain/bg_heavy_rain_B.png', itemLoaded),
+        loadImage('assets/background/bg_heavy_rain/bg_heavy_rain_C.png', itemLoaded)
+    ];
+    assets.destinationBackgrounds.heavyRain = loadImage('assets/background/bg_heavy_rain/bg_heavy_rain_destination.png', itemLoaded);
 
     for (let i = 1; i <= 5; i++) {
         assets.selectClouds.push(loadImage(`assets/select_cloud/Cloud-${i}.png`, itemLoaded));
@@ -447,6 +572,8 @@ function preload() {
     fonts.title = loadFont('assets/fonts/PressStart2P-Regular.ttf', itemLoaded);
     fonts.time = loadFont('assets/fonts/VT323-Regular.ttf', itemLoaded);
     fonts.body = loadFont('assets/fonts/DotGothic16-Regular.ttf', itemLoaded);
+    fonts.dialogueBlue = loadFont('assets/fonts/Blue Screen Personal Use.ttf', itemLoaded);
+    fonts.jersey20 = loadFont('assets/fonts/Jersey20-Regular.ttf', itemLoaded);
     fonts.logo = loadFont('assets/fonts/title_1.otf', itemLoaded);
 
     // Audio
@@ -462,12 +589,24 @@ function preload() {
 
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
     sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
-    sfxDialogue      = loadSound('assets/audio/effects/DIalogue.mp3',   itemLoaded);
-    sfxHitBigCar     = loadSound('assets/audio/effects/HitBigCar.mp3',  itemLoaded);
-    sfxHitSmallCar   = loadSound('assets/audio/effects/HitSmallCar.mp3', itemLoaded);
-    sfxPickupCoffee  = loadSound('assets/audio/effects/CoffeeDrink.wav', itemLoaded);
+    sfxDialogue = loadSound('assets/audio/effects/Dialogue.mp3', itemLoaded);
+    sfxHitBigCar = loadSound('assets/audio/effects/HitBigCar.mp3', itemLoaded);
+    sfxHitSmallCar = loadSound('assets/audio/effects/HitSmallCar.mp3', itemLoaded);
+    sfxPickupCoffee = loadSound('assets/audio/effects/CoffeeDrink.wav', itemLoaded);
     sfxPickupScooter = loadSound('assets/audio/effects/ScooterPick.wav', itemLoaded);
-    // sfxScold = loadSound('assets/audio/effects/Scold.wav', itemLoaded); // TODO: add asset later
+    sfxScooterBrake = loadSound('assets/audio/effects/ScooterBrake.wav', itemLoaded);
+    sfxHitNpc = loadSound('assets/audio/effects/HitNPC.wav', itemLoaded);
+    sfxPuddleBoots = loadSound('assets/audio/effects/PuddleWithShoe.mp3', itemLoaded);
+    sfxPuddleNoBoots = loadSound('assets/audio/effects/HitPuddle.mp3', itemLoaded);
+    sfxHitFantasyCoffee = loadSound('assets/audio/effects/HitFantasyCoffee.mp3', itemLoaded);
+    sfxSmallBusiness = loadSound('assets/audio/effects/HitSmallBusiness.mp3', itemLoaded);
+    sfxPaperCrumple = loadSound('assets/audio/effects/HitPoster.mp3', itemLoaded);
+    sfxDoorOpen = loadSound('assets/audio/effects/LibraryDoorOpen.mp3', itemLoaded);
+    sfxRoomClock = loadSound('assets/audio/effects/RoomClock.mp3', itemLoaded);
+    sfxItemNotification = loadSound('assets/audio/effects/ItemPop.wav', itemLoaded);
+    sfxAmbulance = loadSound('assets/audio/effects/GameOverAmbulance.wav', itemLoaded);
+    sfxHeartbeat = loadSound('assets/audio/effects/GameOverHeartbeat.mp3', itemLoaded);
+    sfxGameWin = loadSound('assets/audio/effects/GameWin.mp3', itemLoaded);
 
     // Control key sprites
     assets.keys.w = loadImage('assets/control_keys/W.png', itemLoaded);
@@ -494,10 +633,15 @@ function preload() {
 
     assets.uobLogo = loadImage('assets/logo/uob_logo.png', itemLoaded);
     assets.warningImg = loadImage('assets/buttons/warning.png', itemLoaded);
+    assets.warningBox = loadImage('assets/buttons/warning_box.png', itemLoaded);
     assets.btnImg = loadImage('assets/buttons/button.png', itemLoaded);
+    assets.button1Img = loadImage('assets/buttons/button_1.png', itemLoaded);
+    assets.buttonStartImg = loadImage('assets/buttons/button_start.png', itemLoaded);
+    assets.buttonHelpImg = loadImage('assets/buttons/button_help.png', itemLoaded);
+    assets.buttonSettingImg = loadImage('assets/buttons/button_setting.png', itemLoaded);
     assets.backImg = loadImage('assets/buttons/back.png', itemLoaded);
     assets.pauseImg = loadImage('assets/buttons/pause.png', itemLoaded);
-    assets.musicOn  = loadImage('assets/buttons/music_on.png',  itemLoaded);
+    assets.musicOn = loadImage('assets/buttons/music_on.png', itemLoaded);
     assets.musicOff = loadImage('assets/buttons/music_off.png', itemLoaded);
 
     // Entity preview sprites (no progress tracking — non-critical)
@@ -519,11 +663,11 @@ function preload() {
     const portraitPath = 'assets/characters/portrait/';
 
     assets.portraitPlayerNormal = loadImage(portraitPath + 'portrait_iris.png', itemLoaded);
-    assets.portraitWiola        = loadImage(portraitPath + 'portrait_wiola.png', itemLoaded);
-    assets.portraitLayla        = loadImage(portraitPath + 'portrait_layla.png', itemLoaded);
-    assets.portraitRaymond      = loadImage(portraitPath + 'portrait_raymond.png', itemLoaded);
-    assets.portraitYuki         = loadImage(portraitPath + 'portrait_yuki.png', itemLoaded);
-    assets.portraitCharlotte     = loadImage(portraitPath + 'portrait_charlotte.png', itemLoaded);
+    assets.portraitWiola = loadImage(portraitPath + 'portrait_wiola.png', itemLoaded);
+    assets.portraitLayla = loadImage(portraitPath + 'portrait_layla.png', itemLoaded);
+    assets.portraitRaymond = loadImage(portraitPath + 'portrait_raymond.png', itemLoaded);
+    assets.portraitYuki = loadImage(portraitPath + 'portrait_yuki.png', itemLoaded);
+    assets.portraitCharlotte = loadImage(portraitPath + 'portrait_charlotte.png', itemLoaded);
 
     // Player directional frame animation (uses authored frame PNGs directly)
     assets.playerAnim = {};
@@ -592,7 +736,7 @@ function setup() {
     tutorialDialogue = new DialogueBox();
     tutorialDialogue.timerMax = 300;   // 5 s — long enough to read tutorial page explanations
 
-    textFont(fonts.body);
+    textFont(fonts.jersey20 || fonts.body);
     gameState.setState(STATE_LOADING);
 
     if (developerMode) devApplyStartupSkip();
@@ -604,7 +748,7 @@ function setup() {
  * p5.js lifecycle hook: main render loop — routes to the active scene each frame.
  */
 function draw() {
-    background(30);
+    background(0);
 
     try {
         switch (gameState.currentState) {
@@ -635,6 +779,12 @@ function draw() {
             case STATE_DIFF_SELECT:
             case STATE_DIFF_CONFIRM:
             case STATE_LOAD_GAME:
+                // Advance the splash→menu title enter animation (STATE_MENU only)
+                if (gameState.currentState === STATE_MENU && _menuFromSplash) {
+                    _menuEnterT = min(1, _menuEnterT + 1 / 35); // ~35 frames ≈ 0.6 s
+                    if (_menuEnterT >= 1) _menuFromSplash = false;
+                }
+
                 if (mainMenu) {
                     mainMenu.menuState = gameState.currentState;
                     // Auto-colorize once the entrance animation finishes — keeps visible gray period
@@ -661,6 +811,8 @@ function draw() {
                     }
                     player.display();
                 }
+                // Dialogue box drawn last so it appears above player and tutorial panels
+                if (roomScene) roomScene.displayOverlay();
                 drawPauseButton();
                 break;
 
@@ -673,10 +825,18 @@ function draw() {
                 drawPauseButton();
                 break;
 
+            case STATE_TUTORIAL_SLIDES:
+                drawTutorialSlidesScreen();
+                break;
+
             case STATE_PAUSED:
                 if (gameState.previousState === STATE_ROOM) {
                     if (roomScene) roomScene.display();
                     if (player) player.display();
+                    // Don't show the UI_INTRO dialogue while the pause menu is open
+                    // (that dialogue is introducing the pause button — no need inside the menu itself)
+                    let _inUIIntro = typeof tutorialHints !== 'undefined' && tutorialHints.roomPhase === 'UI_INTRO';
+                    if (roomScene && !_inUIIntro) roomScene.displayOverlay();
                 } else if (gameState.previousState === STATE_DAY_RUN) {
                     if (env) env.display();
                     if (obstacleManager) obstacleManager.display();
@@ -704,7 +864,7 @@ function draw() {
                         let s = max(width / assets.otherBg.width, height / assets.otherBg.height);
                         imageMode(CENTER);
                         image(assets.otherBg, width / 2, height / 2,
-                              assets.otherBg.width * s, assets.otherBg.height * s);
+                            assets.otherBg.width * s, assets.otherBg.height * s);
                     }
                 }
                 if (endScreenManager) {
@@ -723,6 +883,7 @@ function draw() {
                             currentUnlockedDay = Math.max(currentUnlockedDay, currentDayID + 1);
                         }
                         endScreenManager.activateSuccess();
+                        addPostLevelBadges();
                     }
                     endScreenManager.display();
                 }
@@ -784,18 +945,30 @@ function runGameLoop() {
 
     if (levelController) { levelController.display(); }
 
-    // Win condition: settlement point reached → NPC cutscene then win
-    if (!freezeGameplay && levelController && levelController.checkSettlementPoint()) {
-        if (!_winCutscenePending) {
-            _winCutscenePending = true;
-            let day = currentDayID;
-            console.log(`[runGameLoop] Settlement → NPC cutscene Day ${day}`);
-            triggerTransition(() => startCutscene('library', CS_DAY_NPC[day], () => {
-                triggerTransition(() => gameState.setState(STATE_WIN));
-            }));
+    // Settlement reached in story mode -> black screen + door SFX (2s) -> library cutscene.
+    if (!freezeGameplay && levelController) {
+        const settlementResult = levelController.checkSettlementPoint();
+        if (settlementResult === "WIN") {
+            if (!_winCutscenePending) {
+                _winCutscenePending = true;
+                let day = currentDayID;
+                console.log(`[runGameLoop] Settlement -> library entry transition -> NPC cutscene Day ${day}`);
+
+                triggerLibraryEntryTransition(() => {
+                    if (typeof DIALOGUE_DATA !== 'undefined' && DIALOGUE_DATA.day_npc_start && DIALOGUE_DATA.day_npc_start[day]) {
+                        startCutsceneFromNode(DIALOGUE_DATA.day_npc_start[day], () => {
+                            triggerTransition(() => gameState.setState(STATE_WIN));
+                        });
+                    } else {
+                        startCutscene('library', CS_DAY_NPC[day], () => {
+                            triggerTransition(() => gameState.setState(STATE_WIN));
+                        });
+                    }
+                });
             }
         }
     }
+}
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -810,10 +983,10 @@ const _sfxCooldownUntil = Object.create(null);  // {id: timestamp}
  */
 function playSFX(sound, opt = {}) {
     try {
-        
+
         // 1. basic check
         if (!sound || typeof sound.isLoaded !== 'function' || !sound.isLoaded()) {
-            return; 
+            return;
         }
 
         // 2. Ensure ID and attribute
@@ -840,11 +1013,11 @@ function playSFX(sound, opt = {}) {
 
         if (monophonic && typeof sound.isPlaying === 'function' && sound.isPlaying()) {
             // Optimization: Use jump(0) to reduce the overhead of reconnecting nodes.
-            try { 
-                sound.jump(0); 
-            } catch (jumpErr) { 
-                sound.stop(); 
-                sound.play(); 
+            try {
+                sound.jump(0);
+            } catch (jumpErr) {
+                sound.stop();
+                sound.play();
             }
         } else {
             // 5. Adjust volume and play.
@@ -866,6 +1039,117 @@ function playSFX(sound, opt = {}) {
     }
 }
 
+
+/**
+ * Stops pending/playing fail end audio.
+ */
+function stopFailEndAudio() {
+    if (failEndAudioTimer) {
+        clearTimeout(failEndAudioTimer);
+        failEndAudioTimer = null;
+    }
+
+    const failAudioList = [sfxAmbulance, sfxHeartbeat];
+
+    for (const s of failAudioList) {
+        if (!s) continue;
+        try {
+            if (typeof s.isPlaying === 'function' && s.isPlaying()) {
+                s.stop();
+            }
+        } catch (e) {
+            console.warn('[AUDIO] stopFailEndAudio failed:', e);
+        }
+    }
+}
+
+/**
+ * On FAIL: stop current BGM immediately, wait ~2s, then play fail audio once.
+ * Day 1-4 -> ambulance
+ * Day 5   -> heartbeat
+ */
+function playFailEndAudio() {
+    const day = (typeof currentDayID === 'number') ? currentDayID : 1;
+    const failSound = (day === 5) ? sfxHeartbeat : sfxAmbulance;
+
+    if (!failSound) return;
+
+    // Cancel any pending fail-audio trigger first
+    if (failEndAudioTimer) {
+        clearTimeout(failEndAudioTimer);
+        failEndAudioTimer = null;
+    }
+
+    // Stop current BGM immediately
+    try {
+        if (typeof BGM !== 'undefined' && BGM && typeof BGM.stop === 'function') {
+            BGM.stop();
+        }
+    } catch (e) {
+        console.warn('[AUDIO] Failed to stop BGM on fail:', e);
+    }
+
+    // Schedule fail audio after a short silent buffer
+    failEndAudioTimer = setTimeout(() => {
+        failEndAudioTimer = null;
+
+        try {
+            const vol = (typeof masterVolumeSFX === 'number') ? masterVolumeSFX : 0.5;
+
+            failSound.stop();   // ensure clean restart
+            failSound.setVolume(vol);
+            failSound.play();
+        } catch (e) {
+            console.warn('[AUDIO] playFailEndAudio failed:', e);
+        }
+    }, 1200);
+}
+
+/**
+ * On WIN (Day 1-4): stop current BGM, then play win audio once.
+ * Day 5 uses its own ending BGM, so do nothing there.
+ */
+function playWinEndAudio() {
+    const day = (typeof currentDayID === 'number') ? currentDayID : 1;
+
+    // Day 5 should keep its own ending BGM logic
+    if (day >= 5) return;
+    if (!sfxGameWin) return;
+
+    try {
+        if (typeof BGM !== 'undefined' && BGM && typeof BGM.stop === 'function') {
+            BGM.stop();
+        }
+    } catch (e) {
+        console.warn('[AUDIO] Failed to stop BGM on win:', e);
+    }
+
+    try {
+        const vol = (typeof masterVolumeBGM === 'number') ? masterVolumeBGM : 0.25;
+
+        sfxGameWin.stop();
+        sfxGameWin.setVolume(vol);
+        sfxGameWin.play();
+    } catch (e) {
+        console.warn('[AUDIO] playWinEndAudio failed:', e);
+    }
+}
+
+/**
+ * Stops win end audio if it is still playing.
+ */
+function stopWinEndAudio() {
+    if (!sfxGameWin) return;
+
+    try {
+        if (typeof sfxGameWin.isPlaying === 'function' && sfxGameWin.isPlaying()) {
+            sfxGameWin.stop();
+        }
+    } catch (e) {
+        console.warn('[AUDIO] stopWinEndAudio failed:', e);
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 4: TRANSITIONS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -883,29 +1167,107 @@ function triggerTransition(onBlackout) {
 }
 
 /**
- * Renders the full-screen fade overlay each frame.
- * Advances the alpha, fires the midpoint callback, and resets state on completion.
+ * Special transition used only when entering the library after DayRun.
+ * Fade to black -> immediately play door SFX -> hold black for 2s -> switch to library -> fade in.
+ */
+function triggerLibraryEntryTransition(onAfterBlackout) {
+    if (globalFade.isFading) return;
+
+    // Reset special hold fields first
+    globalFade.holdUntilMs = 0;
+    globalFade.holdDoneCallback = null;
+
+    triggerTransition(() => {
+    // At full black, stop current BGM first
+        if (typeof BGM !== 'undefined' && BGM && typeof BGM.stop === 'function') {
+            BGM.stop();
+        }
+
+        // Then play the door SFX immediately
+        if (typeof playSFX === 'function' && sfxDoorOpen) {
+            playSFX(sfxDoorOpen, {
+                id: 'door_open_library',
+                cooldownMs: 300,
+                monophonic: true
+            });
+        }
+
+        // Hold black for 2 seconds
+        globalFade.holdUntilMs = performance.now() + 2000;
+
+        // After the black hold finishes, continue into the library cutscene
+        globalFade.holdDoneCallback = () => {
+            if (typeof onAfterBlackout === 'function') {
+                onAfterBlackout();
+            }
+        };
+    });
+}
+
+/**
+ * Special transition used only when entering the library after DayRun.
+ * Fade to black -> play door SFX while holding black for 2s -> enter library cutscene.
  */
 function renderGlobalFade() {
     if (!globalFade.isFading && globalFade.alpha <= 0) return;
 
-    globalFade.alpha += globalFade.speed * globalFade.dir;
+    const now = performance.now();
 
-    if (globalFade.dir === 1 && globalFade.alpha >= 255) {
-        globalFade.alpha = 255;
-        if (globalFade.callback) {
-        try {
-            globalFade.callback();
-        } catch (e) {
-            console.error('[Transition] callback crashed:', e);
+    // Fade in to black
+    if (globalFade.dir === 1) {
+        globalFade.alpha += globalFade.speed;
+
+        if (globalFade.alpha >= 255) {
+            globalFade.alpha = 255;
+
+            if (globalFade.callback) {
+                try {
+                    const cb = globalFade.callback;
+                    globalFade.callback = null; // ensure callback only runs once
+                    cb();
+                } catch (e) {
+                    console.error('[Transition] callback crashed:', e);
+                }
+            }
+
+            // Only special transitions will configure a black-screen hold.
+            if (globalFade.holdUntilMs && now < globalFade.holdUntilMs) {
+                globalFade.dir = 0; // hold on black
+            } else {
+                globalFade.dir = -1; // normal fade out
+            }
         }
     }
-        globalFade.dir = -1;
+    // Hold on full black
+    else if (globalFade.dir === 0) {
+        globalFade.alpha = 255;
+
+        if (!globalFade.holdUntilMs || now >= globalFade.holdUntilMs) {
+            if (globalFade.holdDoneCallback) {
+                try {
+                    const cb = globalFade.holdDoneCallback;
+                    globalFade.holdDoneCallback = null;
+                    cb();
+                } catch (e) {
+                    console.error('[Transition] holdDoneCallback crashed:', e);
+                }
+            }
+
+            globalFade.holdUntilMs = 0;
+            globalFade.dir = -1;
+        }
     }
-    if (globalFade.dir === -1 && globalFade.alpha <= 0) {
-        globalFade.alpha = 0;
-        globalFade.isFading = false;
-        globalFade.callback = null;
+    // Fade out from black
+    else if (globalFade.dir === -1) {
+        globalFade.alpha -= globalFade.speed;
+
+        if (globalFade.alpha <= 0) {
+            globalFade.alpha = 0;
+            globalFade.isFading = false;
+            globalFade.callback = null;
+            globalFade.holdUntilMs = 0;
+            globalFade.holdDoneCallback = null;
+        }
     }
 
     push();
@@ -989,7 +1351,7 @@ function keyPressed() {
 
     // Dev shortcuts: 8 = instant WIN, 9 = instant FAIL
     if (developerMode) {
-        if (key === '8') { devGoToWin();  return; }
+        if (key === '8') { devGoToWin(); return; }
         if (key === '9') { devGoToFail("EXHAUSTED"); return; }
     }
 
@@ -1008,6 +1370,7 @@ function keyPressed() {
             pauseIndex = -1;
             showRestartChoice = false;
             showStoryRecap = false;
+            showExitConfirm = false;
             return;
         }
     }
@@ -1040,6 +1403,18 @@ function keyPressed() {
             } else if (keyCode === ESCAPE) {
                 showStoryRecap = false;
                 pauseIndex = -1;
+            }
+            return;
+        } else if (showExitConfirm) {
+            if (keyCode === UP_ARROW || keyCode === 87 || keyCode === DOWN_ARROW || keyCode === 83) {
+                if (typeof playSFX === 'function') playSFX(sfxSelect);
+                exitConfirmIndex = (exitConfirmIndex < 0) ? 0 : (exitConfirmIndex + 1) % EXIT_CONFIRM_OPTIONS.length;
+            } else if ((keyCode === ENTER || keyCode === 13) && exitConfirmIndex >= 0) {
+                if (typeof playSFX === 'function') playSFX(sfxClick);
+                handleExitConfirm();
+            } else if (keyCode === ESCAPE) {
+                showExitConfirm = false;
+                exitConfirmIndex = -1;
             }
             return;
         } else if (showRestartChoice) {
@@ -1077,6 +1452,13 @@ function keyPressed() {
         return;
     }
 
+    // Utility item activation: E key
+    if (state === STATE_DAY_RUN && (key === 'e' || key === 'E' || keyCode === 69)) {
+        if (player && typeof player.activateUtilityItem === "function") {
+            if (player.activateUtilityItem()) return false;
+        }
+    }
+
     // Promoter leaflet interaction: SPACE is consumed by obstacle system while active.
     if (state === STATE_DAY_RUN && player &&
         typeof player.handlePuddleEscapePress === 'function' &&
@@ -1089,6 +1471,10 @@ function keyPressed() {
         typeof obstacleManager.handlePromoterSpacePress === 'function' &&
         (keyCode === 32 || key === ' ')) {
         if (obstacleManager.handlePromoterSpacePress(player)) return false;
+    }
+
+    if (state === STATE_TUTORIAL_SLIDES) {
+        return false;
     }
 
     // Menu navigation
@@ -1112,6 +1498,7 @@ function keyPressed() {
 
     // Close inventory with ESC
     if (gameState.currentState === STATE_INVENTORY && keyCode === ESCAPE) {
+        if (backpackUI) backpackUI.onClose();
         if (tutorialHints.roomPhase === 'CLOSE_BP') {
             if (backpackUI && backpackUI.hasRequiredItems()) {
                 tutorialHints.roomPhase = (currentDayID === 1) ? 'DOOR' : 'DONE';
@@ -1140,9 +1527,10 @@ function handlePauseSelection() {
         if (typeof tutorialHints !== 'undefined' &&
             tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
             tutorialHints.uiTutorialDone = true;
-            tutorialHints.uiIntroStep    = 0;
-            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+            tutorialHints.uiIntroStep = 0;
+            tutorialHints.roomPhase = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
+        newBadges.delete("pause.STORY");
         showStoryRecap = true;
         storyRecapDay = 0;   // open at Prologue (day 0); Days 1-5 follow
         storyScrollOffset = 0;
@@ -1151,47 +1539,62 @@ function handlePauseSelection() {
         if (typeof tutorialHints !== 'undefined' &&
             tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
             tutorialHints.uiTutorialDone = true;
-            tutorialHints.uiIntroStep    = 0;
-            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+            tutorialHints.uiIntroStep = 0;
+            tutorialHints.roomPhase = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
+        newBadges.delete("pause.SETTINGS");
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         mainMenu.diffToastTimer = 0;
         gameState.currentState = STATE_SETTINGS;
-        mainMenu.menuState     = STATE_SETTINGS;
+        mainMenu.menuState = STATE_SETTINGS;
     } else if (selected === "HELP") {
         // Tutorial first-pause: mark done then open help
         if (typeof tutorialHints !== 'undefined' &&
             tutorialHints.roomPhase === 'UI_INTRO' && tutorialHints.uiIntroStep === 1) {
             tutorialHints.uiTutorialDone = true;
-            tutorialHints.uiIntroStep    = 0;
-            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+            tutorialHints.uiIntroStep = 0;
+            tutorialHints.roomPhase = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
+        helpPagesVisited.clear();
+        helpPagesVisited.add(0);  // page 0 is shown on open
+        if (helpPagesVisited.size < 4) newBadges.add("help.pages");
         pauseFromState = gameState.previousState;
         if (typeof playSFX === 'function') playSFX(sfxClick);
         gameState.currentState = STATE_HELP;
-        mainMenu.menuState     = STATE_HELP;
-        mainMenu.helpPage      = 0;
+        mainMenu.menuState = STATE_HELP;
+        mainMenu.helpPage = 0;
     } else if (selected === "EXPLORE ON MY OWN") {
         // Tutorial first-pause: player skips guidance, mark done and resume
         if (typeof tutorialHints !== 'undefined') {
             tutorialHints.uiTutorialDone = true;
-            tutorialHints.uiIntroStep    = 0;
-            tutorialHints.roomPhase      = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
+            tutorialHints.uiIntroStep = 0;
+            tutorialHints.roomPhase = tutorialHints.moveTutorialDone ? 'DESK' : 'MOVE';
         }
         togglePause();
         pauseFromState = null;
     } else if (selected === "RESTART") {
-        showRestartChoice  = true;
+        showRestartChoice = true;
         restartChoiceIndex = -1;
     } else if (selected === "EXIT") {
+        showExitConfirm = true;
+        exitConfirmIndex = -1;
+    }
+}
+
+function handleExitConfirm() {
+    if (EXIT_CONFIRM_OPTIONS[exitConfirmIndex] === "YES, EXIT") {
         triggerTransition(() => {
             gameState.setState(STATE_MENU);
             mainMenu.menuState = STATE_MENU;
-            pauseFromState     = null;
-            showRestartChoice  = false;
-            showStoryRecap     = false;
+            pauseFromState = null;
+            showRestartChoice = false;
+            showStoryRecap = false;
+            showExitConfirm = false;
         });
+    } else if (EXIT_CONFIRM_OPTIONS[exitConfirmIndex] === "CANCEL") {
+        showExitConfirm = false;
+        exitConfirmIndex = -1;
     }
 }
 
@@ -1199,18 +1602,25 @@ function handleRestartChoice() {
     if (RESTART_OPTIONS[restartChoiceIndex] === "BACK TO ROOM") {
         triggerTransition(() => {
             showRestartChoice = false;
-            gameState.setState(STATE_ROOM);
-            if (roomScene) roomScene.reset();
+            gameState.resetFlags();
+            setupRun(currentDayID);
             pauseFromState = null;
         });
     } else if (RESTART_OPTIONS[restartChoiceIndex] === "RESTART RUN") {
         triggerTransition(() => {
             showRestartChoice = false;
+
             player.applyLevelStats(currentDayID);
+            if (typeof player.restoreUtilityItemFromRunSnapshot === "function") {
+                player.restoreUtilityItemFromRunSnapshot();
+            }
+
             player.x = GLOBAL_CONFIG.lanes.lane1;
             player.y = PLAYER_RUN_FOOT_Y;
+
             obstacleManager = new ObstacleManager();
             levelController.initializeLevel(currentDayID);
+
             if (endScreenManager) endScreenManager._activeScreen = null;
             gameState.setState(STATE_DAY_RUN);
 
@@ -1223,14 +1633,14 @@ function handleRestartChoice() {
  * Dispatches mouse press events; also unlocks the Web Audio context on first click.
  */
 function mousePressed() {
-    
-        if (frameCount % 60 === 0) {
-            const ctx = (typeof getAudioContext === 'function') ? getAudioContext() : null;
-            if (ctx && ctx.state !== 'running') {
-                ctx.resume().catch(e => console.warn('[SFX] Context resume failed', e));
-            }
+
+    if (frameCount % 60 === 0) {
+        const ctx = (typeof getAudioContext === 'function') ? getAudioContext() : null;
+        if (ctx && ctx.state !== 'running') {
+            ctx.resume().catch(e => console.warn('[SFX] Context resume failed', e));
         }
-    
+    }
+
     if (globalFade.isFading || !gameState) return;
 
     // Dev corner-drag: intercept before everything else
@@ -1275,7 +1685,7 @@ function mousePressed() {
     if (state === STATE_CREDITS) {
         if (_creditPhase === 'scroll' || _creditPhase === 'pause') {
             console.log("[Credits] Scrolling... interaction locked.");
-            return; 
+            return;
         }
 
         if (_creditPhase === 'poem' && _creditPoemAlpha >= 255) {
@@ -1287,16 +1697,20 @@ function mousePressed() {
             } else {
                 triggerTransition(() => { gameState.resetFlags(); gameState.setState(STATE_MENU); });
             }
-        } 
+        }
         return;
     }
 
-    // Splash screen: unlock audio and transition to main menu
+    // Splash screen: unlock audio and start the animated title transition to main menu
     if (state === STATE_SPLASH) {
         if (getAudioContext().state !== 'running') getAudioContext().resume();
         playSFX(sfxClick);
 
-        triggerTransition(() => gameState.setState(STATE_MENU));
+        // Capture splash title Y so the entering animation can lerp from it
+        _splashEnterCY = (typeof titleDrop !== 'undefined') ? titleDrop.y : 480;
+        _menuEnterT = 0;
+        _menuFromSplash = true;
+        gameState.setState(STATE_MENU);
         return;
     }
 
@@ -1307,6 +1721,9 @@ function mousePressed() {
             if (showStoryRecap) {
                 showStoryRecap = false;
                 pauseIndex = -1;
+            } else if (showExitConfirm) {
+                showExitConfirm = false;
+                exitConfirmIndex = -1;
             } else if (showRestartChoice) {
                 showRestartChoice = false;
                 pauseIndex = -1;
@@ -1315,13 +1732,17 @@ function mousePressed() {
             }
             return;
         }
-        if (showRestartChoice && restartChoiceIndex >= 0) {
+        if (showExitConfirm && exitConfirmIndex >= 0) {
+            if (typeof playSFX === 'function') playSFX(sfxClick);
+            handleExitConfirm();
+            return;
+        } else if (showRestartChoice && restartChoiceIndex >= 0) {
             if (typeof playSFX === 'function') playSFX(sfxClick);
             handleRestartChoice();
         } else if (showStoryRecap) {
             // Right-side up/down arrow clicks
-            let arrowX   = width - 90;
-            let centerY  = height / 2;
+            let arrowX = width - 90;
+            let centerY = height / 2;
             let arrowGap = 90;
             if (storyRecapDay > 0 && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35) {
                 storyRecapDay--;
@@ -1360,6 +1781,8 @@ function mousePressed() {
         state === STATE_SETTINGS || state === STATE_HELP ||
         state === STATE_DIFF_SELECT || state === STATE_DIFF_CONFIRM || state === STATE_LOAD_GAME) {
         if (mainMenu) mainMenu.handleClick(mouseX, mouseY);
+    } else if (state === STATE_TUTORIAL_SLIDES) {
+        return false;
     } else if (state === STATE_FAIL || state === STATE_WIN) {
         if (endScreenManager) endScreenManager.handleClick(mouseX, mouseY);
     } else if (state === STATE_ROOM || state === STATE_DAY_RUN) {
@@ -1446,11 +1869,30 @@ function togglePause() {
     }
 }
 
+function startRoomExitRunSequence() {
+    if (shouldShowDay1RoomExitTutorial()) {
+        tutorialSlidePlayback.active = true;
+        tutorialSlidePlayback.frameStart = frameCount;
+        tutorialSlidePlayback.currentIndex = 0;
+        gameState.setState(STATE_TUTORIAL_SLIDES);
+        return;
+    }
+    gameState.setState(STATE_DAY_RUN);
+}
+
+function finishTutorialSlides() {
+    tutorialSlidePlayback.active = false;
+    tutorialSlidePlayback.frameStart = 0;
+    tutorialSlidePlayback.currentIndex = 0;
+    gameState.setState(STATE_DAY_RUN);
+}
+
 /**
  * Initialises and starts a new run for the given day ID.
  */
 function setupRun(dayID) {
     currentDayID = dayID;
+    currentRunMode = RUN_MODE_STORY;
     _winCutscenePending = false;  // reset so the NPC cutscene can fire this run
 
     // Unlock all characters/story up to this day (supports testing panel access)
@@ -1465,8 +1907,9 @@ function setupRun(dayID) {
 
     if (typeof tutorialHints !== 'undefined') {
         if (dayID === 1 && !tutorialHints.uiTutorialDone) {
-            tutorialHints.roomPhase  = 'UI_INTRO';
+            tutorialHints.roomPhase = 'UI_INTRO';
             tutorialHints.uiIntroStep = 0;
+            initNewGameBadges();
         } else if (dayID === 1 && !tutorialHints.moveTutorialDone) {
             tutorialHints.roomPhase = 'MOVE';
         } else {
@@ -1474,34 +1917,60 @@ function setupRun(dayID) {
         }
     }
     if (backpackUI) backpackUI.resetForNewDay();
+    clearItemToast();
     if (endScreenManager) endScreenManager._activeScreen = null;
+    if (gameState && typeof gameState.clearRunUtilityItemSnapshot === "function") {
+        gameState.clearRunUtilityItemSnapshot();
+    }
+
+    // Play alarm clock immediately — screen is full black from triggerTransition
+    if (typeof playSFX === 'function' && sfxRoomClock) playSFX(sfxRoomClock);
+
+    // Hold the black screen for 1.5 s (alarm rings) then show room/cutscene.
+    // Only possible when called from inside a triggerTransition callback (dir===1).
+    const _inBlackout = globalFade.isFading && globalFade.dir === 1;
 
     // Room cutscene — only on first visit per day per session
     if (typeof CS_DAY_ROOM !== 'undefined' && CS_DAY_ROOM[dayID] &&
         !_roomCutsceneSeen[dayID]) {
         _roomCutsceneSeen[dayID] = true;
-        // Place player at room starting position so bg looks correct
         if (player) { player.x = 940; player.y = 550; }
-        startCutscene('room', CS_DAY_ROOM[dayID], () => {
-            // For Day 2+, skip to DESK phase (no movement tutorial needed again)
-            if (dayID > 1 && typeof tutorialHints !== 'undefined') {
-                tutorialHints.roomPhase = 'DESK';
-            }
-            gameState.setState(STATE_ROOM);
-        });
+        const _launchCutscene = () => {
+            startCutscene('room', CS_DAY_ROOM[dayID], () => {
+                if (dayID > 1 && typeof tutorialHints !== 'undefined') {
+                    tutorialHints.roomPhase = 'DESK';
+                }
+                gameState.setState(STATE_ROOM);
+            });
+        };
+        if (_inBlackout) {
+            globalFade.holdUntilMs    = performance.now() + 1500;
+            globalFade.holdDoneCallback = _launchCutscene;
+        } else {
+            _launchCutscene();
+        }
     } else {
-        // Room position must be set even when cutscene is skipped on retry
         if (player) { player.x = 940; player.y = 550; }
-        gameState.setState(STATE_ROOM);
+        if (_inBlackout) {
+            globalFade.holdUntilMs    = performance.now() + 1500;
+            globalFade.holdDoneCallback = () => { gameState.setState(STATE_ROOM); };
+        } else {
+            gameState.setState(STATE_ROOM);
+        }
     }
 }
 
-/**
- * Starts a run directly on the street, skipping the room scene.
- */
-function setupRunDirectly(dayID) {
+function setupRunDirectly(dayID, runMode = RUN_MODE_STORY) {
     currentDayID = dayID;
+    currentRunMode = runMode;
+    _winCutscenePending = false;
+
     player.applyLevelStats(dayID);
+
+    // Restore the selected utility item for direct restart paths
+    if (typeof player.restoreUtilityItemFromRunSnapshot === "function") {
+        player.restoreUtilityItemFromRunSnapshot();
+    }
 
     // Set position at lane 1 matching standard run spawn
     player.x = GLOBAL_CONFIG.lanes.lane1;
@@ -1509,8 +1978,10 @@ function setupRunDirectly(dayID) {
 
     obstacleManager = new ObstacleManager();
     levelController.initializeLevel(dayID);
+
     if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DONE';
     if (backpackUI) backpackUI.resetForNewDay();
+    clearItemToast();
     if (endScreenManager) endScreenManager._activeScreen = null;
 
     gameState.setState(STATE_DAY_RUN);
@@ -1558,13 +2029,69 @@ function drawLoadingScreen() {
     }
 }
 
+function drawTutorialSlidesScreen() {
+    const slides = (assets && Array.isArray(assets.tutorialSlides)) ? assets.tutorialSlides : [];
+    if (!tutorialSlidePlayback.active || slides.length === 0) {
+        finishTutorialSlides();
+        return;
+    }
+
+    const elapsedFrames = Math.max(0, frameCount - tutorialSlidePlayback.frameStart);
+    const defaultFrames = Math.max(1, Number(tutorialSlidePlayback.framesPerSlide || 60));
+    const keyframeHoldFrames = Math.max(defaultFrames, Number(tutorialSlidePlayback.keyframeHoldFrames || 180));
+    const textKeyframes = tutorialSlidePlayback.textKeyframes instanceof Set
+        ? tutorialSlidePlayback.textKeyframes
+        : new Set();
+
+    let slideIndex = 0;
+    let remainingFrames = elapsedFrames;
+    while (slideIndex < slides.length) {
+        const slideNumber = slideIndex + 1;
+        const durationFrames = textKeyframes.has(slideNumber) ? keyframeHoldFrames : defaultFrames;
+        if (remainingFrames < durationFrames) break;
+        remainingFrames -= durationFrames;
+        slideIndex++;
+    }
+    tutorialSlidePlayback.currentIndex = slideIndex;
+
+    if (slideIndex >= slides.length) {
+        finishTutorialSlides();
+        return;
+    }
+
+    const slide = slides[slideIndex];
+    background(0);
+
+    if (slide) {
+        const scale = Math.min(width / slide.width, height / slide.height);
+        imageMode(CENTER);
+        image(slide, width / 2, height / 2, slide.width * scale, slide.height * scale);
+        imageMode(CORNER);
+    }
+
+    push();
+    rectMode(CENTER);
+    noStroke();
+    fill(0, 0, 0, 140);
+    rect(width / 2, height - 54, 520, 50, 16);
+    textAlign(CENTER, CENTER);
+    textFont(fonts.jersey20 || fonts.body);
+    textSize(28);
+    fill(255, 235, 200);
+    text("Tutorial will continue automatically", width / 2, height - 54);
+    pop();
+}
+
 // ─── WARNING / SPLASH TRANSITION ─────────────────────────────────────────────
 let _splashFadeAlpha = 0;   // black overlay fading out on splash entry [0..255]
 let _warnFrame = 0;         // counts up each draw call while in STATE_WARNING
-const _WARN_FADE_IN  = 90;  // frames for fade-in  (~1.5 s)
-const _WARN_HOLD     = 540; // frames to hold at full opacity  (~9 s)
+let _menuEnterT = 1;    // 0→1: splash-to-menu enter animation progress
+let _menuFromSplash = false; // true while the splash→menu title animation is running
+let _splashEnterCY = 480;  // titleDrop.y captured at the moment of entering menu from splash
+const _WARN_FADE_IN = 90;  // frames for fade-in  (~1.5 s)
+const _WARN_HOLD = 240; // frames to hold at full opacity  (~9 s)
 const _WARN_FADE_OUT = 90;  // frames for fade-out (~1.5 s)
-const _WARN_TOTAL    = _WARN_FADE_IN + _WARN_HOLD + _WARN_FADE_OUT; // 600 ≈ 10 s
+const _WARN_TOTAL = _WARN_FADE_IN + _WARN_HOLD + _WARN_FADE_OUT; // 600 ≈ 10 s
 
 /**
  * Full-screen mental-health content warning.
@@ -1597,55 +2124,42 @@ function drawWarningScreen() {
     let cx = width / 2;
     let cy = height / 2;
 
-    // ── Background ────────────────────────────────────────────────────────────
+    // ── Background: pure black — content fades in and out over it ────────────
     push();
     colorMode(RGB, 255);
     background(0);
 
-    // Faded background image (otherBg) for atmosphere
-    if (assets && assets.otherBg) {
-        let bgS = max(width / assets.otherBg.width, height / assets.otherBg.height);
+    // ── Warning box panel (1200x800, text area is bottom 1200x655) ──────────
+    let panelW = 1200 * s;
+    let panelH = 800 * s;
+    let panelX = cx;
+    // Shift up so the page area (bottom 655 px of the image) is centred,
+    // leaving the cat (top 145 px) sitting above the visual centre.
+    let panelY = cy - 72.5 * s;
+
+    if (assets.warningBox) {
         imageMode(CENTER);
-        tint(255, alpha * 0.3);
-        image(assets.otherBg, cx, cy, assets.otherBg.width * bgS, assets.otherBg.height * bgS);
+        tint(255, alpha);
+        image(assets.warningBox, panelX, panelY, panelW, panelH);
         noTint();
-        imageMode(CORNER);
+    } else {
+        // Fallback panel if warning_box.png is unavailable.
+        fill(14, 14, 22, alpha * 0.95);
+        stroke(200, 170, 100, alpha);
+        strokeWeight(2.5 * s);
+        rectMode(CENTER);
+        rect(panelX, panelY, panelW, panelH, 22 * s);
+        noStroke();
     }
 
-    // Dark overlay
-    fill(0, 0, 0, alpha * 0.80);
-    noStroke();
-    rectMode(CORNER);
-    rect(0, 0, width, height);
-
-    // ── Panel ─────────────────────────────────────────────────────────────────
-    let panelW = 1200 * s;
-    let panelH = 640 * s;
-    let panelX = cx;
-    let panelY = cy;
-
-    // Shadow
-    fill(0, 0, 0, alpha * 0.5);
-    noStroke();
-    rectMode(CENTER);
-    rect(panelX + 10 * s, panelY + 10 * s, panelW, panelH, 22 * s);
-
-    // Panel body
-    fill(14, 14, 22, alpha * 0.95);
-    stroke(200, 170, 100, alpha);
-    strokeWeight(2.5 * s);
-    rect(panelX, panelY, panelW, panelH, 22 * s);
-
-    // Inner border
-    stroke(200, 170, 100, alpha * 0.35);
-    strokeWeight(1 * s);
-    rect(panelX, panelY, panelW - 24 * s, panelH - 24 * s, 16 * s);
-    noStroke();
+    let textAreaTop = panelY - panelH / 2 + 145 * s;
+    let textAreaBottom = panelY + panelH / 2;
+    let textAreaH = textAreaBottom - textAreaTop;
 
     // ── Title ─────────────────────────────────────────────────────────────────
-    let titleY = panelY - panelH / 2 + 80 * s;
+    let titleY = textAreaTop + 48 * s;
     textFont(fonts.title || fonts.body);
-    textSize(52 * s);
+    textSize(44 * s);
     textAlign(CENTER, CENTER);
     fill(220, 190, 110, alpha);
     text("A Quiet Note to You", panelX, titleY);
@@ -1653,30 +2167,30 @@ function drawWarningScreen() {
     // Divider line
     stroke(200, 170, 100, alpha * 0.45);
     strokeWeight(1.5 * s);
-    let divY = titleY + 44 * s;
+    let divY = titleY + 36 * s;
     line(panelX - panelW / 2 + 60 * s, divY, panelX + panelW / 2 - 60 * s, divY);
     noStroke();
 
     // ── Body text (centred, warm) ──────────────────────────────────────────────
-    textFont(fonts.body);
+    textFont(fonts.jersey20 || fonts.body);
     textAlign(CENTER, TOP);
     let bodyLines = [
-    { txt: "Please note: This experience explores stress, burnout,", size: 28, col: [230, 220, 205] },
-    { txt: "and the psychological impact of self-doubt.", size: 28, col: [230, 220, 205] },
-    { txt: "", size: 28, col: [230, 220, 205] },
-    
-    { txt: "If you find these themes distressing, we encourage you", size: 28, col: [230, 220, 205] },
-    { txt: "to prioritise your well-being while playing.", size: 28, col: [230, 220, 205] },
-    { txt: "Support is available if the climb feels too steep.", size: 28, col: [230, 220, 205] },
-    { txt: "", size: 24, col: [230, 220, 205] },
+        { txt: "Please note: This experience explores stress, burnout,", size: 40, col: [230, 220, 205] },
+        { txt: "and the psychological impact of self-doubt.", size: 40, col: [230, 220, 205] },
+        { txt: "", size: 40, col: [230, 220, 205] },
 
-    { txt: "— Resources for Support —", size: 24, col: [210, 185, 120] },
-    { txt: "Bristol Nightline | 01179 266 266 (Nightly, Term-time)", size: 26, col: [210, 185, 120] },
-    { txt: "Samaritans | 116 123 (Free, 24/7 Support)", size: 26, col: [210, 185, 120] },
-    { txt: "Shout Crisis | Text 'SHOUT' to 85258", size: 26, col: [210, 185, 120] },
+        { txt: "If you find these themes distressing, we encourage you", size: 40, col: [230, 220, 205] },
+        { txt: "to prioritise your well-being while playing.", size: 40, col: [230, 220, 205] },
+        { txt: "Support is available if the climb feels too steep.", size: 40, col: [230, 220, 205] },
+        { txt: "", size: 35, col: [230, 220, 205] },
+
+        { txt: "— Resources for Support —", size: 35, col: [210, 185, 120] },
+        { txt: "Bristol Nightline | 01179 266 266 (Nightly, Term-time)", size: 35, col: [210, 185, 120] },
+        { txt: "Samaritans | 116 123 (Free, 24/7 Support)", size: 35, col: [210, 185, 120] },
+        { txt: "Shout Crisis | Text 'SHOUT' to 85258", size: 35, col: [210, 185, 120] },
     ];
 
-    let ty = divY + 32 * s;
+    let ty = divY + 20 * s;
     for (let i = 0; i < bodyLines.length; i++) {
         let entry = bodyLines[i];
         // Compute cumulative y by summing previous line heights
@@ -1686,92 +2200,94 @@ function drawWarningScreen() {
         }
         textSize(entry.size * s);
         fill(entry.col[0], entry.col[1], entry.col[2], alpha);
-        text(entry.txt, panelX, ty + prevH);
+        let y = ty + prevH;
+        if (y > textAreaBottom - 30 * s) break;
+        text(entry.txt, panelX, y);
     }
 
     // ── Footer ────────────────────────────────────────────────────────────────
-    textFont(fonts.body);
+    textFont(fonts.jersey20 || fonts.body);
     textSize(21 * s);
     textAlign(CENTER, CENTER);
     fill(160, 150, 130, alpha * 0.65);
-    text("This screen will continue automatically.", panelX, panelY + panelH / 2 - 35 * s);
+    text("This screen will continue automatically.", panelX, textAreaTop + textAreaH - 24 * s);
 
     pop();
 }
 
 // ─── CREDITS SCREEN ───────────────────────────────────────────────────────────
-let _creditPhase     = 'scroll'; // 'scroll' | 'pause' | 'poem'
-let _creditScrollY   = 0;
-let _creditPauseF    = 0;
+let _creditPhase = 'scroll'; // 'scroll' | 'pause' | 'poem'
+let _creditScrollY = 0;
+let _creditPauseF = 0;
 let _creditPoemAlpha = 0;
 
 const _CREDIT_SCROLL_SPEED = 2.0; // design-space px per frame (~30 s total scroll)
 
 // Raw credit data — sizes in 1920×1080 design-space pixels
 const _CREDIT_DATA = [
-    { type: 'space',    h: 120 },
-    { type: 'header',   h: 80,  text: '\u2014 PARK STREET SURVIVOR \u2014' },
-    { type: 'sub',      h: 50,  text: 'A University of Bristol Group Project' },
-    { type: 'space',    h: 70 },
-    { type: 'divider',  h: 40 },
-    { type: 'space',    h: 55 },
-    { type: 'section',  h: 58,  text: 'THE TEAM' },
-    { type: 'space',    h: 45 },
-    { type: 'name',     h: 50,  text: 'Charlotte Yu' },
-    { type: 'role',     h: 36,  text: 'Core Mechanism & Systems Architect' },
-    { type: 'desc',     h: 32,  text: 'System Integration  \xb7  State Machine Logic  \xb7  Physics Pipeline' },
-    { type: 'space',    h: 44 },
-    { type: 'name',     h: 50,  text: 'Kangrui Wang' },
-    { type: 'role',     h: 36,  text: 'Level Designer' },
-    { type: 'desc',     h: 32,  text: 'Level Geometry  \xb7  Environmental Storytelling  \xb7  Obstacle Choreography' },
-    { type: 'space',    h: 44 },
-    { type: 'name',     h: 50,  text: 'Layla Pei' },
-    { type: 'role',     h: 36,  text: 'UI/UX & Audio Designer' },
-    { type: 'desc',     h: 32,  text: 'Interface Ergonomics  \xb7  Interaction Flows  \xb7  Soundscape Design' },
-    { type: 'space',    h: 44 },
-    { type: 'name',     h: 50,  text: 'Lucca Zhou' },
-    { type: 'role',     h: 36,  text: 'Aesthetic Designer' },
-    { type: 'desc',     h: 32,  text: 'Visual Style Guide  \xb7  Pixel Asset Creation  \xb7  Colour Palette' },
-    { type: 'space',    h: 44 },
-    { type: 'name',     h: 50,  text: 'Keyu Zhou' },
-    { type: 'role',     h: 36,  text: 'Script Designer' },
-    { type: 'desc',     h: 32,  text: 'Narrative Scripting  \xb7  Dialogue Design  \xb7  Emotional Arc' },
-    { type: 'space',    h: 75 },
-    { type: 'divider',  h: 40 },
-    { type: 'space',    h: 55 },
-    { type: 'section',  h: 58,  text: 'SOUNDS & MUSIC' },
-    { type: 'space',    h: 40 },
-    { type: 'label',    h: 40,  text: 'Original Soundscapes' },
-    { type: 'desc',     h: 32,  text: '\u201cPark Street Echoes\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
-    { type: 'desc',     h: 32,  text: '\u201cFeathers in the Rain\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
-    { type: 'space',    h: 55 },
-    { type: 'section',  h: 58,  text: 'VISUAL DESIGN' },
-    { type: 'space',    h: 40 },
-    { type: 'label',    h: 40,  text: 'Pixel Art & Palettes' },
-    { type: 'desc',     h: 32,  text: 'Lucca Zhou  &  Group 7' },
-    { type: 'space',    h: 28 },
-    { type: 'label',    h: 40,  text: 'Typography' },
-    { type: 'desc',     h: 32,  text: 'DotGothic16  \xb7  VT323  (Google Fonts, Open Licence)' },
-    { type: 'space',    h: 75 },
-    { type: 'divider',  h: 40 },
-    { type: 'space',    h: 55 },
-    { type: 'section',  h: 58,  text: 'GOVERNANCE' },
-    { type: 'space',    h: 40 },
-    { type: 'label',    h: 40,  text: 'Academic Programme' },
-    { type: 'desc',     h: 32,  text: 'MSc Computer Science  \xb7  Group 7' },
-    { type: 'desc',     h: 32,  text: 'University of Bristol  \xb7  Faculty of Engineering' },
-    { type: 'space',    h: 28 },
-    { type: 'label',    h: 40,  text: 'Technical Traceability' },
-    { type: 'desc',     h: 32,  text: 'Agile Development  \xb7  Jira Workflow' },
-    { type: 'desc',     h: 32,  text: 'Version Control  \xb7  GitHub' },
-    { type: 'space',    h: 160 },
+    { type: 'space', h: 120 },
+    { type: 'header', h: 80, text: '\u2014 PARK STREET SURVIVOR \u2014' },
+    { type: 'sub', h: 50, text: 'A University of Bristol Group Project' },
+    { type: 'space', h: 70 },
+    { type: 'divider', h: 40 },
+    { type: 'space', h: 55 },
+    { type: 'section', h: 58, text: 'THE TEAM' },
+    { type: 'space', h: 45 },
+    { type: 'name', h: 50, text: 'Charlotte Yu' },
+    { type: 'role', h: 36, text: 'Core Mechanism & Systems Architect' },
+    { type: 'desc', h: 32, text: 'System Integration  \xb7  State Machine Logic  \xb7  Physics Pipeline' },
+    { type: 'space', h: 44 },
+    { type: 'name', h: 50, text: 'Kangrui Wang' },
+    { type: 'role', h: 36, text: 'Level Designer' },
+    { type: 'desc', h: 32, text: 'Level Geometry  \xb7  Environmental Storytelling  \xb7  Obstacle Choreography' },
+    { type: 'space', h: 44 },
+    { type: 'name', h: 50, text: 'Layla Pei' },
+    { type: 'role', h: 36, text: 'UI/UX & Audio Designer' },
+    { type: 'desc', h: 32, text: 'Interface Ergonomics  \xb7  Interaction Flows  \xb7  Soundscape Design' },
+    { type: 'space', h: 44 },
+    { type: 'name', h: 50, text: 'Lucca Zhou' },
+    { type: 'role', h: 36, text: 'Aesthetic Designer' },
+    { type: 'desc', h: 32, text: 'Visual Style Guide  \xb7  Pixel Asset Creation  \xb7  Colour Palette' },
+    { type: 'space', h: 44 },
+    { type: 'name', h: 50, text: 'Keyu Zhou' },
+    { type: 'role', h: 36, text: 'Script Designer' },
+    { type: 'desc', h: 32, text: 'Narrative Scripting  \xb7  Dialogue Design  \xb7  Emotional Arc' },
+    { type: 'space', h: 75 },
+    { type: 'divider', h: 40 },
+    { type: 'space', h: 55 },
+    { type: 'section', h: 58, text: 'SOUNDS & MUSIC' },
+    { type: 'space', h: 40 },
+    { type: 'label', h: 40, text: 'Original Soundscapes' },
+    { type: 'desc', h: 32, text: '\u201cPark Street Echoes\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
+    { type: 'desc', h: 32, text: '\u201cFeathers in the Rain\u201d  \xb7  Original Composition  \xb7  (Placeholder)' },
+    { type: 'space', h: 55 },
+    { type: 'section', h: 58, text: 'VISUAL DESIGN' },
+    { type: 'space', h: 40 },
+    { type: 'label', h: 40, text: 'Pixel Art & Palettes' },
+    { type: 'desc', h: 32, text: 'Lucca Zhou  &  Group 7' },
+    { type: 'space', h: 28 },
+    { type: 'label', h: 40, text: 'Typography' },
+    { type: 'desc', h: 32, text: 'DotGothic16  \xb7  VT323  (Google Fonts, Open Licence)' },
+    { type: 'space', h: 75 },
+    { type: 'divider', h: 40 },
+    { type: 'space', h: 55 },
+    { type: 'section', h: 58, text: 'GOVERNANCE' },
+    { type: 'space', h: 40 },
+    { type: 'label', h: 40, text: 'Academic Programme' },
+    { type: 'desc', h: 32, text: 'MSc Computer Science  \xb7  Group 7' },
+    { type: 'desc', h: 32, text: 'University of Bristol  \xb7  Faculty of Engineering' },
+    { type: 'space', h: 28 },
+    { type: 'label', h: 40, text: 'Technical Traceability' },
+    { type: 'desc', h: 32, text: 'Agile Development  \xb7  Jira Workflow' },
+    { type: 'desc', h: 32, text: 'Version Control  \xb7  GitHub' },
+    { type: 'space', h: 160 },
 ];
 
 /** Resets all credits state; call this before transitioning to STATE_CREDITS. */
 function resetCredits() {
-    _creditPhase     = 'scroll';
-    _creditScrollY   = height;   // block enters from bottom of screen
-    _creditPauseF    = 0;
+    _creditPhase = 'scroll';
+    _creditScrollY = height;   // block enters from bottom of screen
+    _creditPauseF = 0;
     _creditPoemAlpha = 0;
 }
 
@@ -1780,7 +2296,7 @@ function drawCreditsScreen() {
     push();
     background(0);
 
-    let s  = min(width / 1920, height / 1080);
+    let s = min(width / 1920, height / 1080);
     let cx = width / 2;
 
     if (_creditPhase === 'scroll') {
@@ -1791,7 +2307,7 @@ function drawCreditsScreen() {
 
         let cumH = 0;
         for (let i = 0; i < _CREDIT_DATA.length; i++) {
-            let d     = _CREDIT_DATA[i];
+            let d = _CREDIT_DATA[i];
             let lineH = d.h * s;
             let lineY = _creditScrollY + cumH;
             if (lineY + lineH > 0 && lineY < height) {
@@ -1809,7 +2325,7 @@ function drawCreditsScreen() {
     } else if (_creditPhase === 'pause') {
         _creditPauseF++;
         if (_creditPauseF >= 10) {           // ~0.25s black pause before poem
-            _creditPhase     = 'poem';
+            _creditPhase = 'poem';
             _creditPoemAlpha = 0;
         }
 
@@ -1885,7 +2401,7 @@ function _drawCreditsFade() {
     let steps = 14;
     let fadeH = 110;
     for (let i = 0; i < steps; i++) {
-        let t  = i / (steps - 1);
+        let t = i / (steps - 1);
         let y0 = (i / steps) * fadeH;
         let yH = fadeH / steps + 1;
         fill(0, 0, 0, lerp(230, 0, t));
@@ -1899,7 +2415,7 @@ function _drawCreditsFade() {
 function _drawCreditsPoem(s, cx) {
     _creditPoemAlpha = min(255, _creditPoemAlpha + 6);
     let alpha = _creditPoemAlpha;
-    let cy    = height / 2;
+    let cy = height / 2;
 
     push();
     textAlign(CENTER, CENTER);
@@ -1908,17 +2424,17 @@ function _drawCreditsPoem(s, cx) {
 
     let poem = [
         { text: '\u201cHope is the thing with feathers \u2014', ts: 30 * s, col: [240, 228, 200] },
-        { text: 'That perches in the soul \u2014',              ts: 30 * s, col: [240, 228, 200] },
-        { text: 'And sings the tune without the words \u2014',  ts: 30 * s, col: [240, 228, 200] },
-        { text: 'And never stops \u2014 at all.\u201d',         ts: 30 * s, col: [240, 228, 200] },
-        { text: '',                                              ts: 18 * s, col: [0, 0, 0]       },
-        { text: '\u2014 Emily Dickinson (1830\u20131886)',       ts: 22 * s, col: [175, 160, 125] },
-        { text: '',                                              ts: 22 * s, col: [0, 0, 0]       },
-        { text: '',                                              ts: 18 * s, col: [0, 0, 0]       },
-        { text: 'THANK YOU FOR SURVIVING THE SLOPE.',           ts: 28 * s, col: [215, 185, 105] },
+        { text: 'That perches in the soul \u2014', ts: 30 * s, col: [240, 228, 200] },
+        { text: 'And sings the tune without the words \u2014', ts: 30 * s, col: [240, 228, 200] },
+        { text: 'And never stops \u2014 at all.\u201d', ts: 30 * s, col: [240, 228, 200] },
+        { text: '', ts: 18 * s, col: [0, 0, 0] },
+        { text: '\u2014 Emily Dickinson (1830\u20131886)', ts: 22 * s, col: [175, 160, 125] },
+        { text: '', ts: 22 * s, col: [0, 0, 0] },
+        { text: '', ts: 18 * s, col: [0, 0, 0] },
+        { text: 'THANK YOU FOR SURVIVING THE SLOPE.', ts: 28 * s, col: [215, 185, 105] },
     ];
 
-    let lineH  = 44 * s;
+    let lineH = 44 * s;
     let startY = cy - (poem.length * lineH) / 2 + lineH / 2;
 
     for (let i = 0; i < poem.length; i++) {
@@ -2020,74 +2536,108 @@ function drawSplashScreen() {
  */
 function drawLogoPlaceholder(x, y) {
     let isSplash = (gameState.currentState === STATE_SPLASH);
-    let t = frameCount * 0.02;
-    let targetY = isSplash ? (y + 160) : (y + 10);
+    let isEntering = !isSplash && _menuFromSplash;
+    // t: 0 = fully splash, 1 = fully menu
+    let t = isSplash ? 0 : (isEntering ? _menuEnterT : 1);
+    let easy = t * t * (3 - 2 * t); // smoothstep
 
-    // Drop-in physics — wait until the splash fade-in overlay has cleared
-    if (_splashFadeAlpha > 0) {
-        // Hold position off-screen while fading in; shake decays harmlessly
-        titleDrop.shake *= 0.7;
-    } else if (!titleDrop.landed) {
-        titleDrop.vy += 2.0;
-        titleDrop.y += titleDrop.vy;
-        if (titleDrop.y >= y + 160) {
-            titleDrop.y = y + 160;
-            titleDrop.landed = true;
-            titleDrop.shake = 6;
+    // ── Title params: lerp from splash sizes/offsets to menu sizes/offsets ────
+    let psSz = lerp(300, 210, easy);
+    let surSz = lerp(200, 190, easy);
+    let psYOff = lerp(-130, -70, easy);
+    let surYOff = lerp(80, 100, easy);
+    let psSW = lerp(25, 10, easy);
+    let surSW = lerp(20, 10, easy);
+
+    // Alpha for splash-exclusive elements: full at splash, fades out on entry
+    let splashA = constrain((1 - easy) * 255, 0, 255);
+    let showSplashExtras = isSplash || isEntering;
+
+    // ── Title reference centre Y ───────────────────────────────────────────────
+    let cy;
+    let tAnim = frameCount * 0.02;
+    if (isSplash) {
+        // Physics-based drop-in (original behaviour)
+        let targetY = y + 160;
+        if (_splashFadeAlpha > 0) {
+            titleDrop.shake *= 0.7;
+        } else if (!titleDrop.landed) {
+            titleDrop.vy += 2.0;
+            titleDrop.y += titleDrop.vy;
+            if (titleDrop.y >= y + 160) {
+                titleDrop.y = y + 160;
+                titleDrop.landed = true;
+                titleDrop.shake = 6;
+            }
+            titleDrop.shake *= 0.7;
+        } else {
+            titleDrop.y = lerp(titleDrop.y, targetY, 0.15);
+            titleDrop.shake *= 0.7;
         }
-        titleDrop.shake *= 0.7;
+        cy = titleDrop.y;
+    } else if (isEntering) {
+        // Lerp from captured splash position to the menu centre (height * 0.33)
+        cy = lerp(_splashEnterCY, height * 0.33, easy);
+        titleDrop.shake = 0;
     } else {
-        titleDrop.y = lerp(titleDrop.y, targetY, 0.15);
-        titleDrop.shake *= 0.7;
+        cy = height * 0.33;
+        titleDrop.shake = 0;
     }
 
-    // Full-screen logo background
-    if (isSplash && assets.logoImgs && assets.logoImgs[4]) {
+    let shakeX = (isSplash && titleDrop.shake >= 0.5)
+        ? random(-titleDrop.shake, titleDrop.shake) : 0;
+
+    // ── Splash-exclusive: full-screen logo background ─────────────────────────
+    if (showSplashExtras && assets.logoImgs && assets.logoImgs[4]) {
         push();
         imageMode(CENTER);
+        tint(255, splashA);
         image(assets.logoImgs[4], width / 2, height / 2, width * 1.02, height * 1.02);
+        noTint();
         pop();
     }
 
-    // Rear cloud layer
-    if (isSplash && assets.selectClouds) {
+    // ── Rear cloud layer ──────────────────────────────────────────────────────
+    if (showSplashExtras && assets.selectClouds) {
         push();
         imageMode(CENTER);
-        tint(255, 255, 255, 200);
-        image(assets.selectClouds[1], width * 0.1, height * 0.9 + cos(t) * 10, 800, 480);
-        image(assets.selectClouds[2], width * 0.1, height * 0.2 + sin(t) * 10, 700, 420);
-        image(assets.selectClouds[4], width * 1.0, height * 0.09 + sin(t) * 10, 700, 420);
+        tint(255, min(splashA, 200));
+        image(assets.selectClouds[1], width * 0.1, height * 0.9 + cos(tAnim) * 10, 800, 480);
+        image(assets.selectClouds[2], width * 0.1, height * 0.2 + sin(tAnim) * 10, 700, 420);
+        image(assets.selectClouds[4], width * 1.0, height * 0.09 + sin(tAnim) * 10, 700, 420);
+        noTint();
         pop();
     }
 
-    // "PARK STREET" title — only apply random shake while it's perceptible (>= 0.5px)
+    // ── PARK STREET ───────────────────────────────────────────────────────────
     push();
-    let shakeX = (titleDrop.shake >= 0.5) ? random(-titleDrop.shake, titleDrop.shake) : 0;
-    translate(x + shakeX, titleDrop.y);
-    drawSplitTitle("PARK STREET", 300, -130, 25);
+    translate(x + shakeX, cy);
+    drawSplitTitle("PARK STREET", psSz, psYOff, psSW);
     pop();
 
-    // Mid cloud layer (between title lines)
-    if (isSplash && assets.selectClouds) {
+    // ── Mid cloud layer ───────────────────────────────────────────────────────
+    if (showSplashExtras && assets.selectClouds) {
         push();
         imageMode(CENTER);
+        tint(255, splashA);
+        image(assets.selectClouds[0], x - 240, y + 250 + sin(tAnim * 1.2) * 8, 500, 300);
         noTint();
-        image(assets.selectClouds[0], x - 240, y + 250 + sin(t * 1.2) * 8, 500, 300);
         pop();
     }
 
-    // "SURVIVOR" subtitle — reuse the same shake offset computed above
+    // ── SURVIVOR ──────────────────────────────────────────────────────────────
     push();
-    translate(x + shakeX, titleDrop.y);
-    drawSplitTitle("SURVIVOR", 200, 80, 20);
+    translate(x + shakeX, cy);
+    drawSplitTitle("SURVIVOR", surSz, surYOff, surSW);
     pop();
 
-    // Front cloud layer
-    if (isSplash && assets.selectClouds) {
+    // ── Front cloud layer ─────────────────────────────────────────────────────
+    if (showSplashExtras && assets.selectClouds) {
         push();
         imageMode(CENTER);
+        tint(255, splashA);
+        image(assets.selectClouds[2], width * 0.88, y + 230 + sin(tAnim) * 10, 600, 360);
         noTint();
-        image(assets.selectClouds[2], width * 0.88, y + 230 + sin(t) * 10, 600, 360);
         pop();
     }
 }
@@ -2164,6 +2714,12 @@ function drawPauseButton() {
         rect(10, 0, 8, 28);
         pop();
     }
+
+    // New-content badge at top-right of the pause icon
+    if (newBadges.has("pause_btn")) {
+        _drawBadge(bx + 26, by - 26, 44);
+    }
+
     pop();
 }
 
@@ -2171,6 +2727,11 @@ function drawPauseButton() {
  * Renders the pause menu overlay with background, title, and selectable options.
  */
 function renderPauseOverlay() {
+    // Clear pause_btn badge only when all sub-badges are gone
+    if (!newBadges.has("pause.SETTINGS") && !newBadges.has("pause.STORY") && !newBadges.has("pause.HELP")) {
+        newBadges.delete("pause_btn");
+    }
+
     push();
     drawOtherBgWithOverlay();
 
@@ -2188,9 +2749,73 @@ function renderPauseOverlay() {
 
     if (showStoryRecap) {
         renderStoryRecap();
+    } else if (showExitConfirm) {
+        // ── Centred confirmation box ──────────────────────────────────────────
+        let btnW = (assets.btnImg ? assets.btnImg.width : 240) * 1.2;
+        let btnH = (assets.btnImg ? assets.btnImg.height : 60) * 1.2;
+        let spacing = 380;
+
+        let boxW = 860;
+        let boxH = 460;
+        let boxX = width / 2 - boxW / 2;
+        let boxY = height / 2 - boxH / 2;
+
+        // Container panel
+        push();
+        rectMode(CORNER);
+        fill(14, 8, 38, 240);
+        stroke(200, 80, 80, 200);
+        strokeWeight(3);
+        rect(boxX, boxY, boxW, boxH, 18);
+        noStroke();
+        pop();
+
+        let cx = width / 2;
+        let titleY  = boxY + 64;
+        let warnY   = titleY + 82;
+        let hintY   = warnY + 60;
+        let btnsY   = boxY + boxH - 100;
+
+        textAlign(CENTER, CENTER);
+        textFont(fonts.title); textSize(42);
+        stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 100, 100);
+        text("EXIT TO MAIN MENU?", cx, titleY);
+        noStroke(); fill(255, 100, 100);
+        text("EXIT TO MAIN MENU?", cx, titleY);
+
+        textFont(fonts.jersey20 || fonts.body); textSize(34); noStroke();
+        fill(255, 210, 80);
+        text("Warning: unsaved progress may be lost.", cx, warnY);
+        textSize(28); fill(180, 180, 220);
+        text("Tip: click the back arrow (top-left) to return without exiting.", cx, hintY);
+
+        let anyExitHover = false;
+        let totalBtnW = (EXIT_CONFIRM_OPTIONS.length - 1) * spacing + btnW;
+        let btnStartX = cx - totalBtnW / 2 + btnW / 2;
+        for (let i = 0; i < EXIT_CONFIRM_OPTIONS.length; i++) {
+            let ox = btnStartX + i * spacing;
+            let isHover = (mouseX > ox - btnW / 2 && mouseX < ox + btnW / 2 &&
+                mouseY > btnsY - btnH / 2 && mouseY < btnsY + btnH / 2);
+            if (isHover) { exitConfirmIndex = i; anyExitHover = true; }
+            let isSelected = (i === exitConfirmIndex) && exitConfirmIndex >= 0;
+
+            push();
+            translate(ox, btnsY);
+            if (isSelected) scale(1.15);
+            imageMode(CENTER);
+            if (assets.btnImg) image(assets.btnImg, 0, 0, btnW, btnH);
+            textFont(fonts.jersey20 || fonts.body); textSize(34); textAlign(CENTER, CENTER);
+            let btnColor = (EXIT_CONFIRM_OPTIONS[i] === "YES, EXIT") ? color(255, 100, 100) : color(255, 215, 0);
+            stroke(0, 0, 0, 180); strokeWeight(5); fill(btnColor);
+            text(EXIT_CONFIRM_OPTIONS[i], 0, -6);
+            noStroke(); fill(btnColor);
+            text(EXIT_CONFIRM_OPTIONS[i], 0, -6);
+            pop();
+        }
+        if (!anyExitHover && !keyIsPressed) exitConfirmIndex = -1;
     } else if (showRestartChoice) {
-        let btnW = (assets.btnImg ? assets.btnImg.width  : 240) * 1.5;
-        let btnH = (assets.btnImg ? assets.btnImg.height : 60)  * 1.5;
+        let btnW = (assets.btnImg ? assets.btnImg.width : 240) * 1.5;
+        let btnH = (assets.btnImg ? assets.btnImg.height : 60) * 1.5;
         let spacing = 145;
         let totalH = (RESTART_OPTIONS.length - 1) * spacing;
         let startY = (height / 2) - (totalH / 2) + 20;
@@ -2209,7 +2834,7 @@ function renderPauseOverlay() {
             let ox = width / 2;
             let oy = startY + i * spacing;
             let isHover = (mouseX > ox - btnW / 2 && mouseX < ox + btnW / 2 &&
-                           mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
+                mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
             if (isHover) { restartChoiceIndex = i; anyRestartHover = true; }
             let isSelected = (i === restartChoiceIndex) && restartChoiceIndex >= 0;
 
@@ -2218,7 +2843,7 @@ function renderPauseOverlay() {
             if (isSelected) scale(1.15);
             imageMode(CENTER);
             if (assets.btnImg) image(assets.btnImg, 0, 0, btnW, btnH);
-            textFont(fonts.body); textSize(36); textAlign(CENTER, CENTER);
+            textFont(fonts.jersey20 || fonts.body); textSize(36); textAlign(CENTER, CENTER);
             stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
             text(RESTART_OPTIONS[i], 0, -6);
             noStroke(); fill(255, 215, 0);
@@ -2228,8 +2853,8 @@ function renderPauseOverlay() {
         if (!anyRestartHover && !keyIsPressed) restartChoiceIndex = -1;
     } else {
         let options = getPauseOptions();
-        let btnW = (assets.btnImg ? assets.btnImg.width  : 240) * 1.5;
-        let btnH = (assets.btnImg ? assets.btnImg.height : 60)  * 1.5;
+        let btnW = (assets.btnImg ? assets.btnImg.width : 240) * 1.5;
+        let btnH = (assets.btnImg ? assets.btnImg.height : 60) * 1.5;
         let spacing = 145;
         let totalH = (options.length - 1) * spacing;
         let startY = (height / 2) - (totalH / 2) + 30;
@@ -2249,7 +2874,7 @@ function renderPauseOverlay() {
             let ox = width / 2;
             let oy = startY + i * spacing;
             let isHover = (mouseX > ox - btnW / 2 && mouseX < ox + btnW / 2 &&
-                           mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
+                mouseY > oy - btnH / 2 && mouseY < oy + btnH / 2);
             if (isHover) { pauseIndex = i; anyPauseHover = true; }
             let isSelected = (i === pauseIndex) && pauseIndex >= 0;
 
@@ -2258,12 +2883,17 @@ function renderPauseOverlay() {
             if (isSelected) scale(1.15);
             imageMode(CENTER);
             if (assets.btnImg) image(assets.btnImg, 0, 0, btnW, btnH);
-            textFont(fonts.body); textSize(36); textAlign(CENTER, CENTER);
+            textFont(fonts.jersey20 || fonts.body); textSize(42); textAlign(CENTER, CENTER);
             stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 215, 0);
             text(options[i], 0, -6);
             noStroke(); fill(255, 215, 0);
             text(options[i], 0, -6);
             pop();
+
+            // New-content badge at the top-right corner of the button
+            if (newBadges.has("pause." + options[i])) {
+                _drawBadge(ox + btnW / 2 - 18, oy - btnH / 2 + 18, 46);
+            }
         }
         if (!anyPauseHover && !keyIsPressed) pauseIndex = -1;
     }
@@ -2305,7 +2935,7 @@ function drawEndScreen() {
  */
 function renderStoryRecap() {
     // chapter 0 = Prologue, chapters 1-5 = Days 1-5
-    let chapterNums   = ["P", "01", "02", "03", "04", "05"];
+    let chapterNums = ["P", "01", "02", "03", "04", "05"];
     let chapterLabels = ["PROLOGUE", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
 
     // Unlock logic: Prologue always visible; Day N needs Day N complete (currentUnlockedDay >= N+1)
@@ -2319,9 +2949,9 @@ function renderStoryRecap() {
     let recap = getStoryRecap(storyRecapDay);
 
     // ── L2a: Left sidebar — skewed chapter cards (Prologue + Days 1-5) ──
-    let sidebarX     = width * 0.16;
+    let sidebarX = width * 0.16;
     let sidebarBaseY = height * 0.45;
-    let cardSpacing  = 130;
+    let cardSpacing = 130;
 
     push();
     translate(sidebarX, sidebarBaseY);
@@ -2337,7 +2967,7 @@ function renderStoryRecap() {
             : ((i < currentUnlockedDay) || debugAll);
         let isSelected = (i === storyRecapDay);
         let alpha = map(distFromCenter, 0, 2, 255, 50);
-        let s     = map(distFromCenter, 0, 1, 1.15, 0.8);
+        let s = map(distFromCenter, 0, 1, 1.15, 0.8);
 
         push();
         translate(cardX, cardY);
@@ -2351,7 +2981,7 @@ function renderStoryRecap() {
 
         beginShape();
         vertex(-110, -32); vertex(130, -44);
-        vertex(110,   32); vertex(-130,  44);
+        vertex(110, 32); vertex(-130, 44);
         endShape(CLOSE);
 
         textAlign(LEFT, CENTER);
@@ -2377,8 +3007,8 @@ function renderStoryRecap() {
         push();
         imageMode(CENTER);
         image(assets.storyShape,
-              storyDebugData.shape.x, storyDebugData.shape.y,
-              storyDebugData.shape.w, storyDebugData.shape.h);
+            storyDebugData.shape.x, storyDebugData.shape.y,
+            storyDebugData.shape.w, storyDebugData.shape.h);
         drawingContext.filter = 'none';
         pop();
     }
@@ -2398,10 +3028,10 @@ function renderStoryRecap() {
 
         // Content lines — LEFT-aligned, "SPEAKER: text" format with colour-coded speaker names
         textFont(fonts.body); textSize(22); textAlign(LEFT, CENTER);
-        let lineH      = 30;
-        let lineLeft   = textX - textW / 2 + 16;   // left edge with padding
+        let lineH = 30;
+        let lineLeft = textX - textW / 2 + 16;   // left edge with padding
         let contentTop = textY - textH / 2 + 20;   // start near top of clip box
-        let maxScroll  = max(0, recap.lines.length - 14);
+        let maxScroll = max(0, recap.lines.length - 14);
         storyScrollOffset = constrain(storyScrollOffset, 0, maxScroll);
 
         for (let j = 0; j < recap.lines.length; j++) {
@@ -2411,8 +3041,8 @@ function renderStoryRecap() {
             if (lineText === "") continue;
 
             let edgeFade = 255;
-            let topEdge  = textY - textH / 2 + 30;
-            let botEdge  = textY + textH / 2 - 28;
+            let topEdge = textY - textH / 2 + 30;
+            let botEdge = textY + textH / 2 - 28;
             if (ly < topEdge) edgeFade = map(ly, textY - textH / 2, topEdge, 0, 255);
             if (ly > botEdge) edgeFade = map(ly, botEdge, textY + textH / 2, 255, 0);
             edgeFade = constrain(edgeFade, 0, 255);
@@ -2450,7 +3080,7 @@ function renderStoryRecap() {
             rect(textX - barW / 2, textY + textH / 2 + 18, barW, barH, 3);
             fill(255, 215, 0, 150);
             rect(textX - barW / 2, textY + textH / 2 + 18,
-                 map(storyScrollOffset, 0, maxScroll, 20, barW), barH, 3);
+                map(storyScrollOffset, 0, maxScroll, 20, barW), barH, 3);
         }
     } else {
         push();
@@ -2471,7 +3101,10 @@ function renderStoryRecap() {
         textFont(fonts.body);
         textSize(20);
         fill(200);
-        text("COMPLETE TODAY TO REVEAL", textX, textY + 40);
+        let _unlockDayHint = (storyRecapDay === 0)
+            ? "COMPLETE DAY 1 TO UNLOCK"
+            : "COMPLETE DAY " + storyRecapDay + " TO UNLOCK";
+        text(_unlockDayHint, textX, textY + 40);
         pop();
     }
 
@@ -2481,8 +3114,8 @@ function renderStoryRecap() {
         imageMode(CENTER);
         tint(255, storyDebugData.cloud.alpha);
         image(assets.storyCloud,
-              storyDebugData.cloud.x, storyDebugData.cloud.y,
-              storyDebugData.cloud.w, storyDebugData.cloud.h);
+            storyDebugData.cloud.x, storyDebugData.cloud.y,
+            storyDebugData.cloud.w, storyDebugData.cloud.h);
         noTint();
         pop();
     }
@@ -2499,20 +3132,20 @@ function renderStoryRecap() {
     }
 
     // ── L5: Up/Down arrows + day indicator — identical to level-select arrows ──
-    let arrowX   = width - 90;
-    let centerY  = height / 2;
-    let arrowSz  = 60;
+    let arrowX = width - 90;
+    let centerY = height / 2;
+    let arrowSz = 60;
     let arrowGap = 90;
 
     if (assets.backImg) {
         // Up arrow (previous chapter — Prologue is 0)
-        let canGoUp  = storyRecapDay > 0;
-        let upHover  = canGoUp && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35;
+        let canGoUp = storyRecapDay > 0;
+        let upHover = canGoUp && dist(mouseX, mouseY, arrowX, centerY - arrowGap) < 35;
         push();
         translate(arrowX, centerY - arrowGap);
         rotate(HALF_PI);
         if (!canGoUp) tint(255, 60);
-        if (upHover)  scale(1.25);
+        if (upHover) scale(1.25);
         imageMode(CENTER);
         image(assets.backImg, 0, 0, arrowSz, arrowSz);
         noTint();
@@ -2536,7 +3169,7 @@ function renderStoryRecap() {
         translate(arrowX, centerY + arrowGap);
         rotate(-HALF_PI);
         if (!canGoDown) tint(255, 60);
-        if (downHover)  scale(1.25);
+        if (downHover) scale(1.25);
         imageMode(CENTER);
         image(assets.backImg, 0, 0, arrowSz, arrowSz);
         noTint();
@@ -2556,15 +3189,15 @@ function renderStoryRecap() {
 function drawStoryDebugOverlay() {
     push();
     let layers = [
-        { key: 'shape',     label: 'SHAPE',      color: [255, 80,  80 ] },
-        { key: 'cloud',     label: 'CLOUD',      color: [80,  200, 255] },
-        { key: 'textArea',  label: 'CONTENT',    color: [80,  255, 80 ] },
-        { key: 'titleArea', label: 'TITLE',      color: [255, 200, 0  ] }
+        { key: 'shape', label: 'SHAPE', color: [255, 80, 80] },
+        { key: 'cloud', label: 'CLOUD', color: [80, 200, 255] },
+        { key: 'textArea', label: 'CONTENT', color: [80, 255, 80] },
+        { key: 'titleArea', label: 'TITLE', color: [255, 200, 0] }
     ];
 
     for (let l = 0; l < layers.length; l++) {
         let layerIdx = l + 1;
-        let d   = storyDebugData[layers[l].key];
+        let d = storyDebugData[layers[l].key];
         let col = layers[l].color;
         let active = (layerIdx === storyDebugActiveLayer);
 
@@ -2578,7 +3211,7 @@ function drawStoryDebugOverlay() {
         fill(col[0], col[1], col[2], active ? 230 : 130);
         textFont(fonts.body); textSize(15); textAlign(LEFT, BOTTOM);
         text(`[${layerIdx}] ${layers[l].label}: (${d.x}, ${d.y})  ${d.w}×${d.h}`,
-             d.x - d.w / 2 + 4, d.y - d.h / 2 - 4);
+            d.x - d.w / 2 + 4, d.y - d.h / 2 - 4);
     }
 
     // Controls hint bar
@@ -2588,7 +3221,7 @@ function drawStoryDebugOverlay() {
     fill(255, 255, 0, 220);
     textFont(fonts.body); textSize(17); textAlign(CENTER, CENTER);
     text("DEV  [1] Shape  [2] Cloud  [3] Content  [4] Title  |  Arrows: Move  |  Shift+Arrows: Resize  |  P: print",
-         width / 2, height - 25);
+        width / 2, height - 25);
     pop();
 }
 
@@ -2607,7 +3240,7 @@ function drawSaveChoiceScreen() {
     const save = SaveSystem.load();
     const W = width, H = height;
     const cx = W / 2;
-    const s  = min(W / 1920, H / 1080);
+    const s = min(W / 1920, H / 1080);
 
     push();
 
@@ -2645,15 +3278,15 @@ function drawSaveChoiceScreen() {
     }
 
     // ── Option buttons (assets.btnImg, 2× integer scale: 240×60 → 480×120) ──
-    const btnW      = 480 * s;   // 240 native × 2
-    const btnH      = 120 * s;   // 60  native × 2
+    const btnW = 480 * s;   // 240 native × 2
+    const btnH = 120 * s;   // 60  native × 2
     const optLabels = ['[E]  CONTINUE', '[ENTER]  NEW GAME'];
-    const optY      = [H * 0.615, H * 0.760];
+    const optY = [H * 0.615, H * 0.760];
 
     if (fT) textFont(fT);
     for (let i = 0; i < 2; i++) {
-        const bx      = cx - btnW / 2;
-        const by      = optY[i] - btnH / 2;
+        const bx = cx - btnW / 2;
+        const by = optY[i] - btnH / 2;
         const isHover = _saveChoiceIndex === i;
 
         // Draw button image (tint dims unselected option)
@@ -2695,7 +3328,7 @@ function drawSaveChoiceScreen() {
 function _saveChoiceHitTest(mx, my, click) {
     const W = width, H = height;
     const cx = W / 2;
-    const s  = min(W / 1920, H / 1080);
+    const s = min(W / 1920, H / 1080);
     const btnW = 480 * s;
     const btnH = 120 * s;
     const optY = [H * 0.615, H * 0.760];

@@ -106,8 +106,8 @@ const BGM = (() => {
             return 'TimeRoom';
         }
 
-        // 3) Day run -> by day id (1-2 / 3-4 / 5)
-        if (state === STATE_DAY_RUN) {
+        // 3) Day run + tutorial slides -> by day id (1-2 / 3-4 / 5)
+        if (state === STATE_DAY_RUN || state === STATE_TUTORIAL_SLIDES) {
             const day = (typeof currentDayID === 'number') ? currentDayID : 1;
             if (day <= 2) return 'Level12';
             if (day <= 4) return 'Level34';
@@ -132,7 +132,14 @@ const BGM = (() => {
             return null;
         }
 
-        // 5) Credits / Win / Fail: by default, keep whatever was playing (no switch)
+       // 5) Win / Fail / Credits:
+        // no automatic BGM switch here
+        // - WIN audio is handled by end-screen activation logic
+        // - FAIL audio is handled separately with delayed playback
+        if (state === STATE_WIN || state === STATE_FAIL || state === STATE_CREDITS) {
+            return null;
+        }
+
         return null;
     }
 
@@ -164,7 +171,7 @@ const BGM = (() => {
             Object.keys(bgms).forEach(k => {
                 if (bgms[k] && typeof bgms[k].isPlaying === 'function' && bgms[k].isPlaying()) {
                     bgms[k].stop(); 
-                    bgms[k].setVolume(0); // 即使没停掉也让它静音，腾出带宽
+                    bgms[k].setVolume(0); 
                 }
             });
 

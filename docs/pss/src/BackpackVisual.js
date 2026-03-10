@@ -108,6 +108,17 @@ class BackpackVisual {
         this._tutNeedsID     = true;
         this._tutNeedsLaptop = true;
 
+        // In-backpack dialogue box (Iris messages)
+        this.dialogueBox = new DialogueBox();
+        // Day 1 narrative state
+        // _day1IntroStep: 0=pending, 1=showing intro, 2=showing hover-hint, 3=done
+        this._day1IntroStep           = 0;
+        this._day2GummyHintDone       = false;   // Day 2: "try Wiola's gummies" hint shown
+        this._packingDoneMsgDone      = false;   // "all packed, let's go" message
+        this._packingDoneDialogueLock = false;   // lock dialogue until back button clicked
+        this._packedNpcItem           = null;    // Day 3+: name of NPC item in a slot, or null
+        this._npcSlotHintShown        = false;   // Day 3+: one-NPC-item hint shown
+
         // ── DEV DRAG STATE ────────────────────────────────────────────────────
         // Tracks interactive manipulation of debug zones and backpack in dev mode.
         this.devDrag = {
@@ -152,7 +163,24 @@ class BackpackVisual {
         this.tutorialAnimT     = 0;
         this._tutNeedsID       = true;
         this._tutNeedsLaptop   = true;
+        this._day1IntroStep           = 0;
+        this._day2GummyHintDone       = false;
+        this._packingDoneMsgDone      = false;
+        this._packingDoneDialogueLock = false;
+        this._packedNpcItem           = null;
+        this._npcSlotHintShown        = false;
+        this.dialogueBox.reset();
         this.initScatteredItems();
+    }
+
+    /**
+     * Called when the backpack is closed externally (e.g. ESC key).
+     * Clears any active dialogue and the packing-done lock so they don't
+     * persist and reappear on the next entry.
+     */
+    onClose() {
+        this._packingDoneDialogueLock = false;
+        this.dialogueBox.reset();
     }
 
     /**
@@ -289,6 +317,68 @@ class BackpackVisual {
      */
     display() {
         this.shimmer = (this.shimmer + 1) % 360;
+
+        // ── Day 1 intro dialogue (step 0 → trigger intro) ────────────────────
+        if (currentDayID === 1 && this._day1IntroStep === 0) {
+            this._day1IntroStep = 1;
+            this.dialogueBox.persistent = true;
+            this.dialogueBox.trigger(
+                "Every day I need to bring my Student ID and Laptop — they're essential! Drag them into my backpack to get ready.",
+                null, "IRIS"
+            );
+        }
+
+        // ── Day 2: suggest trying Wiola's gummies as soon as backpack opens ─────
+        if (currentDayID === 2 && !this._day2GummyHintDone) {
+            this._day2GummyHintDone = true;
+            this.dialogueBox.persistent = true;
+            this.dialogueBox.trigger(
+                "Wiola's gummies are here too... maybe I should bring some!",
+                null, "IRIS"
+            );
+        }
+
+        // ── Day 3+: show one-item hint as soon as backpack opens ─────────────
+        if (currentDayID >= 3 && !this._npcSlotHintShown) {
+            this._npcSlotHintShown = true;
+            this.dialogueBox.persistent = true;
+            this.dialogueBox.trigger(
+                "Only room for one friend's gift — check the descriptions before you decide. Drag it out if you want to swap!",
+                null, "IRIS"
+            );
+        }
+
+        // Track packed NPC item for other uses
+        if (currentDayID >= 3) {
+            this._packedNpcItem = this._getPackedNpcItem();
+        }
+
+        // ── Once required items are packed, prompt to leave ───────────────────
+        // Day 2: waits until the gummy hint has been shown and dismissed.
+        // Day 3+: waits until the NPC slot hint has been shown (only fires after packing an NPC item).
+        if (this.hasRequiredItems() && !this._packingDoneMsgDone && !this.dialogueBox.active) {
+            let readyForDone;
+            if (currentDayID === 1)      readyForDone = true;
+            else if (currentDayID === 2) readyForDone = this._day2GummyHintDone;
+            else                         readyForDone = this._npcSlotHintShown;
+            if (readyForDone) {
+                this._packingDoneMsgDone      = true;
+                this._packingDoneDialogueLock = true;
+                this.dialogueBox.persistent = true;
+                if (currentDayID === 1) {
+                    this.dialogueBox.trigger(
+                        "Great, I've got everything I need! Time to head out — press the arrow in the top-left to close my bag.",
+                        null, "IRIS"
+                    );
+                } else {
+                    this.dialogueBox.trigger(
+                        "Alright, I think I'm all set — let's head out!",
+                        null, "IRIS"
+                    );
+                }
+            }
+        }
+
         push();
         this.drawRoomBackground();
         this.drawBackpack();
@@ -296,7 +386,6 @@ class BackpackVisual {
         this.drawDragTutorial();
         this.drawTopBar();
         if (this.draggedItem) this.drawDraggedItem();
-        if (this.showReplaceDialog) this.drawReplaceDialog();
         if (this.messageTimer > 0) {
             this.drawMessage();
             this.messageTimer--;
@@ -325,6 +414,10 @@ class BackpackVisual {
         }
         // Dev overlays are drawn last so they are always on top
         if (developerMode) this.drawDevOverlays();
+
+        // Dialogue box rendered on top of everything
+        this.dialogueBox.display();
+
         pop();
     }
 
@@ -389,6 +482,7 @@ class BackpackVisual {
 
         // ── Slots ─────────────────────────────────────────────────────────────
         let startX = cx - (3 * this.slotSize + 2 * this.slotSpacing) / 2;
+        let _tooltipItem = null, _tooltipSx = 0, _tooltipSy = 0;
         for (let i = 0; i < 3; i++) {
             let sx = startX + i * (this.slotSize + this.slotSpacing) + this.slotSize / 2;
             let sy = cy + 45;  // 11px gap below divider, 35px padding at bottom
@@ -444,7 +538,7 @@ class BackpackVisual {
                 }
                 if (isHovered && !this.draggedItem) {
                     let item = this.findItemByName(itemName);
-                    if (item) this.drawSlotTooltip(item, sx, sy);
+                    if (item) { _tooltipItem = item; _tooltipSx = sx; _tooltipSy = sy; }
                 }
             } else {
                 // Empty placeholder symbol
@@ -455,6 +549,8 @@ class BackpackVisual {
                 text("◇", sx, sy + 1);
             }
         }
+        // Draw slot tooltip AFTER all slots so it appears on top of empty slot borders
+        if (_tooltipItem) this.drawSlotTooltip(_tooltipItem, _tooltipSx, _tooltipSy);
         pop();
     }
 
@@ -568,18 +664,26 @@ class BackpackVisual {
                 let breathe = 1.0 + sin(frameCount * 0.06) * 0.10;
                 scale(breathe);
             }
+            // Grey out NPC items when another NPC item is already packed (Day 3+)
+            let greyedOut = currentDayID >= 3 &&
+                            this._isNpcItem(scattered.item.name) &&
+                            this._packedNpcItem !== null &&
+                            scattered.item.name !== this._packedNpcItem;
+
             let itemImg = this._getItemImage(scattered.item.name);
             if (itemImg) {
                 let baseSize = (scattered.item.name === "Laptop Computer") ? 300 : 180;
                 let posData = this.itemFixedPositions[scattered.item.name];
                 let maxSize = baseSize * (posData ? (posData.size || 1.0) : 1.0);
+                if (greyedOut) tint(80, 80, 80, 160);
                 this._drawImageAspect(itemImg, 0, 0, maxSize, maxSize);
+                if (greyedOut) noTint();
             } else {
-                fill(80, 40, 120);
+                fill(greyedOut ? color(40, 40, 40) : color(80, 40, 120));
                 noStroke();
                 rectMode(CENTER);
                 rect(0, 0, 80, 80, 8);
-                fill(255);
+                fill(greyedOut ? 120 : 255);
                 textSize(12);
                 textAlign(CENTER, CENTER);
                 text(scattered.item.name.split(" ")[0].substring(0, 6).toUpperCase(), 0, 0);
@@ -622,38 +726,61 @@ class BackpackVisual {
      * @param {number} itemX - world x of the item centre
      * @param {number} itemY - world y of the item centre
      */
-    drawTooltip(item, itemX, itemY) {
-        push();
-        let title = item.name;
-        let desc = item.description || "";
-
-        textFont(fonts.body);
-        textSize(26);
-        let w  = max(textWidth(title), 260) + 56;
-        textSize(20);
-        if (desc) w = max(w, textWidth(desc) + 56);
-        let h  = desc ? 118 : 72;
-        let tx = constrain(itemX + 90, 10, width - w - 10);
-
-        let ty = constrain(itemY - h / 2, 10, height - h - 10);
+    _drawTooltipBox(tx, ty, w, title, desc) {
+        // Two-part = inner thought + game effect (separated by \n)
+        // Single-part = required items (no \n)
+        const hasTwoParts = desc && desc.includes('\n');
+        const h = hasTwoParts ? 420 : (desc ? 240 : 90);
 
         rectMode(CORNER);
-        fill(22, 10, 48, 245);
+        fill(22, 10, 48, 250);
         stroke(255, 215, 0);
-        strokeWeight(2.5);
-        rect(tx, ty, w, h, 10);
+        strokeWeight(3);
+        rect(tx, ty, w, h, 12);
 
         noStroke();
+        textFont(fonts.body);
         fill(255, 215, 0);
         textAlign(LEFT, TOP);
-        textSize(26);
-        text(title, tx + 18, ty + 14);
+        textSize(38);
+        text(title, tx + 18, ty + 14, w - 36, 54);
 
         if (desc) {
-            fill(200, 160, 255);
-            textSize(20);
-            text(desc, tx + 18, ty + 56);
+            if (hasTwoParts) {
+                const parts = desc.split('\n');
+                // Inner thought (part 1) — soft purple
+                fill(200, 160, 255);
+                textSize(28);
+                text(parts[0], tx + 18, ty + 76, w - 36, 150);
+                // Divider
+                const divY = ty + 234;
+                stroke(140, 90, 200);
+                strokeWeight(1);
+                line(tx + 14, divY, tx + w - 14, divY);
+                noStroke();
+                // Game effect (part 2) — soft green
+                fill(140, 220, 160);
+                textSize(26);
+                text(parts[1], tx + 18, divY + 10, w - 36, 150);
+            } else {
+                // Single-part description (required items)
+                fill(200, 160, 255);
+                textSize(28);
+                text(desc, tx + 18, ty + 76, w - 36, h - 95);
+            }
         }
+        return h;
+    }
+
+    drawTooltip(item, itemX, itemY) {
+        push();
+        const desc = item.description || "";
+        const hasTwoParts = desc.includes('\n');
+        const h = hasTwoParts ? 420 : (desc ? 240 : 90);
+        const w = 440;
+        const tx = constrain(itemX + 40, 10, width - w - 10);
+        const ty = constrain(itemY - h - 20, 10, height - h - 10);
+        this._drawTooltipBox(tx, ty, w, item.name, desc);
         pop();
     }
 
@@ -662,36 +789,13 @@ class BackpackVisual {
      */
     drawSlotTooltip(item, slotX, slotY) {
         push();
-        let title = item.name;
-        let desc = item.description || "";
-
-        textFont(fonts.body);
-        textSize(26);
-        let w  = max(textWidth(title), 260) + 56;
-        textSize(20);
-        if (desc) w = max(w, textWidth(desc) + 56);
-        let h  = desc ? 118 : 72;
-
-        let tx = constrain(slotX - w / 2, 10, width - w - 10);
-        let ty = slotY + this.slotSize / 2 + 12;
-
-        rectMode(CORNER);
-        fill(22, 10, 48, 245);
-        stroke(255, 215, 0);
-        strokeWeight(2.5);
-        rect(tx, ty, w, h, 10);
-
-        noStroke();
-        fill(255, 215, 0);
-        textAlign(LEFT, TOP);
-        textSize(26);
-        text(title, tx + 18, ty + 14);
-
-        if (desc) {
-            fill(200, 160, 255);
-            textSize(20);
-            text(desc, tx + 18, ty + 56);
-        }
+        const desc = item.description || "";
+        const hasTwoParts = desc.includes('\n');
+        const h = hasTwoParts ? 420 : (desc ? 240 : 90);
+        const w = 440;
+        const tx = constrain(slotX + this.slotSize / 2 + 10, 10, width - w - 10);
+        const ty = constrain(slotY - this.slotSize / 2 - h - 10, 10, height - h - 10);
+        this._drawTooltipBox(tx, ty, w, item.name, desc);
         pop();
     }
 
@@ -762,10 +866,11 @@ class BackpackVisual {
         fill(22, 10, 48, 230);
         stroke(255, 215, 0);
         strokeWeight(2);
-        rect(width / 2, this.topBarY + this.topBarH / 2 + 44, 760, 56, 10);
+        rect(width / 2, this.topBarY + this.topBarH / 2 + 44, 460, 52, 10);
         fill(255, 215, 0);
         textAlign(CENTER, CENTER);
-        textSize(17);
+        textFont(fonts.body);
+        textSize(26);
         noStroke();
         text(this.messageText, width / 2, this.topBarY + this.topBarH / 2 + 44);
         pop();
@@ -784,6 +889,31 @@ class BackpackVisual {
         text("Drag items between backpack and desk  |  Hover for info  |  [ESC] to close",
              width / 2, height - 12);
 
+        pop();
+    }
+
+    /**
+     * Draws a pulsing gold ring + label around the back button to guide
+     * the player to close the backpack after packing required items.
+     */
+    _drawBackButtonArrow() {
+        let pulse = (sin(frameCount * 0.08) + 1) * 0.5;
+        let bx = this.backButton.x, by = this.backButton.y;
+        push();
+        // Pulsing ring around the back button
+        noFill();
+        stroke(255, 215, 0, 140 + pulse * 115);
+        strokeWeight(3 + pulse * 1.5);
+        ellipseMode(CENTER);
+        circle(bx, by, 90 + pulse * 12);
+        // "CLOSE BAG" label below
+        noStroke();
+        fill(255, 215, 0, 160 + pulse * 95);
+        let fB = (typeof fonts !== 'undefined') ? (fonts.body || fonts.title) : null;
+        if (fB) textFont(fB);
+        textSize(17);
+        textAlign(CENTER, TOP);
+        text("CLOSE BAG", bx, by + 48);
         pop();
     }
 
@@ -1092,6 +1222,33 @@ class BackpackVisual {
      * In dev mode, checks for dev handles first before normal game interaction.
      */
     handleMousePressed(mx, my) {
+        // Packing-done dialogue is locked — only the back button can dismiss it
+        if (this._packingDoneDialogueLock) {
+            if (this.backButton.checkMouse(mx, my)) {
+                this._packingDoneDialogueLock = false;
+                this.dialogueBox.persistent = false;
+                this.dialogueBox.active = false;
+                this.backButton.handleClick();
+            }
+            return;
+        }
+        // Dismiss persistent dialogue on click; chain hover-hint on Day 1
+        if (this.dialogueBox && this.dialogueBox.active && this.dialogueBox.persistent) {
+            this.dialogueBox.persistent = false;
+            this.dialogueBox.active = false;
+            if (this._day1IntroStep === 1) {
+                // Show hover-hint as the follow-up to the intro message
+                this._day1IntroStep = 2;
+                this.dialogueBox.persistent = true;
+                this.dialogueBox.trigger(
+                    "Tip: hover over any item to see its description!",
+                    null, "IRIS"
+                );
+            } else if (this._day1IntroStep === 2) {
+                this._day1IntroStep = 3;
+            }
+            return;
+        }
         // Back arrow click
         if (this.backButton.checkMouse(mx, my)) {
             this.backButton.handleClick();
@@ -1165,6 +1322,11 @@ class BackpackVisual {
         for (let i = this.scatteredItems.length - 1; i >= 0; i--) {
             let s = this.scatteredItems[i];
             if (dist(mx, my, s.x, s.y) < 100) {
+                // Block picking up greyed-out NPC items (Day 3+)
+                if (currentDayID >= 3 && this._isNpcItem(s.item.name) &&
+                        this._packedNpcItem !== null && s.item.name !== this._packedNpcItem) {
+                    return;
+                }
                 this.draggedItem = s.item;
                 this.dragSource = 'desk';
                 this.dragIndex = i;
@@ -1253,17 +1415,32 @@ class BackpackVisual {
         let npcCount = this.topSlots.filter(id => id && id !== "UoB Student ID" && id !== "Laptop Computer").length;
 
         if (isRequired) {
-            let emptySlot = this.topSlots.indexOf(null);
-            if (emptySlot !== -1) {
-                this.topSlots[emptySlot] = item.name;
-                this.removeFromDesk(item.name);
-                this.showMessage(item.name + " packed!");
+            // Pack the dragged item if not already in a slot
+            if (!this.topSlots.includes(item.name)) {
+                let slot = this.topSlots.indexOf(null);
+                if (slot !== -1) {
+                    this.topSlots[slot] = item.name;
+                    this.removeFromDesk(item.name);
+                }
             }
+            // Binding: auto-pack the partner required item if it's still on the desk
+            let partner = (item.name === "UoB Student ID") ? "Laptop Computer" : "UoB Student ID";
+            let partnerOnDesk = this.scatteredItems.some(s => s.item.name === partner);
+            if (partnerOnDesk && !this.topSlots.includes(partner)) {
+                let slot = this.topSlots.indexOf(null);
+                if (slot !== -1) {
+                    this.topSlots[slot] = partner;
+                    this.removeFromDesk(partner);
+                }
+            }
+            this.showMessage("Student ID & Laptop packed!");
         } else if (npcCount >= 1) {
-            let existingIndex = this.topSlots.findIndex(id => id && id !== "UoB Student ID" && id !== "Laptop Computer");
-            this.showReplaceDialog = true;
-            this.replaceNewItem = item;
-            this.replaceSlotIndex = existingIndex;
+            // Already have a friend's gift — block and notify via dialogue
+            this.dialogueBox.persistent = true;
+            this.dialogueBox.trigger(
+                "There's no more room in my bag! I can only bring one friend's gift to school.",
+                null, "IRIS"
+            );
         } else {
             let emptySlot = this.topSlots.indexOf(null);
             if (emptySlot !== -1) {
@@ -1278,6 +1455,19 @@ class BackpackVisual {
      * Places an item into a specific slot, swapping the occupant back to the desk if needed.
      */
     tryAddToSlot(item, slotIndex) {
+        // Guard: prevent a second NPC item from being added to an empty slot
+        if (!this.topSlots[slotIndex]) {
+            let isNPC = item.name !== "UoB Student ID" && item.name !== "Laptop Computer";
+            let npcCount = this.topSlots.filter(id => id && id !== "UoB Student ID" && id !== "Laptop Computer").length;
+            if (isNPC && npcCount >= 1) {
+                this.dialogueBox.persistent = true;
+                this.dialogueBox.trigger(
+                    "There's no more room in my bag! I can only bring one friend's gift to school.",
+                    null, "IRIS"
+                );
+                return;
+            }
+        }
         if (this.topSlots[slotIndex]) {
             let oldItemName = this.topSlots[slotIndex];
             this.topSlots[slotIndex] = item.name;
@@ -1340,6 +1530,20 @@ class BackpackVisual {
     showMessage(text) {
         this.messageText = text;
         this.messageTimer = 120;
+    }
+
+    /**
+     * Returns true if this item name is a friend/NPC gift (not one of the two required items).
+     */
+    _isNpcItem(name) {
+        return name && name !== "UoB Student ID" && name !== "Laptop Computer";
+    }
+
+    /**
+     * Returns the name of the first NPC item currently in a slot, or null.
+     */
+    _getPackedNpcItem() {
+        return this.topSlots.find(n => this._isNpcItem(n)) || null;
     }
 
     /**

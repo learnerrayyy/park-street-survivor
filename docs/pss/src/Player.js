@@ -68,6 +68,12 @@ class Player {
         this._clockStr     = "08:30:00";
         this._clockRed     = false;
         this._lastClockSec = -1;
+
+        // ── Carried utility item state (selected in Room before DAY_RUN) ──
+        this.carriedUtilityItem = null;      // "Soft Gummy Vitamins" | "Tangle" | "Headphones" | "Rain Boots" | null
+        this.utilityItemCharges = 0;         // remaining uses
+        this.utilityItemArmed = false;       // for E-activated passive items: Tangle / Headphones / Rain Boots
+        this.utilityHudSwapProgress = 0;     // 0 = backpack main, 1 = utility item main
     }
 
     /**
@@ -107,6 +113,223 @@ class Player {
         this.puddleSlowMultiplier = 0.72;
         // In DAY_RUN, default forward-running view should be back-facing.
         this.dir = 'north';
+
+        this.carriedUtilityItem = null;
+        this.utilityItemCharges = 0;
+        this.utilityItemArmed = false;
+        this.utilityHudSwapProgress = 0;
+    }
+
+    // ─── CARRIED UTILITY ITEM ───────────────────────────────────────────────
+
+    /**
+     * Reads backpackUI.topSlots and stores the selected utility item as the
+     * authoritative DAY_RUN item state on the player.
+     * Required items (Student ID / Laptop) are ignored here.
+     */
+    syncUtilityItemFromBackpack() {
+        if (typeof backpackUI === "undefined" || !backpackUI || !Array.isArray(backpackUI.topSlots)) {
+            this.clearUtilityItemState();
+            return;
+        }
+
+        const utilityNames = [
+            "Soft Gummy Vitamins",
+            "Tangle",
+            "Headphones",
+            "Rain Boots"
+        ];
+
+        const selected = backpackUI.topSlots.find(name => utilityNames.includes(name)) || null;
+
+        if (!selected) {
+            this.clearUtilityItemState();
+            return;
+        }
+
+        this.carriedUtilityItem = selected;
+        this.utilityItemCharges = this.getDefaultChargesForUtilityItem(selected);
+        this.utilityItemArmed = false;
+        this.saveUtilityItemSnapshot();
+    }
+
+    /**
+     * Clears the currently carried utility item state.
+     */
+    clearUtilityItemState() {
+        this.carriedUtilityItem = null;
+        this.utilityItemCharges = 0;
+        this.utilityItemArmed = false;
+        this.utilityHudSwapProgress = 0;
+        this.saveUtilityItemSnapshot();
+    }
+
+    isPassiveUtilityItem(itemName) {
+        return itemName === "Tangle" ||
+               itemName === "Headphones" ||
+               itemName === "Rain Boots";
+    }
+
+    saveUtilityItemSnapshot() {
+        if (typeof gameState !== "undefined" && gameState &&
+            typeof gameState.saveRunUtilityItemSnapshot === "function") {
+            gameState.saveRunUtilityItemSnapshot(
+                this.carriedUtilityItem,
+                this.utilityItemCharges,
+                this.utilityItemArmed
+            );
+        }
+    }
+
+    /**
+     * Returns the default number of uses for the given utility item.
+     */
+    getDefaultChargesForUtilityItem(itemName) {
+        if (itemName === "Soft Gummy Vitamins") return 1;
+        if (itemName === "Tangle") return 10;
+        if (itemName === "Headphones") return 5;
+        if (itemName === "Rain Boots") return 3;
+        return 0;
+    }
+
+    /**
+     * Returns true if the player still has a usable carried utility item.
+     */
+    hasUsableUtilityItem() {
+        return !!this.carriedUtilityItem && this.utilityItemCharges > 0;
+    }
+
+    /**
+     * Consumes one charge from the carried utility item.
+     * If charges reach 0, the item is removed and the HUD should fall back to backpack.
+     */
+    consumeUtilityItemCharge() {
+        if (!this.hasUsableUtilityItem()) return false;
+
+        const consumedItem = this.carriedUtilityItem;
+        this.utilityItemCharges = max(0, this.utilityItemCharges - 1);
+        this.utilityItemArmed = this.isPassiveUtilityItem(consumedItem) && this.utilityItemCharges > 0;
+
+        if (this.utilityItemCharges <= 0) {
+            this.clearUtilityItemState();
+            return true;
+        }
+
+        this.saveUtilityItemSnapshot();
+        return true;
+    }
+
+    /**
+     * Activates the carried utility item with the E key.
+     * - Vitamins: immediate full heal + consume 1 charge
+     * - Tangle / Headphones / Rain Boots: arm once, do not consume yet
+     * @returns {boolean} True if the key press was consumed.
+     */
+    activateUtilityItem() {
+        if (!this.hasUsableUtilityItem()) return false;
+
+        if (this.carriedUtilityItem === "Soft Gummy Vitamins") {
+            this.health = this.maxHealth;
+            this.consumeUtilityItemCharge();
+            return true;
+        }
+
+        if (
+            this.carriedUtilityItem === "Tangle" ||
+            this.carriedUtilityItem === "Headphones" ||
+            this.carriedUtilityItem === "Rain Boots"
+        ) {
+            this.utilityItemArmed = true;
+            this.saveUtilityItemSnapshot();
+            return true;
+        }
+
+        return false;
+    }
+
+        /**
+     * Returns true when the armed utility item should cancel the next Fantasy Coffee.
+     */
+    shouldTriggerTangle() {
+        return this.utilityItemArmed &&
+               this.carriedUtilityItem === "Tangle" &&
+               this.utilityItemCharges > 0;
+    }
+
+    /**
+     * Returns true when the armed utility item should cancel the next Promoter poster.
+     */
+    shouldTriggerHeadphones() {
+        return this.utilityItemArmed &&
+               this.carriedUtilityItem === "Headphones" &&
+               this.utilityItemCharges > 0;
+    }
+
+    /**
+     * Returns true when the armed utility item should cancel the next Puddle trap.
+     */
+    shouldTriggerRainBoots() {
+        return this.utilityItemArmed &&
+               this.carriedUtilityItem === "Rain Boots" &&
+               this.utilityItemCharges > 0;
+    }
+
+    /**
+     * Consumes the currently armed utility item if it matches the expected item name.
+     * Returns true when consumption succeeds.
+     */
+    consumeArmedUtilityItem(expectedItemName) {
+        if (!this.utilityItemArmed) return false;
+        if (this.carriedUtilityItem !== expectedItemName) return false;
+        if (!this.hasUsableUtilityItem()) return false;
+
+        return this.consumeUtilityItemCharge();
+    }
+
+    /**
+     * Returns the HUD icon image for the currently carried utility item.
+     * Falls back to the default backpack icon when no usable item is carried.
+     */
+    getUtilityItemHudIcon() {
+        if (!this.hasUsableUtilityItem()) return assets.backpackImg || null;
+
+        if (this.carriedUtilityItem === "Soft Gummy Vitamins") return assets.vitaminImg || assets.backpackImg || null;
+        if (this.carriedUtilityItem === "Tangle") return assets.tangleImg || assets.backpackImg || null;
+        if (this.carriedUtilityItem === "Headphones") return assets.headphoneImg || assets.backpackImg || null;
+        if (this.carriedUtilityItem === "Rain Boots") return assets.rainbootImg || assets.backpackImg || null;
+
+        return assets.backpackImg || null;
+    }
+
+    getEquippedUtilityItemIcon() {
+        if (!this.hasUsableUtilityItem()) return null;
+        if (this.carriedUtilityItem === "Soft Gummy Vitamins") return assets.vitaminImg || null;
+        if (this.carriedUtilityItem === "Tangle") return assets.tangleImg || null;
+        if (this.carriedUtilityItem === "Headphones") return assets.headphoneImg || null;
+        if (this.carriedUtilityItem === "Rain Boots") return assets.rainbootImg || null;
+        return null;
+    }
+
+    /**
+     * Restores the carried utility item from the current run snapshot.
+     * Used by restart run so the player keeps the same item with fresh charges.
+     */
+    restoreUtilityItemFromRunSnapshot() {
+        if (typeof gameState === "undefined" || !gameState) {
+            this.clearUtilityItemState();
+            return;
+        }
+
+        const itemName = gameState.runUtilityItemName || null;
+        if (!itemName) {
+            this.clearUtilityItemState();
+            return;
+        }
+
+        this.carriedUtilityItem = itemName;
+        this.utilityItemCharges = this.getDefaultChargesForUtilityItem(itemName);
+        this.utilityItemArmed = false;
+        this.saveUtilityItemSnapshot();
     }
 
     // ─── CORE UPDATE ─────────────────────────────────────────────────────────
@@ -145,14 +368,14 @@ class Player {
 
             this.playTimeFrames++;
 
-            // Fail condition 2: time limit exceeded (08:30 → 09:00 = 1800s = 108,000 frames at 60 FPS)
-            if (this.playTimeFrames > 108000) {
+            // Story mode only: fail if time limit exceeded (08:30 -> 09:00).
+            if (!isEndlessRunMode() && this.playTimeFrames > 108000) {
                 this.triggerGameOver("LATE");
             }
 
             // Win condition: distance goal reached → trigger victory phase
             let targetDist = DAYS_CONFIG[currentDayID].totalDistance;
-            if (this.distanceRun >= targetDist && this.health > 0) {
+            if (!isEndlessRunMode() && this.distanceRun >= targetDist && this.health > 0) {
                 if (levelController && levelController.getLevelPhase() === "RUNNING") {
                     levelController.triggerVictoryPhase();
                 }
@@ -173,6 +396,12 @@ class Player {
         if (this.speedBoostFramesRemaining > 0) this.speedBoostFramesRemaining--;
         if (this.invincibleFramesRemaining > 0) this.invincibleFramesRemaining--;
         if (this.hpLockFramesRemaining > 0) this.hpLockFramesRemaining--;
+
+        const hudTarget = this.hasUsableUtilityItem() ? 1 : 0;
+        this.utilityHudSwapProgress = lerp(this.utilityHudSwapProgress, hudTarget, 0.18);
+        if (Math.abs(this.utilityHudSwapProgress - hudTarget) < 0.01) {
+            this.utilityHudSwapProgress = hudTarget;
+        }
     }
 
     // ─── MOVEMENT ────────────────────────────────────────────────────────────
@@ -337,12 +566,14 @@ class Player {
     drawTopBar() {
         push();
 
-        this.drawHealthBar(165, 65);
-        this.drawBackpackIcon(98, 85);
-        
-        const leftMargin = 70;
-        const topBarH = 170;
-        this.drawProgressBar(leftMargin, topBarH + 100);
+        // Align energy bar bottom edge with inventory frame bottom edge.
+        this.drawHealthBar(this.hudX(210), this.hudY(111));
+        this.drawBackpackIcon(this.hudX(30), this.hudY(21));
+        this.drawUtilityItemCharges(this.hudX(146), this.hudY(7));
+
+        if (!isEndlessRunMode()) {
+            this.drawProgressBar(this.hudX(30), this.hudY(300));
+        }
 
         pop();
     }
@@ -381,129 +612,328 @@ class Player {
      * Renders the energy bar with a green fill that depletes as stamina drops.
      */
     drawHealthBar(x, y) {
-        textAlign(CENTER, CENTER);
-        fill(255);
-        textSize(32);
-        textStyle(BOLD);
-        // Centred above the bar, clear of the backpack icon on the left
-        text("ENERGY", x + 200, y - 22);
+        const frameW = this.hudW(410);
+        const frameH = this.hudH(70);
+        const frameR = this.hudU(40);
+        const strokeW = this.hudU(7);
+        const inset = this.hudU(6);
+        const innerX = x + inset;
+        const innerY = y + inset;
+        const innerW = frameW - inset * 2;
+        const innerH = frameH - inset * 2;
+        const pct = constrain(this.health / this.maxHealth, 0, 1);
+        const fillW = innerW * pct;
 
-        fill(50);
-        stroke(0);
-        strokeWeight(5);
-        rect(x, y, 400, 50, 4);
+        this.drawHudRoundedPanel(x, y, frameW, frameH, frameR, {
+            bg: "#F5F0FF",
+            stroke: "#9B8FB8",
+            strokeWeight: strokeW,
+            outerShadowColor: "#000000",
+            outerShadowAlpha: 0.5,
+            outerShadowDistance: this.hudU(7),
+            outerShadowAngleDeg: 100,
+            innerShadowColor: "#FFFFFF",
+            innerShadowAlpha: 0.8,
+            innerShadowDistance: this.hudU(11),
+            innerShadowAngleDeg: 90
+        });
 
-        let pct = constrain(this.health / this.maxHealth, 0, 1);
-        fill(0, 255, 100);
-        rect(x + 2, y + 2, (400 - 4) * pct, 45, 3);
+        if (fillW > 0) {
+            push();
+            this.clipRoundedRect(innerX, innerY, innerW, innerH, max(this.hudU(8), frameR - inset));
+            const grad = drawingContext.createLinearGradient(innerX, innerY, innerX, innerY + innerH);
+            grad.addColorStop(0, "#FF85C0");
+            grad.addColorStop(0.55, "#FF5AA8");
+            grad.addColorStop(1, "#E64A96");
+            drawingContext.fillStyle = grad;
+            noStroke();
+            rect(innerX, innerY, fillW, innerH, max(this.hudU(8), frameR - inset));
+            pop();
+        }
+
+        const textShadow = this.shadowOffset(this.hudU(6), 45);
+        push();
+        textFont(fonts.jersey20 || 'sans-serif');
+        textSize(this.hudU(48));
+        textAlign(LEFT, TOP);
+        noStroke();
+        fill(this.colorWithAlpha("#000000", 0.5));
+        text("ENERGY", this.hudX(230) + textShadow.x, this.hudY(21) + textShadow.y);
+        fill("#FFFFFF");
+        text("ENERGY", this.hudX(230), this.hudY(21));
+        pop();
     }
 
     /**
-     * Backpack HUD: circular base plate + overlay item icon (slightly larger than plate)
-     * - plate: white fill + black stroke (static)
-     * - icon: backpack.png by default; if buff item carried, show item.icon
-     * Returns layout metrics so caller can place the health bar tightly beside it.
+     * Draws remaining utility-item charges as dots under the health bar.
+     * Label is displayed to the left of the dots.
+     */
+    drawUtilityItemCharges(x, y) {
+        const d = this.hudU(73);
+        const r = d / 2;
+        const cx = x + r;
+        const cy = y + r;
+        const count = this.hasUsableUtilityItem() ? max(0, floor(this.utilityItemCharges || 0)) : 0;
+
+        const outerOff = this.shadowOffset(this.hudU(7), 45);
+        const innerOff = this.shadowOffset(this.hudU(11), 45);
+
+        // Draw shadows first so they stay beneath the badge fill.
+        push();
+        noStroke();
+        fill(this.colorWithAlpha("#CC5555", 0.5));
+        circle(cx + outerOff.x, cy + outerOff.y, d);
+        pop();
+
+        push();
+        noStroke();
+        fill(this.colorWithAlpha("#FF9999", 0.5));
+        circle(cx + innerOff.x, cy + innerOff.y, d);
+        pop();
+
+        push();
+        noStroke();
+        fill("#FF6B6B");
+        circle(cx, cy, d);
+        pop();
+
+        push();
+        noFill();
+        stroke("#FFFFFF");
+        strokeWeight(this.hudU(7));
+        circle(cx, cy, d);
+        pop();
+
+        push();
+        textFont(fonts.jersey20 || 'sans-serif');
+        textSize(this.hudU(48));
+        textAlign(CENTER, CENTER);
+        noStroke();
+        fill("#FFFFFF");
+        text(String(count), cx, cy - this.hudU(2));
+        pop();
+    }
+
+    /**
+     * Backpack HUD: circular base plate + carried utility item icon.
+     * - No utility item / no charges left -> backpack icon
+     * - Utility item equipped with charges left -> item icon
      */
     drawBackpackIcon(x, y) {
-        // --- layout ---
-        const plateD = 136;          // Base plate diameter
-        const iconD  = 188;          // Icon slightly larger(visual appeal).
+        const swap = constrain(this.utilityHudSwapProgress || 0, 0, 1);
+        const hasUtility = this.hasUsableUtilityItem() && !!this.getEquippedUtilityItemIcon();
+        const backpackImg = assets.backpackImg || null;
+        const utilityImg = this.getEquippedUtilityItemIcon();
 
-        // --- draw base plate ---
-        push();
-        ellipseMode(CENTER);
-        stroke(0);
-        strokeWeight(5);
-        fill(255);
-        circle(x, y, plateD);
+        const frameW = this.hudW(160);
+        const frameH = this.hudH(160);
+        const frameR = this.hudU(34);
 
-        // --- decide what to show ---
-        // 需要把这里的“拿当前携带道具”的逻辑替换成真实的接口/字段
-        let heldItem = null;
-        if (typeof inventorySystem !== "undefined" && inventorySystem.getHeldItem) {
-            heldItem = inventorySystem.getHeldItem();
-        } else if (gameState && gameState.heldItem) {
-            heldItem = gameState.heldItem;
-        }
+        this.drawHudRoundedPanel(x, y, frameW, frameH, frameR, {
+            bg: "#F5F0FF",
+            stroke: "#9B8FB8",
+            strokeWeight: this.hudU(7),
+            outerShadowColor: "#000000",
+            outerShadowAlpha: 0.5,
+            outerShadowDistance: this.hudU(7),
+            outerShadowAngleDeg: 100,
+            innerShadowColor: "#FFFFFF",
+            innerShadowAlpha: 0.8,
+            innerShadowDistance: this.hudU(11),
+            innerShadowAngleDeg: 90
+        });
 
-        // 默认显示基础背包图
-        let iconImg = assets.backpackImg;
+        const cx = x + frameW / 2;
+        const cy = y + frameH / 2;
+        const pulse = 1 + sin(frameCount * 0.18) * 0.04 * swap;
+        const scaledH = this.hudU(120) * pulse;
 
-        // 如果携带了 buff 道具且有图标，则显示该道具图
-        // （type/isBuff 字段按实际数据结构改）
-       if (heldItem && (heldItem.type === "BUFF" || heldItem.isBuff === true) && heldItem.icon) {
-            iconImg = heldItem.icon;
-        }
-
-        // --- draw icon (slightly larger than plate) ---
-        if (iconImg) {
+        if (!hasUtility) {
+            this.drawHudIconFitted(backpackImg, cx, cy, scaledH, 255, -8);
             push();
-            imageMode(CENTER);
-            translate(x, y);
-            rotate(radians(-20));
-            image(iconImg, 0, -8, iconD, iconD);
-            pop();
-        } else {
-            // Placeholder (to avoid blank spaces)
+            colorMode(RGB, 255);
             noStroke();
-            fill(0);
-            textAlign(CENTER, CENTER);
-            textSize(32);
-            text("NO ICON", x, y);
+            fill(255, 255, 255, 200);
+            textFont(fonts.jersey20 || 'sans-serif');
+            textSize(this.hudU(18));
+            textAlign(CENTER, TOP);
+            text('Press E', x + frameW / 2, y + frameH + this.hudU(4));
+            pop();
+            return;
         }
 
-        pop();
+        this.drawHudIconFitted(backpackImg, cx, cy, scaledH, 255 * (1 - swap), -8);
+        this.drawHudIconFitted(utilityImg, cx, cy, scaledH, 255 * swap, -3);
     }
    
     /**
      * Renders the distance progress bar mapped against the level's total distance target.
      */
     drawProgressBar(x, y) {
-        const barWidth = 70;
-        const barHeight = 500;
-        const padding = 4;
-
-        fill(255);
-        stroke(0);
-        strokeWeight(5);
-        rect(x, y, barWidth, barHeight, padding);
+        const frameW = this.hudW(70);
+        const frameH = this.hudH(480);
+        const frameR = this.hudU(20);
+        const inset = this.hudU(6);
 
         let total = DAYS_CONFIG[currentDayID].totalDistance;
-        let pct   = constrain(this.distanceRun / total, 0, 1);
+        let pct = constrain(this.distanceRun / total, 0, 1);
+        const innerX = x + inset;
+        const innerY = y + inset;
+        const innerW = frameW - inset * 2;
+        const innerH = frameH - inset * 2;
+        const fillH = innerH * pct;
 
-        fill(255, 212, 104);
-        let innerMaxH = barHeight - padding; // Maximum internal height
-        let currentH = innerMaxH * pct;      // Current progress height
-        rect(x + 2, y + barHeight - 2, barWidth - 4, -currentH, 3);
+        this.drawHudRoundedPanel(x, y, frameW, frameH, frameR, {
+            bg: "#F5F0FF",
+            stroke: "#9B8FB8",
+            strokeWeight: this.hudU(7),
+            outerShadowColor: "#000000",
+            outerShadowAlpha: 0.5,
+            outerShadowDistance: this.hudU(7),
+            outerShadowAngleDeg: 100,
+            innerShadowColor: "#FFFFFF",
+            innerShadowAlpha: 0.8,
+            innerShadowDistance: this.hudU(11),
+            innerShadowAngleDeg: 90
+        });
+
+        if (fillH > 0) {
+            push();
+            this.clipRoundedRect(innerX, innerY, innerW, innerH, max(this.hudU(8), frameR - inset));
+            const grad = drawingContext.createLinearGradient(innerX, innerY + innerH, innerX, innerY);
+            grad.addColorStop(0, "#F9A825");
+            grad.addColorStop(0.55, "#FFC107");
+            grad.addColorStop(1, "#FFD93D");
+            drawingContext.fillStyle = grad;
+            noStroke();
+            rect(innerX, innerY + innerH - fillH, innerW, fillH, max(this.hudU(8), frameR - inset));
+            pop();
+        }
+
+        const flagImg = assets.distanceFlagImg || null;
+        if (flagImg) {
+            imageMode(CORNER);
+            image(flagImg, this.hudX(38), this.hudY(255), this.hudW(79), this.hudH(91));
+        }
     }
 
-    drawSpeedBoostBanner() {
-        if (this.speedBoostFramesRemaining <= 0) return;
+    getHudScale() {
+        const sx = width / 1920;
+        const sy = height / 1080;
+        const su = min(sx, sy);
+        return { sx, sy, su };
+    }
+
+    hudX(v) {
+        return v * (width / 1920);
+    }
+
+    hudY(v) {
+        return v * (height / 1080);
+    }
+
+    hudW(v) {
+        return v * (width / 1920);
+    }
+
+    hudH(v) {
+        return v * (height / 1080);
+    }
+
+    hudU(v) {
+        const s = min(width / 1920, height / 1080);
+        return v * s;
+    }
+
+    drawHudRoundedPanel(x, y, w, h, r, style) {
+        const outer = this.shadowOffset(style.outerShadowDistance, style.outerShadowAngleDeg);
 
         push();
-        textAlign(CENTER, CENTER);
-        textSize(48);
-        textStyle(BOLD);
-        fill(255, 230, 80, 235);
-        stroke(30, 30, 30, 160);
-        strokeWeight(4);
-        text("SPEED UP", width / 2, height * 0.38);
+        noStroke();
+        fill(this.colorWithAlpha(style.outerShadowColor, style.outerShadowAlpha));
+        rect(x + outer.x, y + outer.y, w, h, r);
+        pop();
+
+        push();
+        noStroke();
+        fill(style.bg);
+        rect(x, y, w, h, r);
+        pop();
+
+        push();
+        this.clipRoundedRect(x, y, w, h, r);
+        const inner = this.shadowOffset(style.innerShadowDistance, style.innerShadowAngleDeg);
+        noStroke();
+        fill(this.colorWithAlpha(style.innerShadowColor, style.innerShadowAlpha));
+        rect(x + inner.x, y + inner.y, w, h, r);
+        pop();
+
+        push();
+        noFill();
+        stroke(style.stroke);
+        strokeWeight(style.strokeWeight);
+        rect(x, y, w, h, r);
         pop();
     }
 
-    applyRunScrollSpeed() {
-        if (this.baseRunScrollSpeed === null) {
-            this.baseRunScrollSpeed = GLOBAL_CONFIG.scrollSpeed;
-        }
+    drawHudIconFitted(img, cx, cy, targetH, alpha, rotDeg) {
+        if (!img || alpha <= 0) return;
 
-        const puddleMul = this.puddleTrapActive ? this.puddleSlowMultiplier : 1;
-        if (this.speedBoostFramesRemaining > 0) {
-            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed * this.activeSpeedMultiplier * puddleMul;
-            this.wasSpeedBoostActive = true;
-        } else if (this.wasSpeedBoostActive || this.puddleTrapActive) {
-            GLOBAL_CONFIG.scrollSpeed = this.baseRunScrollSpeed * puddleMul;
-            this.wasSpeedBoostActive = false;
-        }
+        const ratio = img.width > 0 && img.height > 0 ? (img.width / img.height) : 1;
+        const drawH = targetH;
+        const drawW = drawH * ratio;
+
+        push();
+        imageMode(CENTER);
+        tint(255, constrain(alpha, 0, 255));
+        translate(cx, cy);
+        rotate(radians(rotDeg || 0));
+        image(img, 0, 0, drawW, drawH);
+        noTint();
+        pop();
+    }
+
+    clipRoundedRect(x, y, w, h, r) {
+        const ctx = drawingContext;
+        const rr = min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + rr, y);
+        ctx.lineTo(x + w - rr, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+        ctx.lineTo(x + w, y + h - rr);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+        ctx.lineTo(x + rr, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+        ctx.lineTo(x, y + rr);
+        ctx.quadraticCurveTo(x, y, x + rr, y);
+        ctx.closePath();
+        ctx.clip();
+    }
+
+    clipCircle(cx, cy, d) {
+        const ctx = drawingContext;
+        ctx.beginPath();
+        ctx.arc(cx, cy, d / 2, 0, TWO_PI);
+        ctx.closePath();
+        ctx.clip();
+    }
+
+    shadowOffset(distance, angleDeg) {
+        return {
+            x: cos(radians(angleDeg)) * distance,
+            y: sin(radians(angleDeg)) * distance
+        };
+    }
+
+    colorWithAlpha(hex, alpha) {
+        const clean = String(hex || "#000000").replace("#", "");
+        const full = clean.length === 3
+            ? clean.split("").map(c => c + c).join("")
+            : clean;
+        const r = parseInt(full.slice(0, 2), 16) || 0;
+        const g = parseInt(full.slice(2, 4), 16) || 0;
+        const b = parseInt(full.slice(4, 6), 16) || 0;
+        return `rgba(${r}, ${g}, ${b}, ${constrain(alpha, 0, 1)})`;
     }
 
     drawSpeedBoostBanner() {
