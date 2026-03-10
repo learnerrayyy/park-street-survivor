@@ -362,14 +362,14 @@ class DialogueBox {
             );
         }
 
-        // Dialogue text — use word-by-word highlight render when done typing
+        // Dialogue text — highlighted words render in red immediately as they type
         let fB = (typeof fonts !== 'undefined') ? (fonts.jersey20 || fonts.dialogueBlue || fonts.body || fonts.title) : null;
         if (fB) textFont(fB);
         textSize(58 * s);
         textLeading(58 * s);
         noStroke();
         textAlign(LEFT, TOP);
-        if (this.highlight && this.highlight.size > 0 && this.isFinishedTyping()) {
+        if (this.highlight && this.highlight.size > 0) {
             this._drawHighlightedText(this.displayedText, this.highlight, tx, ty, tw, th);
         } else {
             fill(255);

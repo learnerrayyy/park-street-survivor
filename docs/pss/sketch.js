@@ -33,6 +33,10 @@ let assets = {
     libraryBg: null,
     csNewsBg: null,   // assets/dialogue/news.png  — prologue cutscene bg
     csLibraryBg: null, // assets/dialogue/library.png — NPC cutscene + success screen bg
+    csBusBg: null,             // assets/background/bg_bus/bg_bus.png
+    csPhoneImg: null,          // assets/background/bg_bus/phone.png
+    csOperatingTheatreBg: null,// assets/background/bg_operating_theatre.png
+    csBalloonFestivalBg: null, // assets/background/bg_ballon_festival.png
     dialogBox: null,  // assets/obstacles/dialog_box.png — homeless speech bubble
     dialogueBox: null,      // assets/dialogue/dialog_box.png — main dialogue bar
     dialogueFrameBox: null, // assets/dialogue/frame_box.png — portrait frame
@@ -72,7 +76,7 @@ let fonts = {};
 let sfxSelect, sfxClick, sfxDialogue, sfxItemNotification;
 let sfxHitNpc, sfxHitBigCar, sfxHitSmallCar, sfxHitFantasyCoffee, sfxPuddleNoBoots, sfxSmallBusiness; 
 let sfxPickupCoffee, sfxPickupScooter, sfxPuddleBoots, sfxPaperCrumple, sfxScooterBrake;
-let sfxDoorOpen, sfxAmbulance, sfxHeartbeat, sfxGameWin;
+let sfxDoorOpen, sfxAmbulance, sfxHeartbeat, sfxGameWin, sfxRoomClock;
 
 let failEndAudioTimer = null;
 
@@ -471,7 +475,7 @@ let isLoaded = false;
 let loadProgress = 0;
 let smoothProgress = 0;
 let assetsLoadedCount = 0;
-const totalAssetsToLoad = 58;
+const totalAssetsToLoad = 62;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -510,6 +514,10 @@ function preload() {
     assets.libraryBg = loadImage('assets/background/library.jpg', itemLoaded);
     assets.csNewsBg = loadImage('assets/dialogue/news.png', itemLoaded);
     assets.csLibraryBg = loadImage('assets/dialogue/library.png', itemLoaded);
+    assets.csBusBg             = loadImage('assets/background/bg_bus/bg_bus.png', itemLoaded);
+    assets.csPhoneImg          = loadImage('assets/background/bg_bus/phone.png', itemLoaded);
+    assets.csOperatingTheatreBg= loadImage('assets/background/bg_operating_theatre.png', itemLoaded);
+    assets.csBalloonFestivalBg = loadImage('assets/background/bg_ballon_festival.png', itemLoaded);
     assets.dialogBox = loadImage('assets/obstacles/dialog_box.png', itemLoaded);
     assets.dialogueBox = loadImage('assets/dialogue/dialog_box.png', itemLoaded);
     assets.dialogueFrameBox = loadImage('assets/dialogue/frame_box.png', itemLoaded);
@@ -594,6 +602,7 @@ function preload() {
     sfxSmallBusiness = loadSound('assets/audio/effects/HitSmallBusiness.mp3', itemLoaded);
     sfxPaperCrumple = loadSound('assets/audio/effects/HitPoster.mp3', itemLoaded);
     sfxDoorOpen = loadSound('assets/audio/effects/LibraryDoorOpen.mp3', itemLoaded);
+    sfxRoomClock = loadSound('assets/audio/effects/RoomClock.mp3', itemLoaded);
     sfxItemNotification = loadSound('assets/audio/effects/ItemPop.wav', itemLoaded);
     sfxAmbulance = loadSound('assets/audio/effects/GameOverAmbulance.wav', itemLoaded);
     sfxHeartbeat = loadSound('assets/audio/effects/GameOverHeartbeat.mp3', itemLoaded);
@@ -946,9 +955,15 @@ function runGameLoop() {
                 console.log(`[runGameLoop] Settlement -> library entry transition -> NPC cutscene Day ${day}`);
 
                 triggerLibraryEntryTransition(() => {
-                    startCutscene('library', CS_DAY_NPC[day], () => {
-                        triggerTransition(() => gameState.setState(STATE_WIN));
-                    });
+                    if (typeof DIALOGUE_DATA !== 'undefined' && DIALOGUE_DATA.day_npc_start && DIALOGUE_DATA.day_npc_start[day]) {
+                        startCutsceneFromNode(DIALOGUE_DATA.day_npc_start[day], () => {
+                            triggerTransition(() => gameState.setState(STATE_WIN));
+                        });
+                    } else {
+                        startCutscene('library', CS_DAY_NPC[day], () => {
+                            triggerTransition(() => gameState.setState(STATE_WIN));
+                        });
+                    }
                 });
             }
         }
@@ -1908,23 +1923,40 @@ function setupRun(dayID) {
         gameState.clearRunUtilityItemSnapshot();
     }
 
+    // Play alarm clock immediately — screen is full black from triggerTransition
+    if (typeof playSFX === 'function' && sfxRoomClock) playSFX(sfxRoomClock);
+
+    // Hold the black screen for 1.5 s (alarm rings) then show room/cutscene.
+    // Only possible when called from inside a triggerTransition callback (dir===1).
+    const _inBlackout = globalFade.isFading && globalFade.dir === 1;
+
     // Room cutscene — only on first visit per day per session
     if (typeof CS_DAY_ROOM !== 'undefined' && CS_DAY_ROOM[dayID] &&
         !_roomCutsceneSeen[dayID]) {
         _roomCutsceneSeen[dayID] = true;
-        // Place player at room starting position so bg looks correct
         if (player) { player.x = 940; player.y = 550; }
-        startCutscene('room', CS_DAY_ROOM[dayID], () => {
-            // For Day 2+, skip to DESK phase (no movement tutorial needed again)
-            if (dayID > 1 && typeof tutorialHints !== 'undefined') {
-                tutorialHints.roomPhase = 'DESK';
-            }
-            gameState.setState(STATE_ROOM);
-        });
+        const _launchCutscene = () => {
+            startCutscene('room', CS_DAY_ROOM[dayID], () => {
+                if (dayID > 1 && typeof tutorialHints !== 'undefined') {
+                    tutorialHints.roomPhase = 'DESK';
+                }
+                gameState.setState(STATE_ROOM);
+            });
+        };
+        if (_inBlackout) {
+            globalFade.holdUntilMs    = performance.now() + 1500;
+            globalFade.holdDoneCallback = _launchCutscene;
+        } else {
+            _launchCutscene();
+        }
     } else {
-        // Room position must be set even when cutscene is skipped on retry
         if (player) { player.x = 940; player.y = 550; }
-        gameState.setState(STATE_ROOM);
+        if (_inBlackout) {
+            globalFade.holdUntilMs    = performance.now() + 1500;
+            globalFade.holdDoneCallback = () => { gameState.setState(STATE_ROOM); };
+        } else {
+            gameState.setState(STATE_ROOM);
+        }
     }
 }
 
@@ -2719,12 +2751,12 @@ function renderPauseOverlay() {
         renderStoryRecap();
     } else if (showExitConfirm) {
         // ── Centred confirmation box ──────────────────────────────────────────
-        let btnW = (assets.btnImg ? assets.btnImg.width : 240) * 1.5;
-        let btnH = (assets.btnImg ? assets.btnImg.height : 60) * 1.5;
-        let spacing = 150;
+        let btnW = (assets.btnImg ? assets.btnImg.width : 240) * 1.2;
+        let btnH = (assets.btnImg ? assets.btnImg.height : 60) * 1.2;
+        let spacing = 380;
 
-        let boxW = 820;
-        let boxH = 400;
+        let boxW = 860;
+        let boxH = 460;
         let boxX = width / 2 - boxW / 2;
         let boxY = height / 2 - boxH / 2;
 
@@ -2739,22 +2771,22 @@ function renderPauseOverlay() {
         pop();
 
         let cx = width / 2;
-        let titleY  = boxY + 60;
-        let warnY   = titleY + 70;
-        let hintY   = warnY + 40;
-        let btnsY   = boxY + boxH - 80;
+        let titleY  = boxY + 64;
+        let warnY   = titleY + 82;
+        let hintY   = warnY + 60;
+        let btnsY   = boxY + boxH - 100;
 
         textAlign(CENTER, CENTER);
-        textFont(fonts.title); textSize(40);
+        textFont(fonts.title); textSize(42);
         stroke(0, 0, 0, 180); strokeWeight(5); fill(255, 100, 100);
         text("EXIT TO MAIN MENU?", cx, titleY);
         noStroke(); fill(255, 100, 100);
         text("EXIT TO MAIN MENU?", cx, titleY);
 
-        textFont(fonts.jersey20 || fonts.body); textSize(26); noStroke();
+        textFont(fonts.jersey20 || fonts.body); textSize(34); noStroke();
         fill(255, 210, 80);
         text("Warning: unsaved progress may be lost.", cx, warnY);
-        textSize(22); fill(180, 180, 220);
+        textSize(28); fill(180, 180, 220);
         text("Tip: click the back arrow (top-left) to return without exiting.", cx, hintY);
 
         let anyExitHover = false;
@@ -2772,7 +2804,7 @@ function renderPauseOverlay() {
             if (isSelected) scale(1.15);
             imageMode(CENTER);
             if (assets.btnImg) image(assets.btnImg, 0, 0, btnW, btnH);
-            textFont(fonts.jersey20 || fonts.body); textSize(36); textAlign(CENTER, CENTER);
+            textFont(fonts.jersey20 || fonts.body); textSize(34); textAlign(CENTER, CENTER);
             let btnColor = (EXIT_CONFIRM_OPTIONS[i] === "YES, EXIT") ? color(255, 100, 100) : color(255, 215, 0);
             stroke(0, 0, 0, 180); strokeWeight(5); fill(btnColor);
             text(EXIT_CONFIRM_OPTIONS[i], 0, -6);

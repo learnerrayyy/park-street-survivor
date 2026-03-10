@@ -304,112 +304,199 @@ day5_room_10: {
 },
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DAY 1 NPC — WIOLA: OOD intro & vitamin gummies
-// Flow: 01→02(branch)→03→04→05→06→07→08→09→10(branch)→11→12→13→14→15→16→17
+// DAY 1 NPC — WIOLA: OOD intro, memory branch, vitamin gummies
+// Shared: 01→02→03→04→05→06→07→08→09(branch)
+//   Branch A (Continue): a01→…→a08(showcase)→gift_01→gift_02
+//   Branch B (Remember): b01→…→b13(showcase)→b_gift→gift_02
 // ═══════════════════════════════════════════════════════════════════════════
 
 day1_npc_01: {
-    speaker: "WIOLA", portrait: "wiola_happy", bg: "street_sunny",
+    speaker: "WIOLA", portrait: "wiola_happy",
     sfx: "meeting_chime",
     content: ["Heyy Iris! Long time no see!"],
     next_id: "day1_npc_02"
 },
 day1_npc_02: {
-    speaker: "IRIS", portrait: "iris_normal", bg: "street_sunny",
-    content: ["......"],
-    options: [
-        { label: "Wiola... Hi, it's nice to see you!", next_id: "day1_npc_03" },
-        { label: "Hey girl, it's been ages",            next_id: "day1_npc_03" }
-    ]
+    speaker: "IRIS", portrait: "iris_normal",
+    content: ["……Wiola….Hi, it is nice to see you!"],
+    next_id: "day1_npc_03"
 },
 day1_npc_03: {
-    speaker: "WIOLA", portrait: "wiola_normal", bg: "street_sunny",
-    content: ["What have you been up to lately?"],
+    speaker: "WIOLA", portrait: "wiola_normal",
+    content: ["I see, have you prepared for today's software engineering lab?"],
     next_id: "day1_npc_04"
 },
 day1_npc_04: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_sunny",
-    content: ["....Oh..not...much.."],
+    speaker: "IRIS", portrait: "iris_distressed",
+    content: ["What! That's today? Oh no, you're right. I completely forgot…"],
     next_id: "day1_npc_05"
 },
 day1_npc_05: {
-    speaker: "WIOLA", portrait: "wiola_normal", bg: "street_sunny",
-    content: ["I see, have you prepared for today's",
-              "<h>software engineering</h> lecture?"],
+    speaker: "WIOLA", portrait: "wiola_normal",
+    content: ["No worries, Luckily, I've overviewed the contents last night,",
+              "It's on object orientated design"],
     next_id: "day1_npc_06"
 },
 day1_npc_06: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_sunny",
-    content: ["Noo... Actually, I can't really remember last night.",
-              "I must've just passed out in my sleep."],
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["Just sit with me and I'll talk you through it"],
     next_id: "day1_npc_07"
 },
 day1_npc_07: {
-    speaker: "WIOLA", portrait: "wiola_happy", bg: "street_sunny",
-    content: ["Haha, no worries."],
+    speaker: "IRIS", portrait: "iris_happy",
+    content: ["Thanks, you've always got my back!"],
     next_id: "day1_npc_08"
 },
 day1_npc_08: {
-    speaker: "WIOLA", portrait: "wiola_normal", bg: "street_sunny",
-    content: ["Luckily, I've overviewed the contents last night,",
-              "I think it's about <h>Object-Oriented Design</h>."],
+    speaker: "IRIS", portrait: "iris_tired",
+    content: ["It's strange….Weirdly, I can't remember what I was up to last night…",
+              "I must've just passed out in sleep"],
     next_id: "day1_npc_09"
 },
 day1_npc_09: {
-    speaker: "WIOLA", portrait: "wiola_happy", bg: "street_sunny",
-    content: ["Just sit with me and I'll talk you through it."],
-    next_id: "day1_npc_10"
-},
-day1_npc_10: {
-    speaker: "IRIS", portrait: "iris_normal", bg: "street_sunny",
-    content: ["She's always so helpful..."],
+    speaker: "IRIS", portrait: "iris_distressed",
+    content: ["Something's not adding up….why can't I remember anything?"],
     options: [
-        { label: "Thanks, you've always got my back!", next_id: "day1_npc_11" },
-        { label: "You're a life saver!",               next_id: "day1_npc_11" }
+        { label: "Continue with the conversation",          next_id: "day1_1_a01" },
+        { label: "Try to remember what happened last night", next_id: "day1_1_b01" }
     ]
 },
-day1_npc_11: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_sunny",
-    content: ["I'm truly looking forward to it,",
-              "especially as I can sit down for a while",
-              "after climbing this dreaded hill."],
-    next_id: "day1_npc_12"
+
+// — Branch A: Continue with the conversation —
+day1_1_a01: {
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["Haha you overwork yourself girl…",
+              "no one else studies as hard as you..give yourself a break"],
+    next_id: "day1_1_a02"
 },
-day1_npc_12: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_sunny",
-    content: ["My legs are killing me!"],
-    next_id: "day1_npc_13"
+day1_1_a02: {
+    speaker: "IRIS", portrait: "iris_tired",
+    content: ["I suppose…If only I could study from home",
+              "and didn't have to climb this dreaded hill,",
+              "I would have got my PhD already…"],
+    next_id: "day1_1_a03"
 },
-day1_npc_13: {
-    speaker: "WIOLA", portrait: "wiola_happy", bg: "street_sunny",
-    content: ["Hahaha, well at least your daily cardio is out the way.",
-              "Such a relief that I live close by."],
-    next_id: "day1_npc_14"
+day1_1_a03: {
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["Hahahha, I believe you"],
+    next_id: "day1_1_a04"
 },
-day1_npc_14: {
-    speaker: "IRIS", portrait: "iris_happy", bg: "street_sunny",
+day1_1_a04: {
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["Well.. at least your daily cardio is out the way.",
+              "Such a relief that I live close by"],
+    next_id: "day1_1_a05"
+},
+day1_1_a05: {
+    speaker: "IRIS", portrait: "iris_happy",
     content: ["JEALOUS!"],
-    next_id: "day1_npc_15"
+    next_id: "day1_1_a06"
 },
-day1_npc_15: {
-    speaker: "WIOLA", portrait: "wiola_happy", bg: "street_sunny",
-    sfx: "item_notification",
-    content: ["hehe... I actually have something that could help.",
-              "Recently I bought some <h>vitamin gummies</h>.",
-              "Here, they are quite delicious, and they will give you some energy."],
-    event:   "notice_box",
-    item_id: "Soft Gummy Vitamins",
-    next_id: "day1_npc_16"
+day1_1_a06: {
+    speaker: "IRIS", portrait: "iris_tired",
+    content: ["Really though…do you have any paracetamol? That would really help.."],
+    next_id: "day1_1_a07"
 },
-day1_npc_16: {
-    speaker: "IRIS", portrait: "iris_happy", bg: "street_sunny",
-    content: ["Wow thank you, orange flavour, MY FAVOURITE!"],
-    next_id: "day1_npc_17"
+day1_1_a07: {
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["I don't, but I've got something better…"],
+    next_id: "day1_1_a08"
 },
-day1_npc_17: {
-    speaker: "WIOLA", portrait: "wiola_happy", bg: "street_sunny",
-    content: ["No worries, come on now sleepyhead.",
-              "We're gonna be late!"],
+day1_1_a08: {
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["Recently I bought some vitamin gummies from H&B.",
+              "Here, they contain caffeine so it'll wake you up in no time"],
+    event: "showcase", item_id: "Soft Gummy Vitamins",
+    next_id: "day1_npc_gift_01"
+},
+day1_npc_gift_01: {
+    speaker: "IRIS", portrait: "iris_happy",
+    content: ["Orange flavour, MY FAVOURITE! Thanks!"],
+    next_id: "day1_npc_gift_02"
+},
+
+// — Branch B: Try to remember what happened last night —
+day1_1_b01: {
+    speaker: "IRIS", portrait: "iris_normal",
+    content: ["(Gosh, I really have no recollection….)"],
+    next_id: "day1_1_b02"
+},
+day1_1_b02: {
+    speaker: "IRIS", portrait: "iris_normal",
+    content: ["(And why did Wiola say \"long time no see\"….",
+              "I surely must've seen her last week..)"],
+    next_id: "day1_1_b03"
+},
+day1_1_b03: {
+    speaker: "IRIS", portrait: "iris_normal",
+    content: ["(Although I can't remember…",
+              "I can't even remember last night let alone-)"],
+    next_id: "day1_1_b04"
+},
+day1_1_b04: {
+    speaker: "IRIS", portrait: "iris_distressed",
+    content: ["(What the hell….think!)"],
+    next_id: "day1_1_b05"
+},
+day1_1_b05: {
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["IRIS~"],
+    next_id: "day1_1_b06"
+},
+day1_1_b06: {
+    speaker: "IRIS", portrait: "iris_distressed",
+    content: ["HUh?"],
+    next_id: "day1_1_b07"
+},
+day1_1_b07: {
+    speaker: "WIOLA", portrait: "wiola_normal",
+    content: ["Are you listening? You zoned out"],
+    next_id: "day1_1_b08"
+},
+day1_1_b08: {
+    speaker: "IRIS", portrait: "iris_tired",
+    content: ["OH! Yes, sorry…just a bit sleepy. What did you say?"],
+    next_id: "day1_1_b09"
+},
+day1_1_b09: {
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["Luckily nothing important, I was just telling you about my new coffee machine…",
+              "you have to try my latte!"],
+    next_id: "day1_1_b10"
+},
+day1_1_b10: {
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["I think you could use one right now…"],
+    next_id: "day1_1_b11"
+},
+day1_1_b11: {
+    speaker: "IRIS", portrait: "iris_tired",
+    content: ["…Oh..haha yes of course. I would kill for a coffee right now…",
+              "or in fact anything that could get me up on my feet"],
+    next_id: "day1_1_b12"
+},
+day1_1_b12: {
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["You're with the right person..I have just the thing for you ;)"],
+    next_id: "day1_1_b13"
+},
+day1_1_b13: {
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["Recently I bought some vitamin gummies.",
+              "They're so delicious , and they'll get you through the lecture. Here."],
+    event: "showcase", item_id: "Soft Gummy Vitamins",
+    next_id: "day1_1_b_gift"
+},
+day1_1_b_gift: {
+    speaker: "IRIS", portrait: "iris_happy",
+    content: ["Wow, cheers orange flavour. MY FAVOURITE!"],
+    next_id: "day1_npc_gift_02"
+},
+
+// — Shared ending —
+day1_npc_gift_02: {
+    speaker: "WIOLA", portrait: "wiola_happy",
+    content: ["No worries, come on now sleepyhead. We're gonna be late"],
 },
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -418,71 +505,71 @@ day1_npc_17: {
 // ═══════════════════════════════════════════════════════════════════════════
 
 day2_npc_01: {
-    speaker: "LAYLA", portrait: "layla_normal", bg: "street_sunny",
+    speaker: "LAYLA", portrait: "layla_normal",
     content: ["IRIS! You alright?",
               "You look like you just ran a marathon!"],
     next_id: "day2_npc_02"
 },
 day2_npc_02: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_sunny",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["...H..Hi!"],
     next_id: "day2_npc_03"
 },
 day2_npc_03: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_sunny",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["....I....I....I'm still not used to climbing this stupid hill.."],
     next_id: "day2_npc_04"
 },
 day2_npc_04: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_sunny",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["Every day the hill feels like a torture."],
     next_id: "day2_npc_05"
 },
 day2_npc_05: {
-    speaker: "LAYLA", portrait: "layla_happy", bg: "street_sunny",
+    speaker: "LAYLA", portrait: "layla_happy",
     content: ["HAH! <h>Park Street</h> is not for the weak!"],
     next_id: "day2_npc_06"
 },
 day2_npc_06: {
-    speaker: "LAYLA", portrait: "layla_normal", bg: "street_sunny",
+    speaker: "LAYLA", portrait: "layla_normal",
     content: ["It's alright, you're here now.",
               "We still have 10 minutes left before class."],
     next_id: "day2_npc_07"
 },
 day2_npc_07: {
-    speaker: "LAYLA", portrait: "layla_normal", bg: "street_sunny",
+    speaker: "LAYLA", portrait: "layla_normal",
     content: ["How come you don't take the bus?"],
     next_id: "day2_npc_08"
 },
 day2_npc_08: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_sunny",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["Ohh....well..I don't really have the money for it.",
               "Money is a bit tight these days."],
     next_id: "day2_npc_09"
 },
 day2_npc_09: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_sunny",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["Besides, I guess it's good for my health.",
               "So it's not all that bad."],
     next_id: "day2_npc_10"
 },
 day2_npc_10: {
-    speaker: "LAYLA", portrait: "layla_happy", bg: "street_sunny",
+    speaker: "LAYLA", portrait: "layla_happy",
     content: ["I get it, you want to burn off all the <h>Ji's Chicken</h> you eat!"],
     next_id: "day2_npc_11"
 },
 day2_npc_11: {
-    speaker: "IRIS", portrait: "iris_happy", bg: "street_sunny",
+    speaker: "IRIS", portrait: "iris_happy",
     content: ["Shhhh! Don't mention it!"],
     next_id: "day2_npc_12"
 },
 day2_npc_12: {
-    speaker: "LAYLA", portrait: "layla_happy", bg: "street_sunny",
+    speaker: "LAYLA", portrait: "layla_happy",
     content: ["Haha, I'm just playing."],
     next_id: "day2_npc_13"
 },
 day2_npc_13: {
-    speaker: "IRIS", portrait: "iris_happy", bg: "street_sunny",
+    speaker: "IRIS", portrait: "iris_happy",
     content: ["About the chicken..."],
     options: [
         { label: "I eat fried chicken with no regrets!", next_id: "day2_npc_14" },
@@ -490,35 +577,35 @@ day2_npc_13: {
     ]
 },
 day2_npc_14: {
-    speaker: "LAYLA", portrait: "layla_happy", bg: "street_sunny",
+    speaker: "LAYLA", portrait: "layla_happy",
     content: ["HAHAHA!"],
     next_id: "day2_npc_15"
 },
 day2_npc_15: {
-    speaker: "IRIS", portrait: "iris_normal", bg: "street_sunny",
+    speaker: "IRIS", portrait: "iris_normal",
     content: ["Anyway... weirdly enough, today I did not see any homeless people on my way.",
               "Usually, I always pass them next to <h>TESCO</h>."],
     next_id: "day2_npc_16"
 },
 day2_npc_16: {
-    speaker: "LAYLA", portrait: "layla_happy", bg: "street_sunny",
+    speaker: "LAYLA", portrait: "layla_happy",
     content: ["Hah, maybe they're sleeping it off",
               "after last night's shenanigans."],
     next_id: "day2_npc_17"
 },
 day2_npc_17: {
-    speaker: "IRIS", portrait: "iris_happy", bg: "street_sunny",
+    speaker: "IRIS", portrait: "iris_happy",
     content: ["hahaha, maybe."],
     next_id: "day2_npc_18"
 },
 day2_npc_18: {
-    speaker: "LAYLA", portrait: "layla_normal", bg: "street_sunny",
+    speaker: "LAYLA", portrait: "layla_normal",
     content: ["Who knows? They run on their own cycle.",
               "Anyway, I have a cool gift for you!"],
     next_id: "day2_npc_19"
 },
 day2_npc_19: {
-    speaker: "LAYLA", portrait: "layla_happy", bg: "street_sunny",
+    speaker: "LAYLA", portrait: "layla_happy",
     sfx: "item_notification",
     content: ["It is a <h>tangle toy</h>!",
               "I remember you telling me about your <h>ADHD</h>...",
@@ -528,12 +615,12 @@ day2_npc_19: {
     next_id: "day2_npc_20"
 },
 day2_npc_20: {
-    speaker: "IRIS", portrait: "iris_happy", bg: "street_sunny",
+    speaker: "IRIS", portrait: "iris_happy",
     content: ["WOW thanks! It looks super cute! And it's purple! My fave!"],
     next_id: "day2_npc_21"
 },
 day2_npc_21: {
-    speaker: "LAYLA", portrait: "layla_happy", bg: "street_sunny",
+    speaker: "LAYLA", portrait: "layla_happy",
     content: ["No probs, let's go. You can try it out in class."],
 },
 
@@ -543,33 +630,33 @@ day2_npc_21: {
 // ═══════════════════════════════════════════════════════════════════════════
 
 day3_npc_01: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["HI RAY, so glad to see you!"],
     next_id: "day3_npc_02"
 },
 day3_npc_02: {
-    speaker: "RAYMOND", portrait: "raymond_happy", bg: "street_cloudy",
+    speaker: "RAYMOND", portrait: "raymond_happy",
     content: ["Hey Hey!"],
     next_id: "day3_npc_03"
 },
 day3_npc_03: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["How are you getting on with your courses and study?"],
     next_id: "day3_npc_04"
 },
 day3_npc_04: {
-    speaker: "RAYMOND", portrait: "raymond_normal", bg: "street_cloudy",
+    speaker: "RAYMOND", portrait: "raymond_normal",
     content: ["Oh it's alright, recently I've been travelling a little,",
               "so I have some catching up to do."],
     next_id: "day3_npc_05"
 },
 day3_npc_05: {
-    speaker: "RAYMOND", portrait: "raymond_normal", bg: "street_cloudy",
+    speaker: "RAYMOND", portrait: "raymond_normal",
     content: ["But nothing I can't handle.."],
     next_id: "day3_npc_06"
 },
 day3_npc_06: {
-    speaker: "IRIS", portrait: "iris_happy", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_happy",
     content: ["Travel..."],
     options: [
         { label: "I admire how you balance travel and study!", next_id: "day3_npc_07" },
@@ -577,80 +664,80 @@ day3_npc_06: {
     ]
 },
 day3_npc_07: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["I also hope to travel this summer...",
               "as long as......"],
     next_id: "day3_npc_08"
 },
 day3_npc_08: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_distressed",
     sfx: "heartbeat_faint",
     content: ["..........."],
     next_id: "day3_npc_09"
 },
 day3_npc_09: {
-    speaker: "RAYMOND", portrait: "raymond_concerned", bg: "street_cloudy",
+    speaker: "RAYMOND", portrait: "raymond_concerned",
     sfx: "gasp",
     content: ["HEY!! IRIS!! Are you alright?!!"],
     next_id: "day3_npc_10"
 },
 day3_npc_10: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["........."],
     next_id: "day3_npc_11"
 },
 day3_npc_11: {
-    speaker: "RAYMOND", portrait: "raymond_concerned", bg: "street_cloudy",
+    speaker: "RAYMOND", portrait: "raymond_concerned",
     content: ["IRIS OMG, WAKE UP!"],
     next_id: "day3_npc_12"
 },
 day3_npc_12: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["Ohh.... I'm... I'm alright..",
               "I just felt a bit dizzy."],
     next_id: "day3_npc_13"
 },
 day3_npc_13: {
-    speaker: "RAYMOND", portrait: "raymond_concerned", bg: "street_cloudy",
+    speaker: "RAYMOND", portrait: "raymond_concerned",
     content: ["WHAT!? ARE YOU SURE?",
               "You looked like you were about to pass out."],
     next_id: "day3_npc_14"
 },
 day3_npc_14: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["No, no, I think I'm just exhausted...",
               "this stupid hill always gets me..."],
     next_id: "day3_npc_15"
 },
 day3_npc_15: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["One day, I'll end up on my deathbed because of it…",
               "But not today."],
     next_id: "day3_npc_16"
 },
 day3_npc_16: {
-    speaker: "RAYMOND", portrait: "raymond_concerned", bg: "street_cloudy",
+    speaker: "RAYMOND", portrait: "raymond_concerned",
     content: ["Are you sure you don't want to go back?"],
     next_id: "day3_npc_17"
 },
 day3_npc_17: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["No, no, really it's fine. I'll just have a sip of water."],
     next_id: "day3_npc_18"
 },
 day3_npc_18: {
-    speaker: "RAYMOND", portrait: "raymond_concerned", bg: "street_cloudy",
+    speaker: "RAYMOND", portrait: "raymond_concerned",
     content: ["So stubborn!",
               "I'm not letting you out of my sight, stick close to me."],
     next_id: "day3_npc_19"
 },
 day3_npc_19: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["Ha, ha, ha, funny."],
     next_id: "day3_npc_20"
 },
 day3_npc_20: {
-    speaker: "RAYMOND", portrait: "raymond_happy", bg: "street_cloudy",
+    speaker: "RAYMOND", portrait: "raymond_happy",
     sfx: "item_notification",
     content: ["Okay silly, I have something for you.",
               "A small gift during my travels…",
@@ -660,12 +747,12 @@ day3_npc_20: {
     next_id: "day3_npc_21"
 },
 day3_npc_21: {
-    speaker: "IRIS", portrait: "iris_happy", bg: "street_cloudy",
+    speaker: "IRIS", portrait: "iris_happy",
     content: ["Omg that's too much! Joking, I can accept them. Show me!"],
     next_id: "day3_npc_22"
 },
 day3_npc_22: {
-    speaker: "RAYMOND", portrait: "raymond_happy", bg: "street_cloudy",
+    speaker: "RAYMOND", portrait: "raymond_happy",
     content: ["Here. Let's go before you faint again…"],
 },
 
@@ -677,31 +764,31 @@ day3_npc_22: {
 // ═══════════════════════════════════════════════════════════════════════════
 
 day4_npc_01: {
-    speaker: "YUKI", portrait: "yuki_concerned", bg: "street_rainy",
+    speaker: "YUKI", portrait: "yuki_concerned",
     content: ["IRIS! Hey, what are you doing sat on the ground?",
               "It's totally wet!"],
     next_id: "day4_npc_02"
 },
 day4_npc_02: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["Huh?"],
     next_id: "day4_npc_03"
 },
 day4_npc_03: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: [".....I can't move…..",
               "I feel like I have no control over my body."],
     next_id: "day4_npc_04"
 },
 day4_npc_04: {
-    speaker: "YUKI", portrait: "yuki_normal", bg: "street_rainy",
+    speaker: "YUKI", portrait: "yuki_normal",
     content: ["Just try to get up, you're gonna get sick."],
     next_id: "day4_npc_05"
 },
 day4_npc_05: {
     // Path A skips the confrontation and goes straight to the medical crisis.
     // Path B triggers YUKI's reproach before converging at the crisis.
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["Help..."],
     options: [
         { label: "UGhhh... yeah.. give me a sec...", next_id: "day4_npc_10" },
@@ -709,31 +796,31 @@ day4_npc_05: {
     ]
 },
 day4_npc_06: {
-    speaker: "YUKI", portrait: "yuki_concerned", bg: "street_rainy",
+    speaker: "YUKI", portrait: "yuki_concerned",
     content: ["What's wrong with you Iris?!",
               "I'm just trying to help."],
     next_id: "day4_npc_07"
 },
 day4_npc_07: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["YEAH, well I don't need your help!"],
     next_id: "day4_npc_08"
 },
 day4_npc_08: {
-    speaker: "YUKI", portrait: "yuki_concerned", bg: "street_rainy",
+    speaker: "YUKI", portrait: "yuki_concerned",
     content: ["Alright, tell me what's going on.",
               "Your skin is so pale.",
               "Shouldn't you see a doctor?"],
     next_id: "day4_npc_09"
 },
 day4_npc_09: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     sfx: "heartbeat_critical",
     content: ["..........Wait.....my..... breath........I....can't-"],
     next_id: "day4_npc_10"
 },
 day4_npc_10: {
-    speaker: "???", portrait: "unknown", bg: "hospital_flash",
+    speaker: "???", portrait: "unknown",
     sfx: "flatline",
     content: ["There is no time! We need to do something!",
               "She is <h>bleeding internally</h>!",
@@ -741,24 +828,24 @@ day4_npc_10: {
     next_id: "day4_npc_11"
 },
 day4_npc_11: {
-    speaker: "YUKI", portrait: "yuki_concerned", bg: "street_rainy",
+    speaker: "YUKI", portrait: "yuki_concerned",
     content: ["...IRIS!?... IRIS!!! WHAT THE HELL HAPPENED!?"],
     next_id: "day4_npc_12"
 },
 day4_npc_12: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: [".....hmm? I don't know...",
               "everything just turned black."],
     next_id: "day4_npc_13"
 },
 day4_npc_13: {
-    speaker: "YUKI", portrait: "yuki_concerned", bg: "street_rainy",
+    speaker: "YUKI", portrait: "yuki_concerned",
     content: ["Iris are you alright!?",
               "You passed out! You almost died!"],
     next_id: "day4_npc_14"
 },
 day4_npc_14: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["The truth..."],
     options: [
         { label: "I've been having these episodes recently...", next_id: "day4_npc_17" },
@@ -766,36 +853,36 @@ day4_npc_14: {
     ]
 },
 day4_npc_15: {
-    speaker: "YUKI", portrait: "yuki_concerned", bg: "street_rainy",
+    speaker: "YUKI", portrait: "yuki_concerned",
     content: ["Well, I'm sorry...",
               "I'm just trying to be a good friend."],
     next_id: "day4_npc_16"
 },
 day4_npc_16: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["You're right. I know. This really isn't me."],
     next_id: "day4_npc_17"
 },
 day4_npc_17: {
-    speaker: "YUKI", portrait: "yuki_normal", bg: "street_rainy",
+    speaker: "YUKI", portrait: "yuki_normal",
     content: ["Let's go to the <h>GP</h> on the weekend.",
               "You even forgot your <h>wellies</h> today!",
               "You must be overwhelmed."],
     next_id: "day4_npc_18"
 },
 day4_npc_18: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["Wellies? .....Oh yes... I forgot about them."],
     next_id: "day4_npc_19"
 },
 day4_npc_19: {
-    speaker: "IRIS", portrait: "iris_tired", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_tired",
     content: ["Anyway, I still want to go to the lecture.",
               "I can't afford to fail."],
     next_id: "day4_npc_20"
 },
 day4_npc_20: {
-    speaker: "YUKI", portrait: "yuki_normal", bg: "street_rainy",
+    speaker: "YUKI", portrait: "yuki_normal",
     content: ["Alright, follow me then, stay close."],
 },
 
@@ -822,6 +909,12 @@ day5_npc_02: {
 day5_npc_03: {
     speaker: "???", portrait: "unknown", bg: "hospital_limbo",
     content: ["I have a small surprise for you"],
+    next_id: "day5_npc_gift"
+},
+day5_npc_gift: {
+    speaker: "???", portrait: "unknown", bg: "hospital_limbo",
+    content: ["Here are your wellies — I think you'll need them today."],
+    event: "showcase", item_id: "Rain Boots",
     next_id: "day5_npc_04"
 },
 day5_npc_04: {
@@ -846,97 +939,97 @@ day5_npc_06: {
     next_id: "day5_npc_07"
 },
 day5_npc_07: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["Ugh...I'm still having hallucinations....",
               "but somehow my body feels...better?"],
     next_id: "day5_npc_08"
 },
 day5_npc_08: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["I cannot make any sense of this,",
               "looks like it's not a linear thing"],
     next_id: "day5_npc_09"
 },
 day5_npc_09: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["My mind is still convoluted,",
               "but my limbs feel....light...",
               "Like I'm levitating"],
     next_id: "day5_npc_10"
 },
 day5_npc_10: {
-    speaker: "CHARLOTTE", portrait: "charlotte_normal", bg: "street_rainy",
+    speaker: "CHARLOTTE", portrait: "charlotte_normal",
     content: ["Iris! Here you areee!",
               "Why are you just standing there?"],
     next_id: "day5_npc_11"
 },
 day5_npc_11: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     sfx: "dreamlike_swell",
     content: [".....It's hot air balloons! So many of them....."],
     next_id: "day5_npc_12"
 },
 day5_npc_12: {
-    speaker: "???", portrait: "unknown", bg: "street_rainy",
+    speaker: "???", portrait: "unknown",
     content: ["It's alright, the dangerous part is now behind us..",
               "now we must wait"],
     next_id: "day5_npc_13"
 },
 day5_npc_13: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["How peculiar...",
               "Suddenly the earth feels so still and quiet.",
               "Everything moves as though no longer bound to time..."],
     next_id: "day5_npc_14"
 },
 day5_npc_14: {
-    speaker: "CHARLOTTE", portrait: "charlotte_normal", bg: "street_rainy",
+    speaker: "CHARLOTTE", portrait: "charlotte_normal",
     content: ["Iris what are you saying...?"],
     next_id: "day5_npc_15"
 },
 day5_npc_15: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["Don't you feel like it's beautiful?",
               "Like a painting...",
               "I want to join them..."],
     next_id: "day5_npc_16"
 },
 day5_npc_16: {
-    speaker: "???", portrait: "unknown", bg: "street_rainy",
+    speaker: "???", portrait: "unknown",
     sfx: "voice_echo",
     content: ["They're all here waiting for you,",
               "you just need to rise.."],
     next_id: "day5_npc_17"
 },
 day5_npc_17: {
-    speaker: "CHARLOTTE", portrait: "charlotte_normal", bg: "street_rainy",
+    speaker: "CHARLOTTE", portrait: "charlotte_normal",
     content: ["Iris, you're acting weird…just snap out of it!",
               "I dydhe iknwieeb ewhuuid is heewrjdng wi euo.."],
     next_id: "day5_npc_18"
 },
 day5_npc_18: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["What did you say?"],
     next_id: "day5_npc_19"
 },
 day5_npc_19: {
-    speaker: "CHARLOTTE", portrait: "charlotte_normal", bg: "street_rainy",
+    speaker: "CHARLOTTE", portrait: "charlotte_normal",
     content: ["I said..weli swhe'll meik it trhogh"],
     next_id: "day5_npc_20"
 },
 day5_npc_20: {
-    speaker: "CHARLOTTE", portrait: "charlotte_normal", bg: "street_rainy",
+    speaker: "CHARLOTTE", portrait: "charlotte_normal",
     content: ["I said I wanted to ask you something..",
               "or did you forget?"],
     next_id: "day5_npc_21"
 },
 day5_npc_21: {
-    speaker: "IRIS", portrait: "iris_normal", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_normal",
     content: ["No No, of course not. What is it"],
     next_id: "day5_npc_22"
 },
 day5_npc_22: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["Who to listen to?"],
     options: [
         { label: "Keep listening to the unknown voices", next_id: "day5_npc_23" },
@@ -972,24 +1065,24 @@ day5_npc_26: {
     next_id: "day5_npc_27"
 },
 day5_npc_27: {
-    speaker: "CHARLOTTE", portrait: "charlotte_normal", bg: "street_rainy",
+    speaker: "CHARLOTTE", portrait: "charlotte_normal",
     content: ["You know what, never mind Iris...",
               "Clearly you're not sane!"],
     next_id: "day5_npc_28"
 },
 day5_npc_28: {
-    speaker: "CHARLOTTE", portrait: "charlotte_normal", bg: "street_rainy",
+    speaker: "CHARLOTTE", portrait: "charlotte_normal",
     content: ["Just forget about it."],
     next_id: "day5_npc_29"
 },
 day5_npc_29: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["No, No please Charlotte I'm sorry,",
               "I don't know what's happening to me!"],
     next_id: "day5_npc_30"
 },
 day5_npc_30: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     content: ["Please just tell me......"],
     next_id: "day5_npc_31"
 },
@@ -997,32 +1090,32 @@ day5_npc_30: {
 // ── Charlotte branch + shared ending (31–37) ─────────────────────────────
 
 day5_npc_31: {
-    speaker: "CHARLOTTE", portrait: "charlotte_normal", bg: "street_rainy",
+    speaker: "CHARLOTTE", portrait: "charlotte_normal",
     content: ["Alright....finee....",
               "We thought to go out this weekend",
               "to a new club called '<h>SZPITAL</h>'."],
     next_id: "day5_npc_32"
 },
 day5_npc_32: {
-    speaker: "IRIS", portrait: "iris_normal", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_normal",
     content: ["(..SZPITAL? That is not an English word,",
               "I wonder what it means...)"],
     next_id: "day5_npc_33"
 },
 day5_npc_33: {
-    speaker: "IRIS", portrait: "iris_normal", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_normal",
     content: ["But...you guys don't even like clubbing."],
     next_id: "day5_npc_34"
 },
 day5_npc_34: {
-    speaker: "CHARLOTTE", portrait: "charlotte_normal", bg: "street_rainy",
+    speaker: "CHARLOTTE", portrait: "charlotte_normal",
     content: ["So what?",
               "Just because we don't like it,",
               "doesn't mean we will never do it again"],
     next_id: "day5_npc_35"
 },
 day5_npc_35: {
-    speaker: "IRIS", portrait: "iris_distressed", bg: "street_rainy",
+    speaker: "IRIS", portrait: "iris_distressed",
     sfx: "dreamlike_swell",
     content: ["Besides........this air...the rain....",
               "feels like it's cleansing me....",
@@ -1030,12 +1123,12 @@ day5_npc_35: {
     next_id: "day5_npc_36"
 },
 day5_npc_36: {
-    speaker: "CHARLOTTE", portrait: "charlotte_normal", bg: "street_rainy",
+    speaker: "CHARLOTTE", portrait: "charlotte_normal",
     content: ["Nonsense... It's already decided and we're all going"],
     next_id: "day5_npc_37"
 },
 day5_npc_37: {
-    speaker: "CHARLOTTE", portrait: "charlotte_normal", bg: "street_rainy",
+    speaker: "CHARLOTTE", portrait: "charlotte_normal",
     content: ["Are you coming or not?"],
     options: [
         { label: "No. I can't keep running away from my problems.", action: "good_ending" },
@@ -1430,7 +1523,7 @@ DIALOGUE_DATA.day_room = {
     2: [
         { speaker: 'IRIS', text: "Hmm, time to get up again..." },
         { speaker: 'IRIS', text: "Wow, and the weather is still bright! Another great day to come!" },
-        { speaker: 'IRIS', text: "Perhaps I can even make a quick stop at GAIL's and buy myself an iced matcha!" },
+        { speaker: 'IRIS', text: "Perhaps I can even make a quick stop at <h>GAIL's</h> and buy myself an iced matcha!" },
         { speaker: 'IRIS', text: "There is only one problem..." },
         { speaker: 'IRIS', text: "My body still feels so sore, could it really be after climbing that hill?" },
         { speaker: 'IRIS', text: "Never mind, the first day is always the worst... Surely my body will get used to it." },
@@ -1442,7 +1535,7 @@ DIALOGUE_DATA.day_room = {
         { speaker: 'IRIS', text: "Damn… and here we go back to the standard gloomy weather. I only hope it doesn't rain..." },
         { speaker: 'IRIS', text: "Each day seems to be worse than the other, I don't smoke or drink… or even go clubbing, why is my body this weak?" },
         { speaker: 'IRIS', text: "So annoying." },
-        { speaker: 'IRIS', text: "Maybe I really should contact my GP someday." },
+        { speaker: 'IRIS', text: "Maybe I really should contact my <h>GP</h> someday." },
         { speaker: 'IRIS', text: "Anyway, let's grab some things and go!" },
     ],
     4: [
@@ -1671,6 +1764,14 @@ DIALOGUE_DATA.awakening_reality = [
     { speaker: 'LAYLA',     text: "Hahahaha!" },
     { speaker: 'CHARLOTTE', text: "Hahaha, Iris, you are truly the one and only, Park Street Survivor!" },
 ];
+
+DIALOGUE_DATA.day_npc_start = {
+    1: 'day1_npc_01',
+    2: 'day2_npc_01',
+    3: 'day3_npc_01',
+    4: 'day4_npc_01',
+    5: 'day5_npc_01',
+};
 
 DIALOGUE_DATA.endings = {
     bad: [

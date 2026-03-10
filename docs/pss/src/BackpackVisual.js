@@ -328,9 +328,8 @@ class BackpackVisual {
             );
         }
 
-        // ── Day 2: suggest trying Wiola's gummies once required items are packed ─
-        if (currentDayID === 2 && this.hasRequiredItems() &&
-                !this._day2GummyHintDone && !this.dialogueBox.active) {
+        // ── Day 2: suggest trying Wiola's gummies as soon as backpack opens ─────
+        if (currentDayID === 2 && !this._day2GummyHintDone) {
             this._day2GummyHintDone = true;
             this.dialogueBox.persistent = true;
             this.dialogueBox.trigger(
@@ -339,17 +338,19 @@ class BackpackVisual {
             );
         }
 
-        // ── Day 3+: track packed NPC item and show one-item hint ─────────────
+        // ── Day 3+: show one-item hint as soon as backpack opens ─────────────
+        if (currentDayID >= 3 && !this._npcSlotHintShown) {
+            this._npcSlotHintShown = true;
+            this.dialogueBox.persistent = true;
+            this.dialogueBox.trigger(
+                "Only room for one friend's gift — check the descriptions before you decide. Drag it out if you want to swap!",
+                null, "IRIS"
+            );
+        }
+
+        // Track packed NPC item for other uses
         if (currentDayID >= 3) {
             this._packedNpcItem = this._getPackedNpcItem();
-            if (this._packedNpcItem !== null && !this._npcSlotHintShown && !this.dialogueBox.active) {
-                this._npcSlotHintShown = true;
-                this.dialogueBox.persistent = true;
-                this.dialogueBox.trigger(
-                    "Only room for one friend's gift — check the descriptions before you decide. Drag it out if you want to swap!",
-                    null, "IRIS"
-                );
-            }
         }
 
         // ── Once required items are packed, prompt to leave ───────────────────
@@ -725,15 +726,11 @@ class BackpackVisual {
      * @param {number} itemX - world x of the item centre
      * @param {number} itemY - world y of the item centre
      */
-    drawTooltip(item, itemX, itemY) {
-        push();
-        let title = item.name;
-        let desc = item.description || "";
-        let w = 280;
-        let h = desc ? 220 : 80;
-        // Top-right of item: tooltip appears above and to the right of centre
-        let tx = constrain(itemX + 40, 10, width - w - 10);
-        let ty = constrain(itemY - h - 20, 10, height - h - 10);
+    _drawTooltipBox(tx, ty, w, title, desc) {
+        // Two-part = inner thought + game effect (separated by \n)
+        // Single-part = required items (no \n)
+        const hasTwoParts = desc && desc.includes('\n');
+        const h = hasTwoParts ? 420 : (desc ? 240 : 90);
 
         rectMode(CORNER);
         fill(22, 10, 48, 250);
@@ -745,14 +742,45 @@ class BackpackVisual {
         textFont(fonts.body);
         fill(255, 215, 0);
         textAlign(LEFT, TOP);
-        textSize(34);
-        text(title, tx + 16, ty + 14, w - 32, 44);
+        textSize(38);
+        text(title, tx + 18, ty + 14, w - 36, 54);
 
         if (desc) {
-            fill(200, 160, 255);
-            textSize(24);
-            text(desc, tx + 16, ty + 66, w - 32, h - 82);
+            if (hasTwoParts) {
+                const parts = desc.split('\n');
+                // Inner thought (part 1) — soft purple
+                fill(200, 160, 255);
+                textSize(28);
+                text(parts[0], tx + 18, ty + 76, w - 36, 150);
+                // Divider
+                const divY = ty + 234;
+                stroke(140, 90, 200);
+                strokeWeight(1);
+                line(tx + 14, divY, tx + w - 14, divY);
+                noStroke();
+                // Game effect (part 2) — soft green
+                fill(140, 220, 160);
+                textSize(26);
+                text(parts[1], tx + 18, divY + 10, w - 36, 150);
+            } else {
+                // Single-part description (required items)
+                fill(200, 160, 255);
+                textSize(28);
+                text(desc, tx + 18, ty + 76, w - 36, h - 95);
+            }
         }
+        return h;
+    }
+
+    drawTooltip(item, itemX, itemY) {
+        push();
+        const desc = item.description || "";
+        const hasTwoParts = desc.includes('\n');
+        const h = hasTwoParts ? 420 : (desc ? 240 : 90);
+        const w = 440;
+        const tx = constrain(itemX + 40, 10, width - w - 10);
+        const ty = constrain(itemY - h - 20, 10, height - h - 10);
+        this._drawTooltipBox(tx, ty, w, item.name, desc);
         pop();
     }
 
@@ -761,32 +789,13 @@ class BackpackVisual {
      */
     drawSlotTooltip(item, slotX, slotY) {
         push();
-        let title = item.name;
-        let desc = item.description || "";
-        let w = 280;
-        let h = desc ? 220 : 80;
-        // Top-right of slot
-        let tx = constrain(slotX + this.slotSize / 2 + 10, 10, width - w - 10);
-        let ty = constrain(slotY - this.slotSize / 2 - h - 10, 10, height - h - 10);
-
-        rectMode(CORNER);
-        fill(22, 10, 48, 250);
-        stroke(255, 215, 0);
-        strokeWeight(3);
-        rect(tx, ty, w, h, 12);
-
-        noStroke();
-        textFont(fonts.body);
-        fill(255, 215, 0);
-        textAlign(LEFT, TOP);
-        textSize(34);
-        text(title, tx + 16, ty + 14, w - 32, 44);
-
-        if (desc) {
-            fill(200, 160, 255);
-            textSize(24);
-            text(desc, tx + 16, ty + 66, w - 32, h - 82);
-        }
+        const desc = item.description || "";
+        const hasTwoParts = desc.includes('\n');
+        const h = hasTwoParts ? 420 : (desc ? 240 : 90);
+        const w = 440;
+        const tx = constrain(slotX + this.slotSize / 2 + 10, 10, width - w - 10);
+        const ty = constrain(slotY - this.slotSize / 2 - h - 10, 10, height - h - 10);
+        this._drawTooltipBox(tx, ty, w, item.name, desc);
         pop();
     }
 

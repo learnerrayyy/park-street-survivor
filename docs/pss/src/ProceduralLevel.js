@@ -218,6 +218,8 @@ class ProceduralLevel {
     if (this.frameCounter < this.displayDuration) {
       push();
       fill(255, 255, 255, 255);
+      stroke(148, 0, 211);
+      strokeWeight(3);
       textSize(48);
       textAlign(CENTER, CENTER);
       text(this.levelText, GLOBAL_CONFIG.resolutionW / 2, GLOBAL_CONFIG.resolutionH / 2);

@@ -397,7 +397,7 @@ class Player {
         if (this.invincibleFramesRemaining > 0) this.invincibleFramesRemaining--;
         if (this.hpLockFramesRemaining > 0) this.hpLockFramesRemaining--;
 
-        const hudTarget = (this.utilityItemArmed && this.hasUsableUtilityItem()) ? 1 : 0;
+        const hudTarget = this.hasUsableUtilityItem() ? 1 : 0;
         this.utilityHudSwapProgress = lerp(this.utilityHudSwapProgress, hudTarget, 0.18);
         if (Math.abs(this.utilityHudSwapProgress - hudTarget) < 0.01) {
             this.utilityHudSwapProgress = hudTarget;
@@ -750,6 +750,15 @@ class Player {
 
         if (!hasUtility) {
             this.drawHudIconFitted(backpackImg, cx, cy, scaledH, 255, -8);
+            push();
+            colorMode(RGB, 255);
+            noStroke();
+            fill(255, 255, 255, 200);
+            textFont(fonts.jersey20 || 'sans-serif');
+            textSize(this.hudU(18));
+            textAlign(CENTER, TOP);
+            text('Press E', x + frameW / 2, y + frameH + this.hudU(4));
+            pop();
             return;
         }
 

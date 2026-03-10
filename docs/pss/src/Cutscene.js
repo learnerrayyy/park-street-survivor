@@ -12,16 +12,19 @@ let _cs = {
     choices:        null,      // [{ label, cb }] or null
     showingChoices: false,
     choiceHover:    -1,
+    isNodeMode:    false,      // true = node-based traversal mode
+    currentNodeId: null,       // string ID of current DIALOGUE_DATA node
 };
 
 const SPEAKER_PORTRAIT_MAP = {
-    'IRIS':      'portraitPlayerNormal',
-    'WIOLA':     'portraitWiola',
-    'LAYLA':     'portraitLayla',
-    'RAYMOND':   'portraitRaymond',
-    'YUKI':      'portraitYuki',
-    'CHARLOTTE': 'portraitCharlotte',
-    'NEWSREADER': null
+    'IRIS':       'portraitPlayerNormal',
+    'WIOLA':      'portraitWiola',
+    'LAYLA':      'portraitLayla',
+    'RAYMOND':    'portraitRaymond',
+    'YUKI':       'portraitYuki',
+    'CHARLOTTE':  'portraitCharlotte',
+    'NEWSREADER': null,
+    'VOICE':      null,   // anonymous doctor voice — no portrait
 };
 
 // Per-session "already seen" flags — prevents replays on retry
@@ -53,6 +56,14 @@ let _currentLine    = 0;
 let _endingTimer    = 0;
 let _onEndingDone   = null;
 let _csLastSyncIndex = -1;   // tracks last index synced to _csBox to avoid re-triggering
+let _csLastNodeId    = null; // tracks last node ID synced to _csBox (node mode)
+
+// Screen-effect state (node mode)
+let _screenEffect = { type: null, timer: 0 };
+const _EFFECT_DURATION = { shake: 60, flash: 45, dizzy: 120 };
+
+// Item showcase state (node mode)
+let _showcase = { active: false, itemName: '', timer: 0, pendingNextId: null };
 
 // ─── ITEM RECEIVED NOTICE BOX ───────────────────────────────────────────────
 // Uses assets/dialogue/notice_box.png (520×150 px, design space x:1400 y:100).
@@ -101,6 +112,7 @@ function _getItemImage(displayName) {
     if (n.includes('VITAMIN') || n.includes('GUMM'))  return assets.vitaminImg   || null;
     if (n.includes('TANGLE'))                          return assets.tangleImg    || null;
     if (n.includes('HEADPHONE'))                       return assets.headphoneImg || null;
+    if (n.includes('BOOT') || n.includes('WELLI'))     return assets.rainbootImg  || null;
     return null;
 }
 
@@ -192,6 +204,58 @@ function _drawItemToast() {
     pop();
 }
 
+// ─── NODE-MODE HELPERS ─────────────────────────────────────────────────────────
+
+/**
+ * Strips <h>…</h> tags from a content array, returning plain text and an array
+ * of highlighted words (lowercased) for the DialogueBox highlight pass.
+ */
+function _parseContent(contentArray) {
+    const highlights = new Set();
+    const text = (contentArray || []).map(line =>
+        line.replace(/<h>(.*?)<\/h>/g, (_, phrase) => {
+            // Split multi-word phrases so each word can be matched individually
+            phrase.split(/\s+/).forEach(w => {
+                const clean = w.toLowerCase().replace(/[.,!?…:;'"]/g, '');
+                if (clean) highlights.add(clean);
+            });
+            return phrase;
+        })
+    ).join('\n');
+    return { text, highlight: highlights.size > 0 ? [...highlights] : null };
+}
+
+/** Resolves an action string from a node option into a callable function. */
+function _resolveNodeAction(action) {
+    if (action === 'good_ending') {
+        return () => startCinematicEnding(TEXT_GOOD_ENDING, () => {
+            startCutscene('hospital', CS_AWAKENING_REALITY, () => {
+                if (typeof resetCredits === 'function') resetCredits();
+                gameState.setState(STATE_CREDITS);
+            });
+        });
+    }
+    if (action === 'bad_ending') {
+        return () => startCinematicEnding(TEXT_BAD_ENDING, () => {
+            if (typeof resetCredits === 'function') resetCredits();
+            gameState.setState(STATE_CREDITS);
+        });
+    }
+    return null;
+}
+
+/** Called by DialogueBox when a node-mode option is selected. */
+function _onNodeOptionSelected(opt) {
+    if (opt.next_id) {
+        _cs.currentNodeId = opt.next_id;
+    } else if (opt.action) {
+        const cb = _resolveNodeAction(opt.action);
+        if (cb) cb();
+        return;
+    }
+    _csLastNodeId = null; // force re-sync on next frame
+}
+
 // ─── DIALOGUE DATA ALIASES (sourced from assets/data/dialogue_data.js) ────────
 const TEXT_BAD_ENDING      = DIALOGUE_DATA.endings.bad;
 const TEXT_GOOD_ENDING     = DIALOGUE_DATA.endings.good;
@@ -260,12 +324,49 @@ function startCutscene(bgType, lines, onComplete, choices = null) {
         _csBox.persistent = true;
     }   // force DialogueBox re-trigger on first draw
 
-    _isEndingActive = false;
+    _isEndingActive    = false;
+    _cs.isNodeMode     = false;
+    _cs.currentNodeId  = null;
+    _csLastNodeId      = null;
+    _showcase.active   = false;
+    _screenEffect.type = null;
 
     // Wire up the tracking callback for inline per-line options
     if (_csBox) {
         _csBox.onOptionSelect = _onInlineOptionSelected;
     }
+    gameState.setState(STATE_CUTSCENE);
+}
+
+/**
+ * Starts a node-based cutscene using DIALOGUE_DATA node IDs.
+ * Supports per-node bg changes, screen effects, item showcase, and real branching.
+ */
+function startCutsceneFromNode(startNodeId, onComplete) {
+    const startNode = (typeof DIALOGUE_DATA !== 'undefined') ? DIALOGUE_DATA[startNodeId] : null;
+    const bgType    = (startNode && startNode.bg) ? startNode.bg : 'library';
+    if (typeof BGM !== 'undefined') BGM.setCutsceneScene(bgType);
+
+    _cs.bg             = bgType;
+    _cs.lines          = [];
+    _cs.index          = 0;
+    _cs.onComplete     = onComplete;
+    _cs.choices        = null;
+    _cs.showingChoices = false;
+    _cs.choiceHover    = -1;
+    _cs.isNodeMode     = true;
+    _cs.currentNodeId  = startNodeId;
+    _csLastSyncIndex   = -1;
+    _csLastNodeId      = null;
+    _showcase.active   = false;
+    _screenEffect.type = null;
+    _isEndingActive    = false;
+
+    if (!_csBox) _csBox = new DialogueBox();
+    _csBox.reset();
+    _csBox.persistent     = true;
+    _csBox.onOptionSelect = _onNodeOptionSelected;
+
     gameState.setState(STATE_CUTSCENE);
 }
 
@@ -289,15 +390,27 @@ function csAdvance() {
         return;
     }
 
+    // ── Node-based mode ──────────────────────────────────────────────────────
+    if (_cs.isNodeMode) {
+        if (_showcase.active) return; // blocked while item showcase is playing
+        const node = (typeof DIALOGUE_DATA !== 'undefined') ? DIALOGUE_DATA[_cs.currentNodeId] : null;
+        if (!node) { if (typeof _cs.onComplete === 'function') _cs.onComplete(); return; }
+        if (node.options) return; // waiting for player to pick a node option
+        if (node.next_id) {
+            _cs.currentNodeId = node.next_id;
+            _csLastNodeId = null; // force re-sync
+        } else if (typeof _cs.onComplete === 'function') {
+            _cs.onComplete();
+        }
+        return;
+    }
+
+    // ── Legacy array mode ────────────────────────────────────────────────────
     if (_cs.index < _cs.lines.length - 1) {
         _cs.index++;
     } else if (_cs.choices && _cs.choices.length > 0) {
         _cs.showingChoices = true;
     } else if (typeof _cs.onComplete === 'function') {
-        // Call onComplete directly — it manages its own triggerTransition.
-        // IMPORTANT: do NOT wrap here. A nested triggerTransition is silently
-        // blocked because globalFade.isFading is still true at callback time,
-        // which would leave the game permanently stuck in STATE_CUTSCENE.
         _cs.onComplete();
     }
 }
@@ -357,16 +470,60 @@ function drawCutsceneScreen() {
     push();
     colorMode(RGB, 255);
 
-    // 1. Render background
-    _drawCutsceneBg();
+    // Pre-sync bg from current node (node mode only)
+    if (_cs.isNodeMode && _cs.currentNodeId && typeof DIALOGUE_DATA !== 'undefined') {
+        const _pn = DIALOGUE_DATA[_cs.currentNodeId];
+        if (_pn && _pn.bg) _cs.bg = _pn.bg;
+    }
 
-    // 2. Initialise the shared DialogueBox in persistent (manual-advance) mode
+    // 1. Background (with screen-effect transforms inside their own push/pop)
+    push();
+    _tickAndApplyScreenEffect();
+    _drawCutsceneBg();
+    pop();
+
+    // 2. Flash overlay (full-screen, outside the shake/dizzy transform)
+    _drawFlashOverlay();
+
+    // 3. Ensure DialogueBox exists
     if (!_csBox) {
         _csBox = new DialogueBox();
         _csBox.persistent = true;
         _csBox.onOptionSelect = _onInlineOptionSelected;
     }
 
+    // ── Node-based mode ────────────────────────────────────────────────────────
+    if (_cs.isNodeMode) {
+        if (_cs.currentNodeId && _cs.currentNodeId !== _csLastNodeId) {
+            const node = (typeof DIALOGUE_DATA !== 'undefined') ? DIALOGUE_DATA[_cs.currentNodeId] : null;
+            if (node) {
+                const { text, highlight } = _parseContent(node.content);
+                const assetKey = node.speaker ? (SPEAKER_PORTRAIT_MAP[node.speaker] || null) : null;
+                const portrait = (assetKey && typeof assets !== 'undefined' && assets[assetKey])
+                    ? assets[assetKey] : null;
+                _csBox.trigger(text, portrait, node.speaker || null, node.options || null, highlight);
+                if (node.sfx && typeof playSFX === 'function') playSFX(node.sfx);
+                if (node.effect && _EFFECT_DURATION[node.effect]) {
+                    _screenEffect.type  = node.effect;
+                    _screenEffect.timer = _EFFECT_DURATION[node.effect];
+                }
+                if (node.event === 'showcase' && node.item_id) {
+                    _showcase.active        = true;
+                    _showcase.itemName      = node.item_id;
+                    _showcase.timer         = 120;
+                    _showcase.pendingNextId = node.next_id || null;
+                }
+                _csLastNodeId = _cs.currentNodeId;
+            }
+        }
+        _csBox.display();
+        _drawItemToast();
+        _drawItemShowcase();
+        pop();
+        return;
+    }
+
+    // ── Legacy array mode ─────────────────────────────────────────────────────
     if (_cs.lines.length === 0) { pop(); return; }
 
     if (!_cs.showingChoices) {
@@ -375,16 +532,21 @@ function drawCutsceneScreen() {
             let line = _cs.lines[_cs.index];
             let assetKey = SPEAKER_PORTRAIT_MAP[line.speaker];
             let portrait = (assetKey && assets[assetKey]) ? assets[assetKey] : null;
-            _csBox.trigger(line.text, portrait, line.speaker, line.options || null, line.highlight || null);
+            // Support <h>word</h> syntax in legacy array lines (same as node mode)
+            let lineText = line.text || '';
+            let lineHl   = line.highlight || null;
+            if (lineText.includes('<h>')) {
+                const parsed = _parseContent([lineText]);
+                lineText = parsed.text;
+                lineHl   = parsed.highlight;
+            }
+            _csBox.trigger(lineText, portrait, line.speaker, line.options || null, lineHl);
             _csLastSyncIndex = _cs.index;
-            // Fire onShow events (e.g. item received toast)
             if (line.onShow && line.onShow.type === 'item_received') {
                 _showItemToast(line.onShow.name);
             }
         }
         _csBox.display();
-
-        // "CLICK TO CONTINUE" is now rendered inside DialogueBox below the arrow indicator.
 
     } else {
         // Show the last line in the box (still visible), overlay choice buttons
@@ -430,7 +592,39 @@ function _drawCutsceneBg() {
         }
         noStroke(); fill(0, 0, 0, 100); rectMode(CORNER); rect(0, 0, width, height);
 
-    } else { // 'library'
+    } else if (_cs.bg === 'balloon_festival' || _cs.bg === 'ashton_court') {
+        let img = (typeof assets !== 'undefined') ? (assets.csBalloonFestivalBg || null) : null;
+        if (img) { let bgS = max(width/img.width, height/img.height); imageMode(CENTER); image(img, width/2, height/2, img.width*bgS, img.height*bgS); }
+        else { background(100, 130, 180); }
+        noStroke(); fill(0, 0, 0, 60); rectMode(CORNER); rect(0, 0, width, height);
+
+    } else if (_cs.bg === 'operating_theatre' || _cs.bg === 'hospital_limbo') {
+        let img = (typeof assets !== 'undefined') ? (assets.csOperatingTheatreBg || null) : null;
+        if (img) { let bgS = max(width/img.width, height/img.height); imageMode(CENTER); image(img, width/2, height/2, img.width*bgS, img.height*bgS); }
+        else { background(220, 230, 240); }
+        noStroke(); fill(0, 0, 0, 80); rectMode(CORNER); rect(0, 0, width, height);
+
+    } else if (_cs.bg === 'bus') {
+        let img = (typeof assets !== 'undefined') ? (assets.csBusBg || null) : null;
+        if (img) { let bgS = max(width/img.width, height/img.height); imageMode(CENTER); image(img, width/2, height/2, img.width*bgS, img.height*bgS); }
+        else { background(20, 20, 30); }
+        noStroke(); fill(0, 0, 0, 60); rectMode(CORNER); rect(0, 0, width, height);
+
+    } else if (_cs.bg === 'phone') {
+        // Bus interior + phone overlay centred
+        let busBg = (typeof assets !== 'undefined') ? (assets.csBusBg || null) : null;
+        if (busBg) { let bgS = max(width/busBg.width, height/busBg.height); imageMode(CENTER); image(busBg, width/2, height/2, busBg.width*bgS, busBg.height*bgS); }
+        else { background(20, 20, 30); }
+        noStroke(); fill(0, 0, 0, 70); rectMode(CORNER); rect(0, 0, width, height);
+        let phoneImg = (typeof assets !== 'undefined') ? (assets.csPhoneImg || null) : null;
+        if (phoneImg) {
+            const maxH = height * 0.80;
+            const ratio = min(maxH / phoneImg.height, (width * 0.55) / phoneImg.width);
+            imageMode(CENTER);
+            image(phoneImg, width/2, height/2, phoneImg.width*ratio, phoneImg.height*ratio);
+        }
+
+    } else { // 'library' (default)
         let img = (typeof assets !== 'undefined')
             ? (assets.csLibraryBg || assets.libraryBg || null) : null;
         if (img) {
@@ -442,6 +636,77 @@ function _drawCutsceneBg() {
         }
         noStroke(); fill(0, 0, 0, 100); rectMode(CORNER); rect(0, 0, width, height);
     }
+}
+
+// ─── SCREEN-EFFECT & SHOWCASE HELPERS ──────────────────────────────────────────
+
+/** Applies shake/dizzy transform to the current drawing context (must be inside push/pop). */
+function _tickAndApplyScreenEffect() {
+    if (!_screenEffect.type || _screenEffect.timer <= 0) return;
+    _screenEffect.timer--;
+    if (_screenEffect.timer <= 0) { _screenEffect.type = null; return; }
+    const t = _screenEffect.timer;
+    if (_screenEffect.type === 'shake') {
+        const intensity = map(t, _EFFECT_DURATION.shake, 0, 8, 0) * min(width / 1920, height / 1080);
+        translate(random(-intensity, intensity), random(-intensity, intensity));
+    } else if (_screenEffect.type === 'dizzy') {
+        const prog = t / _EFFECT_DURATION.dizzy;
+        const ecx = width / 2, ecy = height / 2;
+        translate(ecx, ecy);
+        rotate(sin(frameCount * 0.08) * 0.04 * prog);
+        scale(1 + sin(frameCount * 0.07) * 0.015 * prog);
+        translate(-ecx, -ecy);
+    }
+}
+
+/** Draws a white fading overlay for the 'flash' effect (outside any transform). */
+function _drawFlashOverlay() {
+    if (_screenEffect.type !== 'flash' || _screenEffect.timer <= 0) return;
+    const a = constrain(map(_screenEffect.timer, _EFFECT_DURATION.flash, 0, 255, 0), 0, 255);
+    noStroke(); fill(255, 255, 255, a); rectMode(CORNER); rect(0, 0, width, height);
+}
+
+/** Draws the center-screen item showcase and auto-advances when done. */
+function _drawItemShowcase() {
+    if (!_showcase.active) return;
+    _showcase.timer--;
+    if (_showcase.timer <= 0) {
+        _showcase.active = false;
+        if (_showcase.itemName) _showItemToast(_showcase.itemName);
+        if (_showcase.pendingNextId) {
+            _cs.currentNodeId = _showcase.pendingNextId;
+            _csLastNodeId = null;
+        } else if (typeof _cs.onComplete === 'function') {
+            _cs.onComplete();
+        }
+        return;
+    }
+    const t = _showcase.timer;
+    let a;
+    if (t > 105) a = map(t, 120, 105, 0, 255);
+    else if (t < 30) a = map(t, 30, 0, 255, 0);
+    else a = 255;
+
+    push();
+    colorMode(RGB, 255);
+    noStroke(); fill(0, 0, 0, 140 * (a / 255)); rectMode(CORNER); rect(0, 0, width, height);
+    const itemImg = _getItemImage(_showcase.itemName);
+    if (itemImg) {
+        const maxSide = min(width, height) * 0.45;
+        const ratio   = min(maxSide / itemImg.width, maxSide / itemImg.height);
+        imageMode(CENTER);
+        tint(255, a);
+        image(itemImg, width / 2, height / 2, itemImg.width * ratio, itemImg.height * ratio);
+        noTint();
+    }
+    const s = min(width / 1920, height / 1080);
+    let fDB = (typeof fonts !== 'undefined') ? (fonts.jersey20 || fonts.body || null) : null;
+    if (fDB) textFont(fDB);
+    textSize(42 * s);
+    textAlign(CENTER, TOP);
+    noStroke(); fill(255, 215, 0, a);
+    text(_showcase.itemName, width / 2, height / 2 + min(width, height) * 0.25);
+    pop();
 }
 
 // ─── CHOICE BUTTONS ────────────────────────────────────────────────────────────
