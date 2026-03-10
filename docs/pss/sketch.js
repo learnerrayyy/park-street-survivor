@@ -1611,6 +1611,12 @@ function handleRestartChoice() {
             showRestartChoice = false;
 
             player.applyLevelStats(currentDayID);
+            if (backpackUI) {
+                backpackUI.resetForNewDay();
+                if (typeof backpackUI.restoreRunSnapshot === "function") {
+                    backpackUI.restoreRunSnapshot();
+                }
+            }
             if (typeof player.restoreUtilityItemFromRunSnapshot === "function") {
                 player.restoreUtilityItemFromRunSnapshot();
             }
@@ -1980,7 +1986,12 @@ function setupRunDirectly(dayID, runMode = RUN_MODE_STORY) {
     levelController.initializeLevel(dayID);
 
     if (typeof tutorialHints !== 'undefined') tutorialHints.roomPhase = 'DONE';
-    if (backpackUI) backpackUI.resetForNewDay();
+    if (backpackUI) {
+        backpackUI.resetForNewDay();
+        if (typeof backpackUI.restoreRunSnapshot === "function") {
+            backpackUI.restoreRunSnapshot();
+        }
+    }
     clearItemToast();
     if (endScreenManager) endScreenManager._activeScreen = null;
 

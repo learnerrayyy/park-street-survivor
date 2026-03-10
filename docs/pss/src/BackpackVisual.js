@@ -174,6 +174,32 @@ class BackpackVisual {
     }
 
     /**
+     * Persists the current packed-slot selection as the authoritative run start.
+     */
+    saveRunSnapshot() {
+        if (typeof gameState !== "undefined" && gameState &&
+            typeof gameState.saveRunBackpackSnapshot === "function") {
+            gameState.saveRunBackpackSnapshot(this.topSlots);
+        }
+    }
+
+    /**
+     * Rebuilds the backpack from the saved run snapshot after a restart.
+     */
+    restoreRunSnapshot() {
+        if (typeof gameState === "undefined" || !gameState) return;
+
+        const savedSlots = Array.isArray(gameState.runBackpackTopSlots)
+            ? gameState.runBackpackTopSlots.slice(0, 3)
+            : [];
+
+        while (savedSlots.length < 3) savedSlots.push(null);
+        this.topSlots = savedSlots;
+        this._packedNpcItem = this._getPackedNpcItem();
+        this.initScatteredItems();
+    }
+
+    /**
      * Called when the backpack is closed externally (e.g. ESC key).
      * Clears any active dialogue and the packing-done lock so they don't
      * persist and reappear on the next entry.

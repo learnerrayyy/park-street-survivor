@@ -20,6 +20,7 @@ class GameState {
         this.runUtilityItemName = null;
         this.runUtilityItemCharges = 0;
         this.runUtilityItemArmed = false;
+        this.runBackpackTopSlots = [null, null, null];
     }
 
     /**
@@ -100,5 +101,18 @@ class GameState {
         this.runUtilityItemName = null;
         this.runUtilityItemCharges = 0;
         this.runUtilityItemArmed = false;
+        this.runBackpackTopSlots = [null, null, null];
+    }
+
+    /**
+     * Saves the packed backpack slots for the current run so restart can rebuild
+     * the same room selection with fresh item state.
+     */
+    saveRunBackpackSnapshot(topSlots) {
+        const source = Array.isArray(topSlots) ? topSlots : [];
+        this.runBackpackTopSlots = source.slice(0, 3);
+        while (this.runBackpackTopSlots.length < 3) {
+            this.runBackpackTopSlots.push(null);
+        }
     }
 }

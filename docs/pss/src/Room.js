@@ -196,6 +196,10 @@ class RoomScene {
                     player.syncUtilityItemFromBackpack();
                 }
             }
+            if (typeof backpackUI !== 'undefined' && backpackUI &&
+                typeof backpackUI.saveRunSnapshot === "function") {
+                backpackUI.saveRunSnapshot();
+            }
             if (typeof startRoomExitRunSequence === 'function') {
                 startRoomExitRunSequence();
             } else {
