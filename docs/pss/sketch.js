@@ -589,7 +589,7 @@ function preload() {
 
     sfxSelect = loadSound('assets/audio/effects/Select.wav', itemLoaded);
     sfxClick = loadSound('assets/audio/effects/Click.wav', itemLoaded);
-    sfxDialogue = loadSound('assets/audio/effects/Dialogue.mp3', itemLoaded);
+    sfxDialogue = loadSound('assets/audio/effects/DIalogue.mp3', itemLoaded);
     sfxHitBigCar = loadSound('assets/audio/effects/HitBigCar.mp3', itemLoaded);
     sfxHitSmallCar = loadSound('assets/audio/effects/HitSmallCar.mp3', itemLoaded);
     sfxPickupCoffee = loadSound('assets/audio/effects/CoffeeDrink.wav', itemLoaded);
